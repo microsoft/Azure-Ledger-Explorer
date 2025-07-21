@@ -19,6 +19,7 @@ import {
   Dismiss24Regular,
 } from '@fluentui/react-icons';
 import { FileUploadArea } from './FileUploadArea';
+import { LedgerBackupView } from './LedgerBackupView';
 
 const useStyles = makeStyles({
   wizardDialog: {
@@ -122,7 +123,6 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    height: '300px',
     textAlign: 'center',
     color: 'var(--colorNeutralForeground3)',
   },
@@ -141,7 +141,6 @@ export interface AddFilesWizardProps {
 export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChange }) => {
   const styles = useStyles();
   const [selectedTab, setSelectedTab] = useState<string>('local');
-
   const renderMarkdownContent = (content: string) => {
     return content.split('\n\n').map((paragraph, index) => {
       if (paragraph.startsWith('### ')) {
@@ -203,7 +202,6 @@ Core Transparency Service provides transparency and auditability for software su
 ### Coming Soon
           `.trim(),
         };
-
       case 'local':
       default:
         return {
@@ -256,11 +254,12 @@ The system will check for:
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'azure':
+        return <LedgerBackupView />;
       case 'cts':
         return (
           <div className={styles.emptyTabContent}>
             <div className={styles.comingSoonIcon}>
-              {selectedTab === 'azure' ? <CloudRegular /> : <ShieldCheckmarkRegular />}
+              { <ShieldCheckmarkRegular />}
             </div>
             <Text size={500} weight="semibold">
               Coming Soon
@@ -270,7 +269,6 @@ The system will check for:
             </Caption1>
           </div>
         );
-
       case 'local':
       default:
         return <FileUploadArea />;

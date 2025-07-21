@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/storage-file-share": "^12.27.0",
     "@fluentui/react-components": "^9.66.6",
     "@fluentui/react-icons": "^2.0.305",
     "@sqlite.org/sqlite-wasm": "^3.50.1-build1",
