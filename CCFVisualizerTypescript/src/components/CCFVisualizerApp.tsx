@@ -17,7 +17,6 @@ import {
   DataGridCell,
   DataGridBody,
   Badge,
-  Tooltip,
   Button,
   createTableColumn,
 } from '@fluentui/react-components';
@@ -38,6 +37,9 @@ import {
   useStorageQuota
 } from '../hooks/use-ccf-data';
 import { FileUploadArea } from './FileUploadArea';
+import { LedgerVisualization } from './LedgerVisualization';
+import type { TransactionType } from '../utils/transaction-classification';
+import { filterTransactionsByTypes } from '../utils/transaction-classification';
 import { EntryType } from '../types/ccf-types';
 
 
@@ -228,6 +230,11 @@ const useStyles = makeStyles({
     fontSize: '13px',
     color: 'var(--colorNeutralForeground2)',
   },
+  visualizationContainer: {
+    padding: '16px 24px',
+    borderBottom: '1px solid var(--colorNeutralStroke2)',
+    backgroundColor: 'var(--colorNeutralBackground1)',
+  },
 });
 
 // Helper function to format entry type
@@ -259,6 +266,7 @@ export const CCFVisualizerApp: React.FC = () => {
   const [transactionPage, setTransactionPage] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(250); // Default sidebar width
   const [isResizing, setIsResizing] = useState(false);
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<Set<TransactionType>>(new Set());
   const pageSize = 50;
   
   const { data: stats } = useStats();
@@ -281,8 +289,11 @@ export const CCFVisualizerApp: React.FC = () => {
   );
   
   // Use the appropriate data source
-  const transactions = selectedFileId && !searchQuery ? fileTransactions : allTransactions;
+  const rawTransactions = selectedFileId && !searchQuery ? fileTransactions : allTransactions;
   const transactionsLoading = selectedFileId && !searchQuery ? fileTransactionsLoading : allTransactionsLoading;
+  
+  // Apply type filtering to transactions
+  const transactions = rawTransactions ? filterTransactionsByTypes(rawTransactions, selectedTypeFilters) : rawTransactions;
   
   // Get total count based on current view
   const { data: fileTransactionsCount } = useFileTransactionsCount(selectedFileId || 0);
@@ -411,25 +422,25 @@ export const CCFVisualizerApp: React.FC = () => {
     createTableColumn<TransactionRow>({
       columnId: 'sequence',
       compare: (a, b) => a.sequenceNumber - b.sequenceNumber,
-      renderHeaderCell: () => 'Sequence',
+      renderHeaderCell: () => 'Sequence #',
       renderCell: (item) => (
         <div className={styles.monoFontMedium}>
-          #{item.sequenceNumber}
+          #{item.id}
         </div>
       ),
     }),
-    createTableColumn<TransactionRow>({
-      columnId: 'file',
-      compare: (a, b) => a.fileName.localeCompare(b.fileName),
-      renderHeaderCell: () => 'File',
-      renderCell: (item) => (
-        <Tooltip content={item.fileName} relationship="label">
-          <div className={styles.fileNameTooltip}>
-            {item.fileName}
-          </div>
-        </Tooltip>
-      ),
-    }),
+    // createTableColumn<TransactionRow>({
+    //   columnId: 'file',
+    //   compare: (a, b) => a.fileName.localeCompare(b.fileName),
+    //   renderHeaderCell: () => 'File',
+    //   renderCell: (item) => (
+    //     <Tooltip content={item.fileName} relationship="label">
+    //       <div className={styles.fileNameTooltip}>
+    //         {item.fileName}
+    //       </div>
+    //     </Tooltip>
+    //   ),
+    // }),
     createTableColumn<TransactionRow>({
       columnId: 'type',
       compare: (a, b) => a.entryType - b.entryType,
@@ -438,16 +449,6 @@ export const CCFVisualizerApp: React.FC = () => {
         <Badge appearance="outline" size="small">
           {getEntryTypeLabel(item.entryType)}
         </Badge>
-      ),
-    }),
-    createTableColumn<TransactionRow>({
-      columnId: 'version',
-      compare: (a, b) => a.txVersion - b.txVersion,
-      renderHeaderCell: () => 'Version',
-      renderCell: (item) => (
-        <div className={styles.monoFont}>
-          {item.txVersion}
-        </div>
       ),
     }),
     createTableColumn<TransactionRow>({
@@ -613,6 +614,19 @@ export const CCFVisualizerApp: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Ledger Visualization */}
+          {rawTransactions && rawTransactions.length > 0 && (
+            <div className={styles.visualizationContainer}>
+              <LedgerVisualization
+                transactions={rawTransactions}
+                isLoading={fileTransactionsLoading || allTransactionsLoading}
+                maxTransactions={500}
+                selectedTypeFilters={selectedTypeFilters}
+                onFilterChange={setSelectedTypeFilters}
+              />
+            </div>
+          )}
 
           {/* Transaction Table */}
           <div className={styles.tableContainer}>
