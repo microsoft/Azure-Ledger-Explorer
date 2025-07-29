@@ -158,6 +158,7 @@ const useStyles = makeStyles({
 
 export const FileUploadArea: React.FC = () => {
   const styles = useStyles();
+  const localFileUpload = false; // Enable local file upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
@@ -301,7 +302,7 @@ export const FileUploadArea: React.FC = () => {
       )}
 
       {/* File Sequence Info */}
-      {ledgerFiles && ledgerFiles.length > 0 && (
+      {localFileUpload &&  ledgerFiles && ledgerFiles.length > 0 && (
         <div className={styles.fileSequenceInfo}>
           <Text size={300} weight="semibold" style={{ marginBottom: '8px' }}>
             Current Sequence:
@@ -334,7 +335,7 @@ export const FileUploadArea: React.FC = () => {
       )}
 
       {/* Recently Uploaded Files */}
-      {ledgerFiles && ledgerFiles.length > 0 && (
+      {localFileUpload && ledgerFiles && ledgerFiles.length > 0 && (
         <div className={styles.recentFiles}>
           <Text size={600} weight="semibold">
             Ledger Files ({ledgerFiles.length}) - Sequential Order
