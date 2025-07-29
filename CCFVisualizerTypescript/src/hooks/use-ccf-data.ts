@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CCFDatabase } from '../database/ccf-database';
 import { LedgerChunkV2 } from '../parser/ledger-chunk';
 import type { Transaction } from '../types/ccf-types';
+import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 
 // Global database instance (singleton pattern)
 let dbInstance: CCFDatabase | null = null;
@@ -431,5 +432,41 @@ export const useDatabase = () => {
     queryKey: ['database'],
     queryFn: getDatabase,
     staleTime: Infinity, // Database instance doesn't change once created
+  });
+};
+
+/**
+ * Hook to get storage quota information
+ */
+export const useStorageQuota = () => {
+  return useQuery({
+    queryKey: ['storageQuota'],
+    queryFn: getStorageQuota,
+    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 10000, // Consider stale after 10 seconds
+  });
+};
+
+/**
+ * Hook to check storage capacity for a specific size
+ */
+export const useStorageCapacity = (requiredBytes: number) => {
+  return useQuery({
+    queryKey: ['storageCapacity', requiredBytes],
+    queryFn: () => checkStorageCapacity(requiredBytes),
+    enabled: requiredBytes > 0,
+    staleTime: 5000, // Consider stale after 5 seconds
+  });
+};
+
+/**
+ * Hook to estimate database size for transaction count
+ */
+export const useEstimateDatabaseSize = (transactionCount: number) => {
+  return useQuery({
+    queryKey: ['estimateDatabaseSize', transactionCount],
+    queryFn: () => estimateDatabaseSize(transactionCount),
+    enabled: transactionCount > 0,
+    staleTime: 60000, // Estimates don't change frequently
   });
 };

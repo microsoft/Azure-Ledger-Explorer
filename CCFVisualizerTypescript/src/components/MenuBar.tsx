@@ -32,6 +32,7 @@ import {
   useDropDatabase,
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from './AddFilesWizard';
+import { StorageVisualizer } from './StorageVisualizer';
 
 const useStyles = makeStyles({
   header: {
@@ -210,6 +211,15 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
                       <li>{stats.deleteCount} delete operation{stats.deleteCount !== 1 ? 's' : ''}</li>
                     </ul>
                     <Body1>This action cannot be undone.</Body1>
+                    
+                    {/* Storage Status */}
+                    <div style={{ marginTop: '16px' }}>
+                      <StorageVisualizer 
+                        title="Storage Impact" 
+                        showDetails={false}
+                        showRecommendations={false}
+                      />
+                    </div>
                   </DialogBody>
                   <DialogActions>
                     <DialogTrigger disableButtonEnhancement>
@@ -255,6 +265,15 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
                     This is more thorough than "Clear All Data" and will completely reset the database structure.
                     This action cannot be undone.
                   </Body1>
+                  
+                  {/* Storage Status */}
+                  <div style={{ marginTop: '16px' }}>
+                    <StorageVisualizer 
+                      title="Storage Recovery" 
+                      showDetails={false}
+                      showRecommendations={false}
+                    />
+                  </div>
                 </DialogBody>
                 <DialogActions>
                   <DialogTrigger disableButtonEnhancement>

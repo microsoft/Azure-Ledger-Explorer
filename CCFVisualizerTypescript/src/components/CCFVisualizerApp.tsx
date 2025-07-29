@@ -34,10 +34,12 @@ import {
   useFileTransactions,
   useFileTransactionsCount,
   useAllTransactions,
-  useAllTransactionsCount 
+  useAllTransactionsCount,
+  useStorageQuota
 } from '../hooks/use-ccf-data';
 import { FileUploadArea } from './FileUploadArea';
 import { EntryType } from '../types/ccf-types';
+
 
 const useStyles = makeStyles({
   container: {
@@ -262,6 +264,7 @@ export const CCFVisualizerApp: React.FC = () => {
   const { data: stats } = useStats();
   const { data: ledgerFiles } = useLedgerFiles();
   const { isUploading, uploadError } = useFileDrop();
+  const { data: storageInfo } = useStorageQuota();
   
   // Get file-specific transactions if a file is selected
   const { data: fileTransactions, isLoading: fileTransactionsLoading } = useFileTransactions(
@@ -700,6 +703,9 @@ export const CCFVisualizerApp: React.FC = () => {
           {totalTransactions && totalTransactions > pageSize && ` of ${totalTransactions}`} transactions
           {selectedFileId && ledgerFiles && (
             <> • Selected: {ledgerFiles.find(f => f.id === selectedFileId)?.filename}</>
+          )}
+          {storageInfo?.quota && (
+            <> • Storage: {formatBytes(storageInfo.quota.usage)} / {formatBytes(storageInfo.quota.quota)} used ({storageInfo.quota.usagePercentage.toFixed(1)}%)</>
           )}
         </Caption1>
       </footer>
