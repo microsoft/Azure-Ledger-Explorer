@@ -231,7 +231,7 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
   const styles = useStyles();
   const [config, setConfig] = useState<ChatConfig>({
     baseUrl: localStorage.getItem('chat_base_url') || '',
-    systemPrompt: localStorage.getItem('chat_system_prompt') || '',
+    systemPrompt: localStorage.getItem('chat_system_prompt') || defaultSystemPrompt,
   });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -422,6 +422,10 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
             }
           />
           <div className={styles.configContent}>
+            <Text size={200} className={styles.helpText}>
+              Configuration for the AI chat assistant. Set the base URL for the OpenAI API and the system prompt.
+            </Text>
+
             <Field label="Base URL">
               <Input
                 type="url"
@@ -430,14 +434,15 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
                 onChange={(_, data) => setConfig(prev => ({ ...prev, baseUrl: data.value }))} />
             </Field>
 
-            <Divider />
+            <Field label="System prompt">
+              <Textarea
+                resize='vertical'
+                placeholder="Enter system prompt"
+                value={config.systemPrompt}
+                onChange={(_, data) => setConfig(prev => ({ ...prev, systemPrompt: data.value }))} />
+            </Field>
 
-            <div>
-              <Text size={200} className={styles.helpText}>
-                The AI can query your CCF database to answer questions about transactions, 
-                key-value operations, and ledger statistics.
-              </Text>
-            </div>
+            <Divider />
 
             <Button onClick={clearChat} appearance="outline">
               Clear Chat
