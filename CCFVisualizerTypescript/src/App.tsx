@@ -9,6 +9,7 @@ import StatsPage from './pages/StatsPage';
 import { AIPage } from './pages/AIPage';
 import { MenuBar } from './components/MenuBar';
 import GridLayout from './components/AppLayout';
+import { ConfigPage } from './pages/ConfigPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -54,6 +55,7 @@ function App() {
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/ai" element={<AIPage />} />
                 <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
+                <Route path="/config" element={<ConfigPage />} />
               </Routes>
             </GridLayout.Main>
           </GridLayout>

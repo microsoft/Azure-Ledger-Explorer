@@ -25,6 +25,7 @@ import {
   DatabaseRegular,
   NumberSymbolRegular,
   Bot24Regular,
+  Settings24Regular,
 } from '@fluentui/react-icons';
 import { 
   useStats, 
@@ -124,6 +125,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       navigate('/stats');
     } else if (tabValue === 'ai') {
       navigate('/ai');
+    } else if (tabValue === 'config') {
+      navigate('/config');
     }
   };
 
@@ -156,6 +159,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
             </Tab>
             <Tab value="ai" icon={<Bot24Regular />}>
               AI Assistant
+            </Tab>
+            <Tab value="config" icon={<Settings24Regular />}>
+              Configuration
             </Tab>
           </TabList>
         </div>

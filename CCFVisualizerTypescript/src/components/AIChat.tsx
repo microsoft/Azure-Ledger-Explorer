@@ -24,7 +24,8 @@ import {
   Person24Regular,
 } from '@fluentui/react-icons';
 import { CCFDatabase } from '../database/ccf-database';
-import defaultSystemPrompt from '../assets/defaultSystemPrompt.md?raw';
+import { useConfig } from '../pages/ConfigPage';
+
 
 interface ChatMessage {
   id: string;
@@ -37,11 +38,6 @@ interface ChatMessage {
   error?: string;
 }
 
-interface ChatConfig {
-  baseUrl: string;
-  systemPrompt: string;
-}
-
 interface AIChatProps {
   database: CCFDatabase;
 }
@@ -50,34 +46,18 @@ const useStyles = makeStyles({
   container: {
     display: 'flex',
     height: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     ...shorthands.gap('16px'),
     ...shorthands.overflow('hidden'),
   },
-  leftPane: {
-    width: '300px',
-    ...shorthands.borderRight('1px', 'solid', tokens.colorNeutralStroke2),
-    flexShrink: 0,
-    ...shorthands.padding('16px'),
-    backgroundColor: tokens.colorNeutralBackground2,
-    overflowY: 'auto',
-  },
-  configHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    ...shorthands.gap('8px'),
-  },
-  configContent: {
-    ...shorthands.padding('16px'),
-    display: 'flex',
-    flexDirection: 'column',
-    ...shorthands.gap('16px'),
-  },
-  rightPane: {
+  chatPane: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     ...shorthands.padding('16px'),
     minWidth: 0,
+    maxWidth: '800px',
     overflowY: 'auto',
   },
   chatCard: {
@@ -229,10 +209,8 @@ const useStyles = makeStyles({
 
 export const AIChat: React.FC<AIChatProps> = ({ database }) => {
   const styles = useStyles();
-  const [config, setConfig] = useState<ChatConfig>({
-    baseUrl: localStorage.getItem('chat_base_url') || '',
-    systemPrompt: localStorage.getItem('chat_system_prompt') || defaultSystemPrompt,
-  });
+  const { config } = useConfig(); 
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -244,18 +222,8 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Save config to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('chat_base_url', config.baseUrl);
-    if (config.systemPrompt) {
-      localStorage.setItem('chat_system_prompt', config.systemPrompt);
-    } else {
-      localStorage.setItem('chat_system_prompt', defaultSystemPrompt);
-    }
-  }, [config]);
-
   const getSystemPrompt = () => {
-      return config.systemPrompt || defaultSystemPrompt;
+      return config.systemPrompt;
   };
 
   const executeQuery = async (sqlQuery: string): Promise<unknown[]> => {
@@ -410,49 +378,9 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
 
   return (
     <div className={styles.container}>
-      {/* Left Pane - Configuration */}
-      <div className={styles.leftPane}>
-        <Card>
-          <CardHeader
-            header={
-              <div className={styles.configHeader}>
-                <Settings24Regular />
-                <Text weight="semibold">AI Configuration</Text>
-              </div>
-            }
-          />
-          <div className={styles.configContent}>
-            <Text size={200} className={styles.helpText}>
-              Configuration for the AI chat assistant. Set the base URL for the OpenAI API and the system prompt.
-            </Text>
-
-            <Field label="Base URL">
-              <Input
-                type="url"
-                placeholder="https://xyz.cognitiveservices.azure.com/"
-                value={config.baseUrl}
-                onChange={(_, data) => setConfig(prev => ({ ...prev, baseUrl: data.value }))} />
-            </Field>
-
-            <Field label="System prompt">
-              <Textarea
-                resize='vertical'
-                placeholder="Enter system prompt"
-                value={config.systemPrompt}
-                onChange={(_, data) => setConfig(prev => ({ ...prev, systemPrompt: data.value }))} />
-            </Field>
-
-            <Divider />
-
-            <Button onClick={clearChat} appearance="outline">
-              Clear Chat
-            </Button>
-          </div>
-        </Card>
-      </div>
 
       {/* Right Pane - Chat Interface */}
-      <div className={styles.rightPane}>
+      <div className={styles.chatPane}>
         <Card className={styles.chatCard}>
           <CardHeader
             header={
@@ -463,6 +391,12 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
                   <Database24Regular />
                   <span className={styles.badgeText}>SQL Enabled</span>
                 </Badge>
+
+                { error || messages.length > 0 ? (
+                  <Button onClick={clearChat} appearance="outline">
+                    New conversation
+                  </Button>
+                ) : null }
               </div>
             }
           />
