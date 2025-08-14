@@ -227,30 +227,22 @@ export const CCFVisualizerApp: React.FC = () => {
     }
   }, [ledgerFiles, selectedFileId]);
   
-  // Get file-specific transactions (simplified - always use file-based data)
+  // Get file-specific transactions with server-side search
   const { data: fileTransactions, isLoading: fileTransactionsLoading } = useFileTransactions(
     selectedFileId || 0, 
     pageSize, 
-    transactionPage * pageSize
+    transactionPage * pageSize,
+    searchQuery || undefined
   );
   
-  // Get transaction count for the selected file
-  const { data: fileTransactionsCount } = useFileTransactionsCount(selectedFileId || 0);
+  // Get transaction count for the selected file with search
+  const { data: fileTransactionsCount } = useFileTransactionsCount(
+    selectedFileId || 0, 
+    searchQuery || undefined
+  );
   
-  // Apply search filtering if there's a query
-  const searchFilteredTransactions = React.useMemo(() => {
-    if (!fileTransactions || !searchQuery) return fileTransactions;
-    
-    return fileTransactions.filter(transaction => 
-      transaction.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      transaction.id.toString().includes(searchQuery) ||
-      transaction.version.toString().includes(searchQuery) ||
-      (transaction.mapName && transaction.mapName.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [fileTransactions, searchQuery]);
-  
-  // Apply type filtering to transactions
-  const transactions = searchFilteredTransactions ? filterTransactionsByTypes(searchFilteredTransactions, selectedTypeFilters) : searchFilteredTransactions;
+  // Apply only type filtering to transactions (search is now server-side)
+  const transactions = fileTransactions ? filterTransactionsByTypes(fileTransactions, selectedTypeFilters) : fileTransactions;
   const transactionsLoading = fileTransactionsLoading;
   const totalTransactions = fileTransactionsCount;
 
@@ -266,9 +258,11 @@ export const CCFVisualizerApp: React.FC = () => {
       transactionsLoading,
       totalTransactions,
       hasData,
-      stats
+      stats,
+      currentPage: transactionPage + 1,
+      totalPages: Math.ceil((totalTransactions || 0) / pageSize)
     });
-  }, [selectedFileId, searchQuery, fileTransactions, transactions, transactionsLoading, totalTransactions, hasData, stats]);
+  }, [selectedFileId, searchQuery, fileTransactions, transactions, transactionsLoading, totalTransactions, hasData, stats, transactionPage]);
 
   const handleFileSelect = (fileId: number) => {
     setSelectedFileId(fileId);
@@ -282,7 +276,7 @@ export const CCFVisualizerApp: React.FC = () => {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setTransactionPage(0);
-    // Note: Search is now limited to the currently selected file's transactions
+    // Note: Search is now performed server-side with proper pagination
   };
 
   const handlePreviousPage = () => {

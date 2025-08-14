@@ -5,13 +5,9 @@ import {
   Label,
   Textarea,
   Select,
-  Card,
-  CardHeader,
-  CardFooter,
   Divider,
   Spinner,
   Text,
-  Badge,
   MessageBar,
   makeStyles,
   tokens,
@@ -20,7 +16,6 @@ import {
 import {
   Send24Regular,
   Settings24Regular,
-  Database24Regular,
   Bot24Regular,
   Person24Regular,
 } from '@fluentui/react-icons';
@@ -49,15 +44,17 @@ const useStyles = makeStyles({
   container: {
     display: 'flex',
     height: '100%',
+    minHeight: 0, // Critical for flex children to shrink
     ...shorthands.gap('16px'),
     ...shorthands.overflow('hidden'),
   },
   leftPane: {
-    width: '300px',
+    width: '280px',
     ...shorthands.borderRight('1px', 'solid', tokens.colorNeutralStroke2),
     flexShrink: 0,
     ...shorthands.padding('16px'),
     backgroundColor: tokens.colorNeutralBackground2,
+    overflowY: 'auto', // Allow left pane to scroll if content is too long
   },
   configHeader: {
     display: 'flex',
@@ -74,27 +71,32 @@ const useStyles = makeStyles({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.padding('16px'),
     minWidth: 0,
+    minHeight: 0, // Critical for flex child to shrink
+    overflow: 'hidden', // Ensure no overflow from the right pane
+    height: '100%', // Explicit height
   },
   chatCard: {
     flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  chatHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    ...shorthands.gap('8px'),
+    display: 'grid',
+    gridTemplateRows: '1fr auto', // Messages area takes remaining space, input area is auto-sized
+    overflow: 'hidden', // Critical for proper layout
+    minHeight: 0, // Allow flex child to shrink
+    height: '100%', // Explicit height
+    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    ...shorthands.borderRadius('8px'),
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   messagesArea: {
-    flex: 1,
-    ...shorthands.padding('16px'),
+    ...shorthands.padding('24px', '16px', '16px', '16px'),
     overflowY: 'auto',
+    overflowX: 'hidden',
     display: 'flex',
     flexDirection: 'column',
     ...shorthands.gap('16px'),
-    minHeight: 0,
+    minHeight: 0, // Critical for scrolling to work properly
+    height: '100%', // Take full available height in grid row
+    position: 'relative', // Ensure proper positioning context
   },
   welcomeContainer: {
     textAlign: 'center',
@@ -203,12 +205,20 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   errorContainer: {
-    ...shorthands.padding('0', '16px'),
+    ...shorthands.padding('8px', '16px', '0', '16px'),
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    right: 0,
+    zIndex: 10, // Ensure it appears above other content
   },
   inputArea: {
     display: 'flex',
     ...shorthands.gap('8px'),
     width: '100%',
+    ...shorthands.padding('16px'),
+    ...shorthands.borderTop('1px', 'solid', tokens.colorNeutralStroke2),
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   inputTextarea: {
     flex: 1,
@@ -218,9 +228,6 @@ const useStyles = makeStyles({
   helpText: {
     fontSize: '14px',
     color: tokens.colorNeutralForeground3,
-  },
-  badgeText: {
-    ...shorthands.margin('0', '0', '0', '4px'),
   },
 });
 
@@ -410,15 +417,11 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
     <div className={styles.container}>
       {/* Left Pane - Configuration */}
       <div className={styles.leftPane}>
-        <Card>
-          <CardHeader
-            header={
-              <div className={styles.configHeader}>
-                <Settings24Regular />
-                <Text weight="semibold">AI Configuration</Text>
-              </div>
-            }
-          />
+        <div>
+          <div className={styles.configHeader}>
+            <Settings24Regular />
+            <Text weight="semibold">Configuration</Text>
+          </div>
           <div className={styles.configContent}>
             <div>
               <Label htmlFor="api-key">OpenAI API Key</Label>
@@ -464,34 +467,21 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
               Clear Chat
             </Button>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Right Pane - Chat Interface */}
       <div className={styles.rightPane}>
-        <Card className={styles.chatCard}>
-          <CardHeader
-            header={
-              <div className={styles.chatHeader}>
-                <Bot24Regular />
-                <Text weight="semibold">CCF Ledger AI Assistant</Text>
-                <Badge appearance="outline" size="small">
-                  <Database24Regular />
-                  <span className={styles.badgeText}>SQL Enabled</span>
-                </Badge>
-              </div>
-            }
-          />
-
+        <div className={styles.chatCard}>
           {/* Messages Area */}
           <div className={styles.messagesArea}>
             {messages.length === 0 && (
               <div className={styles.welcomeContainer}>
                 <Bot24Regular className={styles.welcomeIcon} />
                 <div>
-                  <Text size={400} weight="semibold">Welcome to CCF Ledger AI</Text>
+                  <Text size={500} weight="semibold">CCF Ledger AI Assistant</Text>
                   <br />
-                  <Text size={200}>
+                  <Text size={300}>
                     Ask me anything about your CCF ledger data. I can write SQL queries to analyze 
                     transactions, key-value operations, and provide insights.
                   </Text>
@@ -568,17 +558,16 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className={styles.errorContainer}>
-              <MessageBar intent="error" onDismiss={() => setError(null)}>
-                {error}
-              </MessageBar>
-            </div>
-          )}
+          {/* Input Area with optional error display above it */}
+          <div style={{ position: 'relative' }}>
+            {error && (
+              <div className={styles.errorContainer}>
+                <MessageBar intent="error">
+                  {error}
+                </MessageBar>
+              </div>
+            )}
 
-          {/* Input Area */}
-          <CardFooter>
             <div className={styles.inputArea}>
               <Textarea
                 placeholder="Ask me about your CCF ledger data..."
@@ -596,8 +585,8 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
                 disabled={!currentMessage.trim() || isLoading || !config.apiKey}
               />
             </div>
-          </CardFooter>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

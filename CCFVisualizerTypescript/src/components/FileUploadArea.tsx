@@ -216,9 +216,9 @@ export const FileUploadArea: React.FC = () => {
     
     if (validation.isValid) {
       // Check storage capacity before proceeding
-      const totalSize = committedFiles.reduce((sum, file) => sum + file.size, 0);
-      const estimatedDBSize = estimateDatabaseSize(committedFiles.length * 1000);
-      const requiredStorage = totalSize + estimatedDBSize;
+      // const totalSize = committedFiles.reduce((sum, file) => sum + file.size, 0);
+      // const estimatedDBSize = estimateDatabaseSize(committedFiles.length * 1000);
+      //const requiredStorage = totalSize + estimatedDBSize;
       
       // Note: In a real implementation, you'd want to wait for storageCapacity to load
       // For now, we'll proceed optimistically and let the user see warnings in the UI

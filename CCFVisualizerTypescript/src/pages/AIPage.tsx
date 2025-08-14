@@ -9,6 +9,7 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     height: '100%',
     overflow: 'hidden',
+    minHeight: 0, // Critical for flex child to shrink
   },
   loadingContainer: {
     display: 'flex',
@@ -30,6 +31,8 @@ const useStyles = makeStyles({
   content: {
     flex: 1,
     overflow: 'hidden',
+    minHeight: 0, // Critical for flex child to shrink
+    height: '100%',
   },
 });
 

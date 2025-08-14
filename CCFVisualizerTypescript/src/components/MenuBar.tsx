@@ -25,6 +25,7 @@ import {
   DatabaseRegular,
   NumberSymbolRegular,
   Bot24Regular,
+  ShieldCheckmarkRegular,
 } from '@fluentui/react-icons';
 import { 
   useStats, 
@@ -112,6 +113,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       return 'stats';
     } else if (location.pathname.startsWith('/ai')) {
       return 'ai';
+    } else if (location.pathname.startsWith('/verification')) {
+      return 'verification';
     }
     return 'files';
   };
@@ -125,6 +128,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       navigate('/stats');
     } else if (tabValue === 'ai') {
       navigate('/ai');
+    } else if (tabValue === 'verification') {
+      navigate('/verification');
     }
   };
 
@@ -154,6 +159,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
             </Tab>
             <Tab value="stats" icon={<NumberSymbolRegular />}>
               Stats
+            </Tab>
+            <Tab value="verification" icon={<ShieldCheckmarkRegular />}>
+              Verification
             </Tab>
             <Tab value="ai" icon={<Bot24Regular />}>
               AI Assistant

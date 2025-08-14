@@ -434,7 +434,7 @@ export class CCFDatabase {
   /**
    * Get transactions for a specific file with full structure
    */
-  async getFileTransactions(fileId: number, limit = 100, offset = 0): Promise<Array<{
+  async getFileTransactions(fileId: number, limit = 100, offset = 0, searchQuery?: string): Promise<Array<{
     id: number;
     fileId: number;
     fileName: string;
@@ -450,7 +450,7 @@ export class CCFDatabase {
   }>> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const sql = `
+    let sql = `
       SELECT DISTINCT
         t.id, t.file_id, f.filename, t.version, t.flags, t.size,
         t.entry_type, t.tx_version, t.max_conflict_version,
@@ -460,11 +460,29 @@ export class CCFDatabase {
       FROM transactions t
       JOIN ledger_files f ON t.file_id = f.id
       WHERE t.file_id = ?
-      ORDER BY t.id
-      LIMIT ? OFFSET ?
     `;
 
-    const result = this.db.exec(sql, [fileId, limit, offset]);
+    const params: any[] = [fileId];
+
+    // Add search filtering if provided
+    if (searchQuery && searchQuery.trim()) {
+      sql += ` AND (
+        f.filename LIKE ? OR
+        CAST(t.id AS TEXT) LIKE ? OR
+        CAST(t.version AS TEXT) LIKE ? OR
+        EXISTS (
+          SELECT 1 FROM kv_writes kw 
+          WHERE kw.transaction_id = t.id AND kw.map_name LIKE ?
+        )
+      )`;
+      const searchPattern = `%${searchQuery.trim()}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    sql += ` ORDER BY t.id LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const result = this.db.exec(sql, params);
 
     if (result.length === 0) return [];
 
@@ -487,14 +505,34 @@ export class CCFDatabase {
   /**
    * Get total count of transactions for a specific file
    */
-  async getFileTransactionsCount(fileId: number): Promise<number> {
+  async getFileTransactionsCount(fileId: number, searchQuery?: string): Promise<number> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const result = this.db.exec(`
+    let sql = `
       SELECT COUNT(*) as count 
-      FROM transactions 
-      WHERE file_id = ?
-    `, [fileId]);
+      FROM transactions t
+      JOIN ledger_files f ON t.file_id = f.id
+      WHERE t.file_id = ?
+    `;
+
+    const params: any[] = [fileId];
+
+    // Add search filtering if provided
+    if (searchQuery && searchQuery.trim()) {
+      sql += ` AND (
+        f.filename LIKE ? OR
+        CAST(t.id AS TEXT) LIKE ? OR
+        CAST(t.version AS TEXT) LIKE ? OR
+        EXISTS (
+          SELECT 1 FROM kv_writes kw 
+          WHERE kw.transaction_id = t.id AND kw.map_name LIKE ?
+        )
+      )`;
+      const searchPattern = `%${searchQuery.trim()}%`;
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+    }
+
+    const result = this.db.exec(sql, params);
 
     if (result.length === 0 || result[0].values.length === 0) return 0;
 
@@ -1145,6 +1183,60 @@ export class CCFDatabase {
   }
 
   /**
+   * Get the total count of keys in the latest state of a CCF table/map with optional search
+   */
+  async getTableLatestStateCount(mapName: string, searchQuery?: string): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    let sql = `
+      WITH latest_versions AS (
+        SELECT 
+          key_name,
+          MAX(version) as max_version
+        FROM (
+          SELECT key_name, version FROM kv_writes WHERE map_name = ?
+          UNION ALL
+          SELECT key_name, version FROM kv_deletes WHERE map_name = ?
+        ) AS all_keys
+        GROUP BY key_name
+      ),
+      latest_operations AS (
+        SELECT 
+          lv.key_name,
+          COALESCE(w.value_text, NULL) as value_text,
+          lv.max_version as version,
+          COALESCE(w.transaction_id, d.transaction_id) as transaction_id,
+          CASE WHEN d.transaction_id IS NOT NULL THEN 1 ELSE 0 END as is_deleted
+        FROM latest_versions lv
+        LEFT JOIN kv_writes w ON lv.key_name = w.key_name 
+          AND lv.max_version = w.version 
+          AND w.map_name = ?
+        LEFT JOIN kv_deletes d ON lv.key_name = d.key_name 
+          AND lv.max_version = d.version 
+          AND d.map_name = ?
+      )
+      SELECT COUNT(*) as count
+      FROM latest_operations lo
+    `;
+
+    const params: unknown[] = [mapName, mapName, mapName, mapName];
+
+    if (searchQuery && searchQuery.trim()) {
+      sql += `
+        WHERE (
+          lo.key_name LIKE ? OR
+          (lo.value_text IS NOT NULL AND lo.value_text LIKE ?)
+        )
+      `;
+      const searchPattern = `%${searchQuery.trim()}%`;
+      params.push(searchPattern, searchPattern);
+    }
+
+    const result = this.db.exec(sql, params);
+    return result.length > 0 ? (result[0].values[0][0] as number) : 0;
+  }
+
+  /**
    * Get transactions that affected a specific key in a CCF table/map
    */
   async getKeyTransactions(mapName: string, keyName: string, limit = 50, offset = 0): Promise<Array<{
@@ -1337,6 +1429,86 @@ export class CCFDatabase {
     }
 
     return settings;
+  }
+
+  /**
+   * Get transactions with their related data for verification
+   * Similar to C# GetTransactionsWithRelatedAsync
+   */
+  async getTransactionsWithRelated(start: number, limit: number): Promise<Array<{
+    txId: number;
+    txHash: Uint8Array;
+    tables: Array<{
+      storeName: string;
+      value: string;
+    }>;
+  }>> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    // Get transactions with their tx_digest (hash)
+    const transactionResult = this.db.exec(`
+      SELECT id, tx_digest
+      FROM transactions
+      ORDER BY id
+      LIMIT ? OFFSET ?
+    `, [limit, start]);
+
+    if (transactionResult.length === 0) return [];
+
+    const transactions = transactionResult[0].values.map((row: unknown[]) => ({
+      txId: row[0] as number,
+      txHash: new Uint8Array(row[1] as ArrayBuffer),
+    }));
+
+    // For each transaction, get its writes that might contain signature information
+    const result: Array<{
+      txId: number;
+      txHash: Uint8Array;
+      tables: Array<{
+        storeName: string;
+        value: string;
+      }>;
+    }> = [];
+
+    for (const tx of transactions) {
+      const writesResult = this.db.exec(`
+        SELECT map_name, value_text
+        FROM kv_writes
+        WHERE transaction_id = ? AND value_text IS NOT NULL
+      `, [tx.txId]);
+
+      const tables: Array<{ storeName: string; value: string }> = [];
+      
+      if (writesResult.length > 0) {
+        for (const writeRow of writesResult[0].values) {
+          tables.push({
+            storeName: writeRow[0] as string,
+            value: writeRow[1] as string,
+          });
+        }
+      }
+
+      result.push({
+        txId: tx.txId,
+        txHash: tx.txHash,
+        tables,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get total count of all transactions
+   */
+  async getTotalTransactionsCount(): Promise<number> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const result = this.db.exec(`SELECT COUNT(*) as count FROM transactions`);
+
+    if (result.length === 0 || result[0].values.length === 0) return 0;
+
+    return result[0].values[0][0] as number;
   }
 
   /**

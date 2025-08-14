@@ -23,6 +23,8 @@ const useStyles = makeStyles({
   },
   main: { 
     gridArea: 'main',
+    overflow: 'hidden',
+    minHeight: 0,
   },
   right: { 
     gridArea: 'right',

@@ -32,6 +32,7 @@ export const queryKeys = {
   ccfTables: ['ccfTables'] as const,
   tableKeyValues: (mapName: string, limit: number, offset: number, searchQuery?: string) => ['tableKeyValues', mapName, limit, offset, searchQuery] as const,
   tableLatestState: (mapName: string, limit: number, offset: number, searchQuery?: string) => ['tableLatestState', mapName, limit, offset, searchQuery] as const,
+  tableLatestStateCount: (mapName: string, searchQuery?: string) => ['tableLatestStateCount', mapName, searchQuery] as const,
   keyTransactions: (mapName: string, keyName: string, limit: number, offset: number) => ['keyTransactions', mapName, keyName, limit, offset] as const,
   searchByKeyOrValue: (query: string, limit: number) => ['searchByKeyOrValue', query, limit] as const,
 };
@@ -123,6 +124,20 @@ export const useAllTransactions = (limit = 1000, offset = 0, searchQuery?: strin
 };
 
 /**
+ * Hook to get transactions with related data for verification
+ */
+export const useTransactionsWithRelated = (start: number, limit: number) => {
+  return useQuery({
+    queryKey: ['transactionsWithRelated', start, limit],
+    queryFn: async () => {
+      const db = await getDatabase();
+      return db.getTransactionsWithRelated(start, limit);
+    },
+    enabled: start >= 0,
+  });
+};
+
+/**
  * Hook to get total count of all transactions
  */
 export const useAllTransactionsCount = (searchQuery?: string) => {
@@ -131,6 +146,19 @@ export const useAllTransactionsCount = (searchQuery?: string) => {
     queryFn: async () => {
       const db = await getDatabase();
       return db.getAllTransactionsCount(searchQuery);
+    },
+  });
+};
+
+/**
+ * Hook to get total transactions count for verification
+ */
+export const useTotalTransactionsCount = () => {
+  return useQuery({
+    queryKey: ['totalTransactionsCount'],
+    queryFn: async () => {
+      const db = await getDatabase();
+      return db.getTotalTransactionsCount();
     },
   });
 };
@@ -330,12 +358,12 @@ export const useFileDrop = () => {
 /**
  * Hook to get transactions for a specific file with full structure (like useAllTransactions)
  */
-export const useFileTransactions = (fileId: number, limit = 100, offset = 0) => {
+export const useFileTransactions = (fileId: number, limit = 100, offset = 0, searchQuery?: string) => {
   return useQuery({
-    queryKey: ['fileTransactions', fileId, limit, offset],
+    queryKey: ['fileTransactions', fileId, limit, offset, searchQuery],
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getFileTransactions(fileId, limit, offset);
+      return db.getFileTransactions(fileId, limit, offset, searchQuery);
     },
     enabled: fileId > 0,
   });
@@ -358,12 +386,12 @@ export const useTransactionById = (transactionId: number) => {
 /**
  * Hook to get total count of transactions for a specific file
  */
-export const useFileTransactionsCount = (fileId: number) => {
+export const useFileTransactionsCount = (fileId: number, searchQuery?: string) => {
   return useQuery({
-    queryKey: ['fileTransactionsCount', fileId],
+    queryKey: ['fileTransactionsCount', fileId, searchQuery],
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getFileTransactionsCount(fileId);
+      return db.getFileTransactionsCount(fileId, searchQuery);
     },
     enabled: fileId > 0,
   });
@@ -405,6 +433,20 @@ export const useTableLatestState = (mapName: string, limit = 100, offset = 0, se
     queryFn: async () => {
       const db = await getDatabase();
       return db.getTableLatestState(mapName, limit, offset, searchQuery);
+    },
+    enabled: mapName.length > 0,
+  });
+};
+
+/**
+ * Hook to get the total count of keys in the latest state of a CCF table
+ */
+export const useTableLatestStateCount = (mapName: string, searchQuery?: string) => {
+  return useQuery({
+    queryKey: queryKeys.tableLatestStateCount(mapName, searchQuery),
+    queryFn: async () => {
+      const db = await getDatabase();
+      return db.getTableLatestStateCount(mapName, searchQuery);
     },
     enabled: mapName.length > 0,
   });

@@ -1,5 +1,5 @@
 import {ShareClient } from '@azure/storage-file-share';
-import type {LedgerFileInfo, ValidationResult} from '../utils/ledger-validation';
+import type {LedgerFileInfo } from '../utils/ledger-validation';
 import {parseLedgerFilename, validateLedgerSequence } from '../utils/ledger-validation';
 
 export class AzureFileShareService {

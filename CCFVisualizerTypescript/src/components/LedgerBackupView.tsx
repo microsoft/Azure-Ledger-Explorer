@@ -24,7 +24,7 @@ import {
   DocumentRegular,
   CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
-import { useFileDrop , useClearAllData, useLedgerFiles} from '../hooks/use-ccf-data';
+import { useFileDrop , useClearAllData } from '../hooks/use-ccf-data';
 
 const useStyles = makeStyles({
         fileSequenceInfo: {

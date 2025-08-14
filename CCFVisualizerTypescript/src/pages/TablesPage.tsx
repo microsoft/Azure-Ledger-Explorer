@@ -19,8 +19,8 @@ import {
     SearchBox,
     Tooltip,
 } from '@fluentui/react-components';
-import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular } from '@fluentui/react-icons';
-import { useCCFTables, useTableLatestState, useKeyTransactions } from '../hooks/use-ccf-data';
+import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular } from '@fluentui/react-icons';
+import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions } from '../hooks/use-ccf-data';
 
 const useStyles = makeStyles({
     container: {
@@ -95,10 +95,21 @@ const useStyles = makeStyles({
         ...shorthands.padding('16px', '24px'),
     },
     paginationContainer: {
-        ...shorthands.padding('16px', '24px'),
+        ...shorthands.padding('8px', '16px'),
         ...shorthands.borderTop('1px', 'solid', tokens.colorNeutralStroke2),
         display: 'flex',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: tokens.colorNeutralBackground2,
+    },
+    paginationControls: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+    },
+    paginationInfo: {
+        fontSize: '13px',
+        color: tokens.colorNeutralForeground2,
     },
     loadingContainer: {
         display: 'flex',
@@ -176,12 +187,21 @@ const TablesPage: React.FC = () => {
         offset,
         searchQuery // Pass search query to the hook
     );
+    const { data: totalKeyCount } = useTableLatestStateCount(
+        tableName || '',
+        searchQuery
+    );
     const { data: keyTransactions, isLoading: keyTransactionsLoading } = useKeyTransactions(
         selectedKey?.mapName || '',
         selectedKey?.keyName || '',
         100,
         0
     );
+
+    // Pagination calculations
+    const totalPages = Math.ceil((totalKeyCount || 0) / itemsPerPage);
+    const hasNextPage = currentPage < totalPages;
+    const hasPreviousPage = currentPage > 1;
 
     const handleTableSelect = useCallback((table: string) => {
         navigate(`/tables/${encodeURIComponent(table)}`);
@@ -198,6 +218,23 @@ const TablesPage: React.FC = () => {
     const handleTransactionSelect = useCallback((transactionId: number) => {
         navigate(`/transaction/${transactionId}`);
     }, [navigate]);
+
+    const handleSearchChange = useCallback((query: string) => {
+        setSearchQuery(query);
+        setCurrentPage(1); // Reset to first page when searching
+    }, []);
+
+    const handlePreviousPage = useCallback(() => {
+        if (hasPreviousPage) {
+            setCurrentPage(currentPage - 1);
+        }
+    }, [currentPage, hasPreviousPage]);
+
+    const handleNextPage = useCallback(() => {
+        if (hasNextPage) {
+            setCurrentPage(currentPage + 1);
+        }
+    }, [currentPage, hasNextPage]);
 
     const formatValue = (value: Uint8Array | null): string => {
         if (!value) return '';
@@ -369,7 +406,7 @@ const TablesPage: React.FC = () => {
                                 <SearchBox
                                     placeholder="Search keys and values..."
                                     value={searchQuery}
-                                    onChange={(_, data) => setSearchQuery(data?.value || '')}
+                                    onChange={(_, data) => handleSearchChange(data?.value || '')}
                                 />
                             </div>
 
@@ -464,6 +501,34 @@ const TablesPage: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Pagination Controls */}
+                            {keyValues && keyValues.length > 0 && totalKeyCount && totalKeyCount > itemsPerPage && (
+                                <div className={classes.paginationContainer}>
+                                    <div className={classes.paginationInfo}>
+                                        Page {currentPage} of {totalPages} ({totalKeyCount} total keys)
+                                    </div>
+                                    <div className={classes.paginationControls}>
+                                        <Button
+                                            appearance="subtle"
+                                            icon={<ChevronLeft24Regular />}
+                                            disabled={!hasPreviousPage}
+                                            onClick={handlePreviousPage}
+                                        >
+                                            Previous
+                                        </Button>
+                                        <Button
+                                            appearance="subtle"
+                                            icon={<ChevronRight24Regular />}
+                                            disabled={!hasNextPage}
+                                            onClick={handleNextPage}
+                                            iconPosition="after"
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div className={classes.emptyState}>
