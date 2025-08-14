@@ -27,6 +27,7 @@ import {
   Bot24Regular,
   ShieldCheckmarkRegular,
   DocumentSearch24Regular,
+  Settings24Regular,
 } from '@fluentui/react-icons';
 import { 
   useStats, 
@@ -118,6 +119,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       return 'verification';
     } else if (location.pathname.startsWith('/write-receipt')) {
       return 'write-receipt';
+    } else if (location.pathname.startsWith('/config')) {
+      return 'config';
     }
     return 'files';
   };
@@ -135,6 +138,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       navigate('/verification');
     } else if (tabValue === 'write-receipt') {
       navigate('/write-receipt');
+    } else if (tabValue === 'config') {
+      navigate('/config');
     }
   };
 
@@ -173,6 +178,9 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
             </Tab>
             <Tab value="ai" icon={<Bot24Regular />}>
               AI Assistant
+            </Tab>
+            <Tab value="config" icon={<Settings24Regular />}>
+              Configuration
             </Tab>
           </TabList>
         </div>
