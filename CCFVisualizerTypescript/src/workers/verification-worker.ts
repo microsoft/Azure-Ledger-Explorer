@@ -241,6 +241,7 @@ class VerificationWorker {
       this.postMessage({ type: 'checkpoint', data: stoppedCheckpoint });
     } else {
       // Final checkpoint - completed
+      console.log('Worker: Verification completed, creating final checkpoint');
       const finalCheckpoint: VerificationCheckpoint = {
         id: this.currentSessionId,
         timestamp: Date.now(),
@@ -252,9 +253,17 @@ class VerificationWorker {
         originalFiles: files.map(f => ({ name: f.name, size: f.size, lastModified: f.lastModified }))
       };
 
-      await this.saveCheckpoint(finalCheckpoint);
+      console.log('Worker: About to save final checkpoint:', finalCheckpoint);
+      try {
+        await this.saveCheckpoint(finalCheckpoint);
+        console.log('Worker: Final checkpoint saved successfully');
+      } catch (error) {
+        console.error('Worker: Failed to save final checkpoint:', error);
+      }
+      
       this.progress.status = 'completed';
       this.postMessage({ type: 'completed', data: { success: true, finalCheckpoint } });
+      console.log('Worker: Completion message sent');
     }
   }
 
@@ -330,30 +339,46 @@ class VerificationWorker {
 
   // Simple IndexedDB operations for the worker context
   private async saveCheckpoint(checkpoint: VerificationCheckpoint): Promise<void> {
+    console.log('Worker: Attempting to save checkpoint:', checkpoint);
     return new Promise((resolve, reject) => {
       const request = indexedDB.open('CCFVerificationCheckpoints', 1);
 
-      request.onerror = () => reject(new Error('Failed to open IndexedDB'));
+      request.onerror = () => {
+        console.error('Worker: Failed to open IndexedDB for checkpoint save');
+        reject(new Error('Failed to open IndexedDB'));
+      };
 
       request.onupgradeneeded = (event) => {
+        console.log('Worker: Creating IndexedDB schema for checkpoints');
         const db = (event.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains('checkpoints')) {
           const store = db.createObjectStore('checkpoints', { keyPath: 'id' });
           store.createIndex('timestamp', 'timestamp', { unique: false });
           store.createIndex('status', 'status', { unique: false });
+          console.log('Worker: Created checkpoints store');
         }
       };
 
       request.onsuccess = () => {
+        console.log('Worker: IndexedDB opened successfully for checkpoint save');
         const db = request.result;
         const transaction = db.transaction(['checkpoints'], 'readwrite');
         const store = transaction.objectStore('checkpoints');
         const putRequest = store.put(checkpoint);
 
-        putRequest.onerror = () => reject(new Error('Failed to save checkpoint'));
+        putRequest.onerror = () => {
+          console.error('Worker: Failed to save checkpoint to store');
+          reject(new Error('Failed to save checkpoint'));
+        };
         putRequest.onsuccess = () => {
+          console.log('Worker: Checkpoint saved successfully:', checkpoint.id);
           db.close();
           resolve();
+        };
+        
+        transaction.onerror = () => {
+          console.error('Worker: Transaction failed while saving checkpoint');
+          reject(new Error('Transaction failed'));
         };
       };
     });

@@ -20,6 +20,45 @@ import {
   Person24Regular,
 } from '@fluentui/react-icons';
 import { CCFDatabase } from '../database/ccf-database';
+import { useVerification } from '../hooks/use-verification';
+import type { WriteReceipt } from '../types/write-receipt-types';
+
+// Direct IndexedDB check function
+const checkIndexedDBForCheckpoints = async (): Promise<any[]> => {
+  return new Promise((resolve) => {
+    const request = indexedDB.open('CCFVerificationCheckpoints', 1);
+    
+    request.onerror = () => {
+      console.error('Failed to open IndexedDB:', request.error);
+      resolve([]);
+    };
+    
+    request.onsuccess = () => {
+      const db = request.result;
+      
+      if (!db.objectStoreNames.contains('checkpoints')) {
+        console.log('No checkpoints store found');
+        resolve([]);
+        return;
+      }
+      
+      const transaction = db.transaction(['checkpoints'], 'readonly');
+      const store = transaction.objectStore('checkpoints');
+      const getAllRequest = store.getAll();
+      
+      getAllRequest.onerror = () => {
+        console.error('Failed to get checkpoints:', getAllRequest.error);
+        resolve([]);
+      };
+      
+      getAllRequest.onsuccess = () => {
+        const checkpoints = getAllRequest.result;
+        console.log('Direct IndexedDB check found checkpoints:', checkpoints);
+        resolve(checkpoints);
+      };
+    };
+  });
+};
 
 interface ChatMessage {
   id: string;
@@ -29,6 +68,13 @@ interface ChatMessage {
   sqlResult?: unknown[];
   timestamp: Date;
   error?: string;
+  // New verification action fields
+  verificationAction?: 'ledger' | 'receipt';
+  verificationResult?: unknown;
+  receiptData?: {
+    receipt: WriteReceipt;
+    networkCert: string;
+  };
 }
 
 interface OpenAIConfig {
@@ -243,6 +289,25 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Add verification hooks
+  const verification = useVerification();
+  
+  // Force refresh checkpoints when component mounts
+  useEffect(() => {
+    const refreshCheckpointsOnMount = async () => {
+      try {
+        console.log('AI: Refreshing checkpoints on component mount...');
+        await verification.refreshCheckpoints();
+        console.log('AI: Mount refresh completed, checkpoints:', verification.checkpoints?.length || 0);
+      } catch (error) {
+        console.error('AI: Failed to refresh checkpoints on mount:', error);
+      }
+    };
+    
+    // Add a small delay to ensure everything is initialized
+    setTimeout(refreshCheckpointsOnMount, 1000);
+  }, [verification.refreshCheckpoints]);
+
   // Auto-scroll to bottom when new messages are added
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -265,16 +330,22 @@ TABLES:
 - kv_writes: Contains key-value write operations (id, transaction_id, map_name, key_name, value_text, version, created_at)
 - kv_deletes: Contains key-value delete operations (id, transaction_id, map_name, key_name, version, created_at)
 
+VERIFICATION CAPABILITIES:
+You can also perform cryptographic verification operations:
+- VERIFY_LEDGER: Check if the current ledger is cryptographically verified and return verification status
+- VERIFY_RECEIPT: Validate if a provided write receipt is part of the current ledger
+
 IMPORTANT GUIDELINES:
 1. When answering questions about the data, you MUST write SQL queries to get accurate information
 2. Always use SELECT queries only - never INSERT, UPDATE, DELETE, or DDL statements
 3. Use appropriate JOINs to get comprehensive information
 4. Format SQL queries clearly and explain what they do
 5. If you need to execute a SQL query, include it in your response with the format: \`\`\`sql\n[query]\n\`\`\`
-6. Explain your findings in a user-friendly way
-7. The map_name field typically contains CCF table names like 'public:ccf.gov.nodes', 'public:ccf.internal.consensus', etc.
-8. The value_text field contains UTF-8 decoded values from the ledger
-9. CCF transactions can contain multiple key-value operations
+6. For verification operations, use verification commands directly in your response (NOT in code blocks): VERIFY_LEDGER or VERIFY_RECEIPT
+7. Explain your findings in a user-friendly way
+8. The map_name field typically contains CCF table names like 'public:ccf.gov.nodes', 'public:ccf.internal.consensus', etc.
+9. The value_text field contains UTF-8 decoded values from the ledger
+10. CCF transactions can contain multiple key-value operations
 
 You can answer questions about:
 - Transaction counts and statistics
@@ -282,6 +353,12 @@ You can answer questions about:
 - File information and ledger structure
 - Data analysis and patterns
 - Specific searches within the ledger data
+- Ledger verification status and integrity
+- Write receipt validation against the ledger
+
+When users ask about:
+- "Is the ledger verified?", "verification status", "ledger integrity" → respond with VERIFY_LEDGER (not in a code block)
+- "Verify this receipt", "is this receipt valid?", "receipt verification" → respond with VERIFY_RECEIPT (not in a code block)
 
 Always be helpful and provide detailed explanations of your SQL queries and results.`;
   };
@@ -292,6 +369,219 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
     } catch (error) {
       console.error('SQL execution error:', error);
       throw error;
+    }
+  };
+
+  const executeLedgerVerification = async (): Promise<unknown> => {
+    try {
+      console.log('AI: Checking verification status...');
+      console.log('AI: verification.isRunning:', verification.isRunning);
+      console.log('AI: verification.progress:', verification.progress);
+      console.log('AI: verification.checkpoints:', verification.checkpoints);
+      console.log('AI: verification.checkpoints.length:', verification.checkpoints?.length || 0);
+
+      // First check if there's an active verification running
+      if (verification.isRunning && verification.progress) {
+        console.log('AI: Found active verification');
+        const isComplete = verification.progress.status === 'completed';
+        const hasError = !!verification.error;
+        const progress = verification.progress.totalTransactions > 0 
+          ? (verification.progress.currentTransaction / verification.progress.totalTransactions) * 100 
+          : 0;
+        
+        return {
+          status: verification.progress.status,
+          progress: progress,
+          currentTransaction: verification.progress.currentTransaction,
+          totalTransactions: verification.progress.totalTransactions,
+          processedFiles: verification.progress.processedFiles,
+          totalFiles: verification.progress.totalFiles,
+          currentFileName: verification.progress.currentFileName,
+          isComplete,
+          isVerified: isComplete && !hasError,
+          error: verification.error,
+          message: isComplete 
+            ? (hasError ? 'Ledger verification failed' : 'Ledger verification completed successfully')
+            : `Verification in progress: ${progress.toFixed(1)}% (${verification.progress.currentTransaction}/${verification.progress.totalTransactions} transactions)`
+        };
+      }
+
+      // Check for any completed checkpoints from previous sessions
+      if (verification.checkpoints && verification.checkpoints.length > 0) {
+        console.log('AI: Found checkpoints, count:', verification.checkpoints.length);
+        console.log('AI: Checkpoints:', verification.checkpoints);
+        
+        // Find the most recent checkpoint
+        const latestCheckpoint = verification.checkpoints
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+        
+        console.log('AI: Latest checkpoint:', latestCheckpoint);
+        
+        if (latestCheckpoint) {
+          const isCompleted = latestCheckpoint.status === 'pass';
+          const hasError = latestCheckpoint.status === 'fail';
+          const isStopped = latestCheckpoint.status === 'stopped';
+          
+          return {
+            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
+            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
+            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
+            currentFileIndex: latestCheckpoint.currentFileIndex,
+            lastVerifiedFile: latestCheckpoint.lastVerifiedFile,
+            isComplete: isCompleted,
+            isVerified: isCompleted && !hasError,
+            sessionId: latestCheckpoint.id,
+            timestamp: new Date(latestCheckpoint.timestamp).toLocaleString(),
+            failureDetails: latestCheckpoint.failureDetails,
+            message: isCompleted 
+              ? 'Ledger verification completed successfully'
+              : hasError 
+                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
+                : isStopped 
+                  ? `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions. Use resume to continue.`
+                  : `Previous verification processed ${latestCheckpoint.totalTransactionsProcessed} transactions`,
+            debugInfo: {
+              checkpointStatus: latestCheckpoint.status,
+              checkpointTimestamp: latestCheckpoint.timestamp,
+              isCompleted,
+              hasError,
+              isStopped
+            }
+          };
+        }
+      }
+
+      console.log('AI: No verification or checkpoints found');
+      
+      // No verification found - but let's try to refresh checkpoints and check again
+      console.log('AI: Attempting to refresh checkpoints...');
+      try {
+        await verification.refreshCheckpoints();
+        console.log('AI: Checkpoints refreshed, new count:', verification.checkpoints?.length || 0);
+        
+        if (verification.checkpoints && verification.checkpoints.length > 0) {
+          console.log('AI: Found checkpoints after refresh!');
+          const latestCheckpoint = verification.checkpoints
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          
+          const isCompleted = latestCheckpoint.status === 'pass';
+          const hasError = latestCheckpoint.status === 'fail';
+          
+          return {
+            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
+            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
+            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
+            message: isCompleted 
+              ? 'Ledger verification completed successfully (found after refresh)'
+              : hasError 
+                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
+                : `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions`,
+            refreshedCheckpoints: true
+          };
+        }
+      } catch (refreshError) {
+        console.error('AI: Failed to refresh checkpoints:', refreshError);
+      }
+      
+      // Direct IndexedDB check as a last resort
+      console.log('AI: Trying direct IndexedDB check...');
+      try {
+        const directCheckpoints = await checkIndexedDBForCheckpoints();
+        console.log('AI: Direct IndexedDB found:', directCheckpoints.length, 'checkpoints');
+        
+        if (directCheckpoints.length > 0) {
+          const latestCheckpoint = directCheckpoints
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          
+          console.log('AI: Latest checkpoint from direct check:', latestCheckpoint);
+          
+          const isCompleted = latestCheckpoint.status === 'pass';
+          const hasError = latestCheckpoint.status === 'fail';
+          
+          return {
+            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
+            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
+            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
+            message: isCompleted 
+              ? 'Ledger verification completed successfully (found via direct IndexedDB check)'
+              : hasError 
+                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
+                : `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions`,
+            foundViaDirectCheck: true,
+            hookCheckpointsCount: verification.checkpoints?.length || 0
+          };
+        }
+      } catch (directError) {
+        console.error('AI: Direct IndexedDB check failed:', directError);
+      }
+
+      return {
+        status: 'not_started',
+        message: 'No ledger verification has been started. Please start verification manually from the verification page.',
+        isRunning: verification.isRunning,
+        hasProgress: !!verification.progress,
+        availableCheckpoints: verification.checkpoints?.length || 0,
+        debugInfo: {
+          hookState: {
+            isRunning: verification.isRunning,
+            hasProgress: !!verification.progress,
+            checkpointsLength: verification.checkpoints?.length || 0,
+            currentSessionId: verification.currentSessionId
+          }
+        }
+      };
+    } catch (error) {
+      console.error('Ledger verification error:', error);
+      return {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown verification error',
+        message: 'Failed to execute ledger verification'
+      };
+    }
+  };
+
+  const executeReceiptVerification = async (receiptJson?: string, networkCert?: string): Promise<unknown> => {
+    try {
+      if (!receiptJson || !networkCert) {
+        return {
+          status: 'error',
+          error: 'Both receipt JSON and network certificate are required for verification',
+          message: 'Please provide both the write receipt JSON and network certificate'
+        };
+      }
+
+      // Parse the receipt
+      let receipt: WriteReceipt;
+      try {
+        receipt = JSON.parse(receiptJson);
+      } catch (error) {
+        return {
+          status: 'error',
+          error: 'Invalid receipt JSON format',
+          message: 'The provided receipt JSON is not valid'
+        };
+      }
+
+      // For now, return a message that receipt verification needs to be implemented
+      // with proper database integration
+      return {
+        status: 'not_implemented',
+        message: 'Receipt verification against ledger database is not yet implemented in the AI assistant. Please use the Write Receipt Verification page for full verification.',
+        receiptStructure: {
+          cert: !!receipt.cert,
+          nodeId: receipt.nodeId,
+          signature: !!receipt.signature,
+          proof: receipt.proof?.length || 0,
+          leafComponents: !!receipt.leafComponents
+        }
+      };
+    } catch (error) {
+      console.error('Receipt verification error:', error);
+      return {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown verification error',
+        message: 'Failed to execute receipt verification'
+      };
     }
   };
 
@@ -332,7 +622,24 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
 
   const extractSqlQuery = (content: string): string | null => {
     const sqlMatch = content.match(/```sql\n([\s\S]*?)\n```/);
-    return sqlMatch ? sqlMatch[1].trim() : null;
+    const query = sqlMatch ? sqlMatch[1].trim() : null;
+    
+    // Don't treat verification commands as SQL queries
+    if (query && (query.includes('VERIFY_LEDGER') || query.includes('VERIFY_RECEIPT'))) {
+      return null;
+    }
+    
+    return query;
+  };
+
+  const extractVerificationCommand = (content: string): 'ledger' | 'receipt' | null => {
+    if (content.includes('VERIFY_LEDGER')) {
+      return 'ledger';
+    }
+    if (content.includes('VERIFY_RECEIPT')) {
+      return 'receipt';
+    }
+    return null;
   };
 
   const handleSendMessage = async () => {
@@ -356,14 +663,33 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
       
       // Check if the response contains a SQL query
       const sqlQuery = extractSqlQuery(aiResponse);
+      
+      // Check if the response contains a verification command
+      const verificationCommand = extractVerificationCommand(aiResponse);
+      
       let sqlResult: unknown[] | undefined;
+      let verificationResult: unknown | undefined;
       let executionError: string | undefined;
 
+      // Execute SQL query if present
       if (sqlQuery) {
         try {
           sqlResult = await executeQuery(sqlQuery);
         } catch (err) {
           executionError = err instanceof Error ? err.message : 'SQL execution failed';
+        }
+      }
+
+      // Execute verification command if present
+      if (verificationCommand) {
+        try {
+          if (verificationCommand === 'ledger') {
+            verificationResult = await executeLedgerVerification();
+          } else if (verificationCommand === 'receipt') {
+            verificationResult = await executeReceiptVerification();
+          }
+        } catch (err) {
+          executionError = err instanceof Error ? err.message : 'Verification execution failed';
         }
       }
 
@@ -373,6 +699,8 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
         content: aiResponse,
         sqlQuery: sqlQuery || undefined,
         sqlResult,
+        verificationAction: verificationCommand || undefined,
+        verificationResult,
         error: executionError,
         timestamp: new Date(),
       };
@@ -532,10 +860,23 @@ Always be helpful and provide detailed explanations of your SQL queries and resu
                       </div>
                     )}
                     
+                    {(message.verificationResult !== undefined && message.verificationResult !== null) && (
+                      <div className={styles.sqlSection}>
+                        <Text size={200} weight="semibold" className={styles.sqlResultHeader}>
+                          {message.verificationAction === 'ledger' ? 'Ledger Verification:' : 'Receipt Verification:'}
+                        </Text>
+                        <pre className={styles.sqlResult}>
+                          {typeof message.verificationResult === 'string' 
+                            ? message.verificationResult 
+                            : JSON.stringify(message.verificationResult, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                    
                     {message.error && (
                       <div className={styles.errorSection}>
                         <MessageBar intent="error">
-                          <Text size={200}>SQL Error: {message.error}</Text>
+                          <Text size={200}>Error: {message.error}</Text>
                         </MessageBar>
                       </div>
                     )}
