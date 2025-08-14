@@ -26,6 +26,7 @@ import {
   NumberSymbolRegular,
   Bot24Regular,
   ShieldCheckmarkRegular,
+  DocumentSearch24Regular,
 } from '@fluentui/react-icons';
 import { 
   useStats, 
@@ -115,6 +116,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       return 'ai';
     } else if (location.pathname.startsWith('/verification')) {
       return 'verification';
+    } else if (location.pathname.startsWith('/write-receipt')) {
+      return 'write-receipt';
     }
     return 'files';
   };
@@ -130,6 +133,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
       navigate('/ai');
     } else if (tabValue === 'verification') {
       navigate('/verification');
+    } else if (tabValue === 'write-receipt') {
+      navigate('/write-receipt');
     }
   };
 
@@ -161,7 +166,10 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
               Stats
             </Tab>
             <Tab value="verification" icon={<ShieldCheckmarkRegular />}>
-              Verification
+              Ledger Verification
+            </Tab>
+            <Tab value="write-receipt" icon={<DocumentSearch24Regular />}>
+              Receipt Verification
             </Tab>
             <Tab value="ai" icon={<Bot24Regular />}>
               AI Assistant

@@ -8,6 +8,7 @@ import TablesPage from './pages/TablesPage';
 import StatsPage from './pages/StatsPage';
 import { AIPage } from './pages/AIPage';
 import { LedgerVerificationPage } from './pages/LedgerVerificationPage';
+import { WriteReceiptVerificationPage } from './pages/WriteReceiptVerificationPage';
 import { MenuBar } from './components/MenuBar';
 import GridLayout from './components/AppLayout';
 
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/ai" element={<AIPage />} />
                 <Route path="/verification" element={<LedgerVerificationPage />} />
+                <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
                 <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
               </Routes>
             </GridLayout.Main>
