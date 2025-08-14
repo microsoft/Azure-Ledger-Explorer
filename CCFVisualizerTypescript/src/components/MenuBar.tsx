@@ -146,7 +146,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({ onToggleTheme, isDarkMode }) =
   return (
     <header className={styles.header}>
       <div className={styles.headerContent}>
-        <h1 className={styles.title}>CCF Ledger Explorer</h1>
+        <h1 className={styles.title}>Sage</h1>
         <Caption1 className={styles.subtitle}>
           {hasData ? (
             `${stats.fileCount} file${stats.fileCount !== 1 ? 's' : ''} • ${stats.transactionCount} transaction${stats.transactionCount !== 1 ? 's' : ''}`
