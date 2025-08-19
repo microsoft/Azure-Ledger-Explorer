@@ -56,8 +56,6 @@ function App() {
               <MenuBar 
                 onToggleTheme={handleToggleTheme} 
                 isDarkMode={isDarkMode}
-                hasActiveChat={hasActiveChat}
-                onNewConversation={clearChatFunction}
               />
             </GridLayout.Top>
             <GridLayout.Main>
@@ -69,6 +67,7 @@ function App() {
                     <AIPage 
                       onChatStateChange={setHasActiveChat}
                       onRegisterClearChat={setClearChatFunction}
+                      clearChatFunction={clearChatFunction}
                     />
                   } 
                 />

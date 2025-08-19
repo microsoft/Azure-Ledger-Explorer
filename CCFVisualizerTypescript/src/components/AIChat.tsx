@@ -27,7 +27,11 @@ import {
   Add24Regular,
   DocumentAdd24Regular,
   DatabaseArrowDownRegular,
+  Edit24Regular,
 } from '@fluentui/react-icons';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { AddFilesWizard } from './AddFilesWizard';
 import { CCFDatabase } from '../database/ccf-database';
 import { useAllTransactionsCount } from '../hooks/use-ccf-data';
@@ -94,6 +98,7 @@ interface AIChatProps {
   database: CCFDatabase;
   onChatStateChange?: (hasActiveChat: boolean) => void;
   onRegisterClearChat?: (clearFn: (() => void) | null) => void;
+  clearChatFunction?: (() => void) | null;
 }
 
 const useStyles = makeStyles({
@@ -194,6 +199,78 @@ const useStyles = makeStyles({
     wordBreak: 'break-word',
     fontSize: '16px',
   },
+  markdownContent: {
+    fontSize: '16px',
+    lineHeight: '1.5',
+    '& h1, & h2, & h3, & h4, & h5, & h6': {
+      marginTop: '16px',
+      marginBottom: '8px',
+      fontWeight: '600',
+      color: tokens.colorNeutralForeground1,
+    },
+    '& h1': { fontSize: '20px' },
+    '& h2': { fontSize: '18px' },
+    '& h3': { fontSize: '16px' },
+    '& p': {
+      margin: '8px 0',
+      lineHeight: '1.5',
+    },
+    '& ul, & ol': {
+      margin: '8px 0',
+      paddingLeft: '24px',
+    },
+    '& li': {
+      margin: '4px 0',
+    },
+    '& blockquote': {
+      margin: '12px 0',
+      padding: '8px 16px',
+      borderLeft: `4px solid ${tokens.colorBrandStroke1}`,
+      backgroundColor: tokens.colorNeutralBackground2,
+      fontStyle: 'italic',
+    },
+    '& code': {
+      backgroundColor: tokens.colorNeutralBackground3,
+      padding: '2px 4px',
+      borderRadius: '4px',
+      fontSize: '14px',
+      fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
+    },
+    '& pre': {
+      margin: '12px 0',
+      padding: '12px',
+      backgroundColor: tokens.colorNeutralBackground6,
+      borderRadius: '8px',
+      overflow: 'auto',
+      fontSize: '14px',
+      lineHeight: '1.4',
+    },
+    '& pre code': {
+      backgroundColor: 'transparent',
+      padding: '0',
+    },
+    '& a': {
+      color: tokens.colorBrandForeground1,
+      textDecoration: 'none',
+      '&:hover': {
+        textDecoration: 'underline',
+      },
+    },
+    '& table': {
+      borderCollapse: 'collapse',
+      width: '100%',
+      margin: '12px 0',
+    },
+    '& th, & td': {
+      border: `1px solid ${tokens.colorNeutralStroke2}`,
+      padding: '8px 12px',
+      textAlign: 'left',
+    },
+    '& th': {
+      backgroundColor: tokens.colorNeutralBackground2,
+      fontWeight: '600',
+    },
+  },
   sqlSection: {
     ...shorthands.margin('12px', '0', '0', '0'),
   },
@@ -283,9 +360,10 @@ const useStyles = makeStyles({
 
   //ending area
   inputAreaAnimating: {
-    position: 'fixed',
+    position: 'absolute',
     left: 'auto',
     top: '47%',
+    bottom: '20px',
     transform: 'translateY(-50%)',
     width: '100%',
     maxWidth: '830px',
@@ -299,10 +377,9 @@ const useStyles = makeStyles({
   },
 
   inputAreaAnimatingToBottom: {
-    position: 'fixed',
+    position: 'fixed', 
     left: 'auto',
-    top: '47%',
-    bottom: '20px',
+    top: 'calc(100vh - 230px)',
     transform: 'translateY(80%)',
     width: '100%',
     maxWidth: '830px',
@@ -337,7 +414,7 @@ const useStyles = makeStyles({
     left: 'auto',
     top: '47%',
     bottom: 0,
-    transform: 'translateY(-12%)',
+    transform: 'translateY(-11%)',
     width: '100%',
     maxWidth: '830px',
     zIndex: 1000,
@@ -448,16 +525,61 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorBrandBackgroundHover,
     },
   },
+  newConversationButton: {
+    minWidth: '32px',
+    height: '32px',
+    ...shorthands.borderRadius('50%'),
+    backgroundColor: tokens.colorNeutralBackground2,
+    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    color: tokens.colorNeutralForeground1,
+    '&:hover': {
+      backgroundColor: tokens.colorNeutralBackground2Hover,
+      ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1Hover),
+    },
+  },
   helpText: {
     fontSize: '14px',
     color: tokens.colorNeutralForeground3,
   },
 });
 
+// Custom markdown components for syntax highlighting
+const markdownComponents = {
+  code({ node, inline, className, children, ...props }: any) {
+    const match = /language-(\w+)/.exec(className || '');
+    const language = match ? match[1] : '';
+    
+    return !inline && match ? (
+      <SyntaxHighlighter
+        style={oneDark}
+        language={language}
+        PreTag="div"
+        customStyle={{
+          margin: '12px 0',
+          borderRadius: '8px',
+          fontSize: '14px',
+        }}
+        {...props}
+      >
+        {String(children).replace(/\n$/, '')}
+      </SyntaxHighlighter>
+    ) : (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+  pre({ children, ...props }: any) {
+    // If the pre contains a code block with syntax highlighting, don't add extra styling
+    return <>{children}</>;
+  },
+};
+
 export const AIChat: React.FC<AIChatProps> = ({ 
   database, 
   onChatStateChange, 
-  onRegisterClearChat 
+  onRegisterClearChat,
+  clearChatFunction 
 }) => {
   const styles = useStyles();
   const { config } = useConfig();
@@ -479,6 +601,9 @@ export const AIChat: React.FC<AIChatProps> = ({
   
   // Animation state for input area transition
   const [inputAnimationClass, setInputAnimationClass] = useState('');
+  
+  // State to control when to show initial UI elements during clear animation
+  const [showInitialUI, setShowInitialUI] = useState(true);
   
   // Force refresh checkpoints when component mounts
   useEffect(() => {
@@ -872,6 +997,7 @@ export const AIChat: React.FC<AIChatProps> = ({
 
     // Start animation if this is the first message
     if (messages.length === 0) {
+      setShowInitialUI(false); // Hide initial UI when starting conversation
       setInputAnimationClass('animating');
       // After a brief moment, transition to the bottom position
       setTimeout(() => {
@@ -963,12 +1089,16 @@ export const AIChat: React.FC<AIChatProps> = ({
   };
 
   const clearChat = () => {      
+      // Clear messages immediately and hide initial UI during animation
+      setMessages([]);
+      setShowInitialUI(false);
+      
       // After a brief moment, transition to center position
       setTimeout(() => {
         setInputAnimationClass('animatingToCenterFinal');
-        // After animation completes, reset to normal state
+        // After animation completes, show initial UI and reset animation state
         setTimeout(() => {
-          setMessages([]);
+          setShowInitialUI(true);
           setError(null);
           setInputAnimationClass('');
         }, 800); // Match the CSS transition duration
@@ -1018,8 +1148,8 @@ export const AIChat: React.FC<AIChatProps> = ({
   return (
     <>
       <div className={hasMessages ? styles.containerWithMessages : styles.container}>
-        {/* Sage Title - visible when no messages */}
-        {!hasMessages && (
+        {/* Sage Title - visible when no messages and showing initial UI */}
+        {!hasMessages && showInitialUI && (
           <div className={styles.sageTitle}>
             Sage
           </div>
@@ -1085,20 +1215,34 @@ export const AIChat: React.FC<AIChatProps> = ({
                 </MenuPopover>
               </Menu>
 
-              {/* Send button on right */}
-              <Button
-                appearance="primary"
-                icon={<Send24Regular />}
-                onClick={() => handleSendMessage()}
-                disabled={!currentMessage.trim() || isLoading || !config.baseUrl}
-                className={styles.sendButton}
-              />
+              {/* Right side buttons group */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* New Conversation button - only show when there are messages */}
+                {hasMessages && (
+                  <Button
+                    appearance="subtle"
+                    icon={<Edit24Regular />}
+                    onClick={() => clearChatFunction?.()}
+                    className={styles.newConversationButton}
+                    title="New Conversation"
+                  />
+                )}
+
+                {/* Send button on right */}
+                <Button
+                  appearance="primary"
+                  icon={<Send24Regular />}
+                  onClick={() => handleSendMessage()}
+                  disabled={!currentMessage.trim() || isLoading || !config.baseUrl}
+                  className={styles.sendButton}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Starter templates - visible when no messages, positioned under input area */}
-        {!hasMessages && (
+        {/* Starter templates - visible when no messages and showing initial UI, positioned under input area */}
+        {!hasMessages && showInitialUI && (
           <div className={styles.starterTemplates}>
             <CompoundButton
               icon={<ChatAddRegular />}
@@ -1249,9 +1393,17 @@ export const AIChat: React.FC<AIChatProps> = ({
                 
                 <div className={message.role === 'user' ? styles.userMessageContent : styles.messageContent}>
                   <div className={`${styles.messageBubble} ${message.role === 'user' ? styles.userBubble : styles.assistantBubble}`}>
-                    <Text className={styles.messageText}>
-                      {message.content}
-                    </Text>
+                    {message.role === 'user' ? (
+                      <Text className={styles.messageText}>
+                        {message.content}
+                      </Text>
+                    ) : (
+                      <div className={styles.markdownContent}>
+                        <ReactMarkdown components={markdownComponents}>
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
                     
                     {message.sqlQuery && (
                       <div className={styles.sqlSection}>

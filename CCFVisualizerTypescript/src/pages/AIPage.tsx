@@ -37,11 +37,13 @@ const useStyles = makeStyles({
 interface AIPageProps {
   onChatStateChange?: (hasActiveChat: boolean) => void;
   onRegisterClearChat?: (clearFn: (() => void) | null) => void;
+  clearChatFunction?: (() => void) | null;
 }
 
 export const AIPage: React.FC<AIPageProps> = ({ 
   onChatStateChange, 
-  onRegisterClearChat 
+  onRegisterClearChat,
+  clearChatFunction 
 }) => {
   const { data: database, isLoading, error } = useDatabase();
   const styles = useStyles();
@@ -77,6 +79,7 @@ export const AIPage: React.FC<AIPageProps> = ({
           database={database}
           onChatStateChange={onChatStateChange}
           onRegisterClearChat={onRegisterClearChat}
+          clearChatFunction={clearChatFunction}
         />
       </div>
     </div>

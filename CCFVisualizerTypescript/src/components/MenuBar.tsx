@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   makeStyles,
   Button,
@@ -16,7 +16,6 @@ import {
   ShieldCheckmarkRegular,
   DocumentSearch24Regular,
   Settings24Regular,
-  Edit24Regular,
 } from '@fluentui/react-icons';
 import { 
   useStats,
@@ -60,47 +59,20 @@ const useStyles = makeStyles({
 interface MenuBarProps {
   onToggleTheme: () => void;
   isDarkMode: boolean;
-  hasActiveChat?: boolean;
-  onNewConversation?: (() => void) | null;
 }
 
 export const MenuBar: React.FC<MenuBarProps> = ({ 
   onToggleTheme, 
   isDarkMode, 
-  hasActiveChat = false,
-  onNewConversation 
 }) => {
   const styles = useStyles();
   const navigate = useNavigate();
-  const location = useLocation();
   const { data: stats } = useStats();
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
-  const getActiveTab = () => {
-    if (location.pathname.startsWith('/tables')) {
-      return 'tables';
-    } else if (location.pathname.startsWith('/stats')) {
-      return 'stats';
-    } else if (location.pathname.startsWith('/chat')) {
-      return 'chat';
-    } else if (location.pathname.startsWith('/config')) {
-      return 'config';
-    } else if (location.pathname.startsWith('/files')) {
-      return 'files';
-    } else if (location.pathname.startsWith('/verification')) {
-      return 'verification';
-    } else if (location.pathname.startsWith('/write-receipt')) {
-      return 'write-receipt';
-    } else if (location.pathname.startsWith('/config')) {
-      return 'config';
-    }
-  };
-
   const handleTabChange = (tabValue: string) => {
-    if (tabValue === 'new-conversation') {
-      onNewConversation?.();
-    } else if (tabValue === 'files') {
+    if (tabValue === 'files') {
       navigate('/files');
     } else if (tabValue === 'tables') {
       navigate('/tables');
@@ -130,11 +102,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
         {/* Navigation Tabs */}
         <div className={styles.navigationTabs}>
           <TabList onTabSelect={(_, data) => handleTabChange(data.value as string)}>
-            {hasActiveChat && location.pathname.startsWith('/chat') && (
-              <Tab value="new-conversation" icon={<Edit24Regular />}>
-                New Conversation
-              </Tab>
-            )}
             <Tab value="chat" icon={<Bot24Regular />}>
               Chat
             </Tab>
