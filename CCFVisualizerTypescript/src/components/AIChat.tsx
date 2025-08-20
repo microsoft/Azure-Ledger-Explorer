@@ -74,6 +74,7 @@ const checkIndexedDBForCheckpoints = async (): Promise<any[]> => {
 
 interface ChatMessage {
   id: string;
+  state: 'initial' | 'streaming' | 'finished';
   role: 'user' | 'assistant';
   responseId?: string;
   content: string;
@@ -635,11 +636,12 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
     }
   };
 
-  const callOpenAIResponseAPI = async (messages: ChatMessage[], newMessage: string): Promise<{ id: string; text: string }> => {
+  const callOpenAIResponseAPI = async (messages: ChatMessage[], newMessage: string): Promise<Response> => {
     if (!config.baseUrl) {
       throw new Error('Base URL is required to send the request');
     }
 
+    // FIXME: limit the messages to not hit the context limit
     let input = '';
     // collect prior conversations as history for this question
     messages.forEach(m => {
@@ -659,6 +661,7 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        stream: true,
         input: input,
         instructions: getSystemPrompt(),
         previous_response_id: previousResponseId,
@@ -672,27 +675,7 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
       throw new Error(errorData.error?.message || `OpenAI API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    let concatenatedResponse = "";
-    if (data.output && data.output.length > 0) {
-      for (const output of data.output) {
-        if (output.type === 'message') {
-          for (const messageContent of output.content) {
-            if (messageContent.type === 'output_text') {
-              concatenatedResponse += `${messageContent.text}\n\n`;
-            } else {
-              concatenatedResponse += `> Using: ${messageContent.type}\n\n`;
-            }
-          }
-        } else {
-          concatenatedResponse += `> Using: ${output.type}\n\n`;
-        }
-      }
-    }
-    return {
-      id: data.id || '',
-      text: concatenatedResponse || 'No response received'
-    };
+    return response;
   };
 
   const extractSqlQuery = (content: string): string | null => {
@@ -717,11 +700,153 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
     return null;
   };
 
+  const processResponse = async (response: Response) => {
+    if (!response.body) {
+      throw new Error('Response body is empty');
+    }
+    // Put blank message which is in progress and periodically update it
+    let message: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      state: 'streaming',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, message]);
+
+    // Append response to the message as it gets streamed
+    // ------------------
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    const sseDataPrefix = 'data: ';
+    let fullResponseText = '';
+    let responseId: string;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          setMessages(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last) {
+              last.state = 'finished';
+            }
+            return updated;
+          });
+          console.log('Stream finished');
+          break;
+        }
+        
+        // Handle SSE value
+        const chunk = decoder.decode(value);
+        // split by new lines
+        const lines = chunk.split('\n');
+
+        let textDelta = '';
+        for (const line of lines) {
+          if (!line.startsWith(sseDataPrefix)) {
+            continue;
+          }
+          const dataString = line.slice(sseDataPrefix.length).trim();
+          if (dataString && dataString !== '[DONE]') {
+            try {
+              const data = JSON.parse(dataString);
+              console.log(data.type, data);
+              if (data.type === 'response.output_text.delta') {
+                textDelta += data.delta || '';
+              } else if (data.type === 'response.output_item.added') {
+                if (data.item.type === 'mcp_list_tools' || data.item.type === 'message') {
+                  continue;
+                } else if (data.item.type === 'file_search_call') {
+                  textDelta += '\n> Searching for files ...\n\n';
+                } else if (data.item.type === 'mcp_call') {
+                  textDelta += '\n> Calling: ' + data.item.server_label + ':' + data.item.name + (data.item.arguments ? ' with: ' + JSON.stringify(data.item.arguments) : '') + '\n\n';
+                } else {
+                  textDelta += '\n> Using: ' + data.item.type + '\n\n';
+                }
+              } else if (data.type === 'response.completed') {
+                responseId = data.response.id;
+              }
+            } catch (error) {
+              console.error('Error parsing SSE data:', dataString, 'error is:', error);
+            }
+          }
+        }
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last) {
+            last.content += textDelta;
+            fullResponseText += textDelta;
+            if (responseId != null) {
+              last.responseId = responseId;
+            }
+          }
+          return updated;
+        });
+      }
+    } finally {
+      reader.releaseLock();
+    }
+      
+    // Once finished perform other actions
+    // ------------------
+
+    // Check if the response contains a SQL query
+    const sqlQuery = extractSqlQuery(fullResponseText);
+    
+    // Check if the response contains a verification command
+    const verificationCommand = extractVerificationCommand(fullResponseText);
+    
+    let sqlResult: unknown[] | undefined;
+    let verificationResult: unknown | undefined;
+    let executionError: string | undefined;
+
+    // Execute SQL query if present
+    if (sqlQuery) {
+      try {
+        sqlResult = await executeQuery(sqlQuery);
+      } catch (err) {
+        executionError = err instanceof Error ? err.message : 'SQL execution failed';
+      }
+    }
+
+    // Execute verification command if present
+    if (verificationCommand) {
+      try {
+        if (verificationCommand === 'ledger') {
+          verificationResult = await executeLedgerVerification();
+        } else if (verificationCommand === 'receipt') {
+          verificationResult = await executeReceiptVerification();
+        }
+      } catch (err) {
+        executionError = err instanceof Error ? err.message : 'Verification execution failed';
+      }
+    }
+
+    setMessages(prev => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last) {
+        last.sqlQuery = sqlQuery || undefined;
+        last.sqlResult = sqlResult;
+        last.verificationAction = verificationCommand || undefined;
+        last.verificationResult = verificationResult;
+        last.error = executionError;
+        last.timestamp = new Date();
+      }
+      return updated;
+    });
+  }
+
   const handleSendMessage = async (optionalMessage?: string) => {
     if (isLoading || (!optionalMessage && !currentMessage.trim())) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
+      state: 'finished',
       role: 'user',
       content: optionalMessage || currentMessage.trim(),
       timestamp: new Date(),
@@ -735,53 +860,7 @@ export const AIChat: React.FC<AIChatProps> = ({ database }) => {
     try {
       // Get AI response
       const aiResponse = await callOpenAIResponseAPI(messages, userMessage.content);
-      
-      // Check if the response contains a SQL query
-      const sqlQuery = extractSqlQuery(aiResponse.text);
-      
-      // Check if the response contains a verification command
-      const verificationCommand = extractVerificationCommand(aiResponse.text);
-      
-      let sqlResult: unknown[] | undefined;
-      let verificationResult: unknown | undefined;
-      let executionError: string | undefined;
-
-      // Execute SQL query if present
-      if (sqlQuery) {
-        try {
-          sqlResult = await executeQuery(sqlQuery);
-        } catch (err) {
-          executionError = err instanceof Error ? err.message : 'SQL execution failed';
-        }
-      }
-
-      // Execute verification command if present
-      if (verificationCommand) {
-        try {
-          if (verificationCommand === 'ledger') {
-            verificationResult = await executeLedgerVerification();
-          } else if (verificationCommand === 'receipt') {
-            verificationResult = await executeReceiptVerification();
-          }
-        } catch (err) {
-          executionError = err instanceof Error ? err.message : 'Verification execution failed';
-        }
-      }
-
-      const assistantMessage: ChatMessage = {
-        id: aiResponse.id || (Date.now() + 1).toString(),
-        responseId: aiResponse.id,
-        role: 'assistant',
-        content: aiResponse.text,
-        sqlQuery: sqlQuery || undefined,
-        sqlResult,
-        verificationAction: verificationCommand || undefined,
-        verificationResult,
-        error: executionError,
-        timestamp: new Date(),
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
+      await processResponse(aiResponse);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
