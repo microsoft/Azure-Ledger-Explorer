@@ -31,8 +31,7 @@ import {
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Editor } from '@monaco-editor/react';
 import { AddFilesWizard } from './AddFilesWizard';
 import { CCFDatabase } from '../database/ccf-database';
 import { useAllTransactionsCount } from '../hooks/use-ccf-data';
@@ -545,26 +544,45 @@ const useStyles = makeStyles({
   },
 });
 
-// Custom markdown components for syntax highlighting
+// Custom markdown components for syntax highlighting with Monaco
 const markdownComponents = {
   code({ node, inline, className, children, ...props }: any) {
     const match = /language-(\w+)/.exec(className || '');
-    const language = match ? match[1] : '';
+    const language = match ? match[1] : 'text';
+    const code = String(children).replace(/\n$/, '');
     
     return !inline && match ? (
-      <SyntaxHighlighter
-        style={oneDark}
-        language={language}
-        PreTag="div"
-        customStyle={{
-          margin: '12px 0',
-          borderRadius: '8px',
-          fontSize: '14px',
-        }}
-        {...props}
-      >
-        {String(children).replace(/\n$/, '')}
-      </SyntaxHighlighter>
+      <div style={{ margin: '12px 0', borderRadius: '8px', overflow: 'hidden' }}>
+        <Editor
+          height="auto"
+          language={language}
+          value={code}
+          theme="vs-dark"
+          options={{
+            readOnly: true,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            lineNumbers: 'off',
+            glyphMargin: false,
+            folding: false,
+            lineDecorationsWidth: 0,
+            lineNumbersMinChars: 0,
+            overviewRulerBorder: false,
+            hideCursorInOverviewRuler: true,
+            overviewRulerLanes: 0,
+            scrollbar: {
+              vertical: 'hidden',
+              horizontal: 'auto',
+              verticalScrollbarSize: 0,
+              horizontalScrollbarSize: 8,
+            },
+            wordWrap: 'on',
+            automaticLayout: true,
+            fontSize: 14,
+            fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
+          }}
+        />
+      </div>
     ) : (
       <code className={className} {...props}>
         {children}
@@ -572,7 +590,7 @@ const markdownComponents = {
     );
   },
   pre({ children }: any) {
-    // If the pre contains a code block with syntax highlighting, don't add extra styling
+    // If the pre contains a code block with Monaco, don't add extra styling
     return <>{children}</>;
   },
 };
