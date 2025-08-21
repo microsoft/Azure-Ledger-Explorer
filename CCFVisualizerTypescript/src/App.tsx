@@ -33,7 +33,7 @@ function App() {
   });
   
   // Chat state management
-  const [hasActiveChat, setHasActiveChat] = useState(false);
+  const [, setHasActiveChat] = useState(false);
   const [clearChatFunction, setClearChatFunction] = useState<(() => void) | null>(null);
   
   const currentTheme = isDarkMode ? webDarkTheme : webLightTheme;
