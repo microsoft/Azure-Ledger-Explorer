@@ -30,6 +30,7 @@ import {
   Edit24Regular,
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { AddFilesWizard } from './AddFilesWizard';
@@ -570,7 +571,7 @@ const markdownComponents = {
       </code>
     );
   },
-  pre({ children, ...props }: any) {
+  pre({ children }: any) {
     // If the pre contains a code block with syntax highlighting, don't add extra styling
     return <>{children}</>;
   },
@@ -1478,7 +1479,7 @@ export const AIChat: React.FC<AIChatProps> = ({
                       </Text>
                     ) : (
                       <div className={styles.markdownContent}>
-                        <ReactMarkdown components={markdownComponents}>
+                        <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
                           {message.content}
                         </ReactMarkdown>
                       </div>
