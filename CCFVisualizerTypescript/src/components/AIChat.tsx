@@ -403,6 +403,7 @@ const useStyles = makeStyles({
     whiteSpace: 'pre-wrap',
     overflowWrap: 'break-word',
     overflowY: 'auto',
+    color: tokens.colorNeutralForeground1,
     '&:focus': {
       outline: 'none',
     },
