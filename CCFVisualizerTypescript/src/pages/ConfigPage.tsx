@@ -18,12 +18,15 @@ import {
   DialogContent,
   DialogBody,
   DialogActions,
+  Caption1,
+  Spinner,
 } from '@fluentui/react-components';
 import {
   Settings24Regular,
   Delete24Regular,
   DatabaseArrowDownRegular,
   DocumentAdd24Regular,
+  ErrorCircle16Regular,
 } from '@fluentui/react-icons';
 import defaultSystemPrompt from '../assets/defaultSystemPrompt.md?raw';
 import { 
@@ -33,6 +36,7 @@ import {
   useDropDatabase,
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from '../components/AddFilesWizard';
+import { useTools } from '../hooks/use-tools';
 
 const useStyles = makeStyles({
   container: {
@@ -73,6 +77,24 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     ...shorthands.gap('16px'),
   },
+  toolsList: {
+    marginTop: '8px',
+    padding: '8px',
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  toolItem: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
+    marginRight: '12px',
+  },
+  statusMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    marginTop: '4px',
+  },
 });
 
 interface AppConfig {
@@ -110,6 +132,9 @@ export const ConfigPage: React.FC = () => {
   const { data: stats } = useStats();
   const clearAllDataMutation = useClearAllData();
   const dropDatabaseMutation = useDropDatabase();
+  
+  // Fetch tools when baseUrl changes
+  const { data: toolsData, isLoading: isLoadingTools, error: toolsError } = useTools(config.baseUrl);
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
@@ -265,15 +290,55 @@ export const ConfigPage: React.FC = () => {
           />
           <div className={styles.configContent}>
             <Text size={200}>
-              Configuration for the AI chat assistant. Set the base URL for the OpenAI API and the system prompt.
+              Configuration for the AI chat. Set the base URL for the OpenAI API and tweak the system prompt.
             </Text>
 
-            <Field label="Base URL for chat responses (OpenAI response API)">
+            <Field label="Base URL for chat integration">
               <Input
                 type="url"
                 placeholder="https://xyz.cognitiveservices.azure.com/"
                 value={config.baseUrl}
                 onChange={(_, data) => setConfig(prev => ({ ...prev, baseUrl: data.value }))} />
+              
+              {/* Tools status and list */}
+              {config.baseUrl && (
+                <>
+                  {isLoadingTools && (
+                    <div className={styles.statusMessage}>
+                      <Spinner size="tiny" />
+                      <Caption1>Loading available tools...</Caption1>
+                    </div>
+                  )}
+                  
+                  {toolsError && (
+                    <div className={styles.statusMessage}>
+                      <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
+                      <Caption1 style={{ color: tokens.colorPaletteRedForeground1 }}>
+                        Failed to fetch tools: {toolsError.message}
+                      </Caption1>
+                    </div>
+                  )}
+                  
+                  {toolsData?.tools && toolsData.tools.length > 0 && (
+                    <div className={styles.toolsList}>
+                      <Caption1>
+                        <span>Available tools ({toolsData.tools.length}):</span>{' '}
+                        {toolsData.tools.map((tool, index) => (
+                          <span key={index} className={styles.toolItem}>
+                            {tool.name}
+                          </span>
+                        ))}
+                      </Caption1>
+                    </div>
+                  )}
+                  
+                  {toolsData?.tools && toolsData.tools.length === 0 && (
+                    <div className={styles.statusMessage}>
+                      <Caption1>No tools available, check if server is running or can access MCP tools</Caption1>
+                    </div>
+                  )}
+                </>
+              )}
             </Field>
 
             <Field label="System prompt">
