@@ -153,12 +153,10 @@ export class CtsFilesService {
       }
     }
     const validation = validateLedgerSequence([], files);
-    if (validation.isValid) {
-      return validation.sortedFiles;
+    if (!validation.isValid) {
+      console.warn(`Ledger files validation failed:`, validation.errors);
     }
-    else {
-      return [];
-    }
+    return validation.sortedFiles;
   }
 
   async downloadLedgerFiles(ledgerFile: LedgerFileInfo): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {

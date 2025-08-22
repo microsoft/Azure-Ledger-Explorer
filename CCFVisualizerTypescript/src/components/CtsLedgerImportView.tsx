@@ -95,6 +95,56 @@ const useStyles = makeStyles({
     },
 });
 
+export const useDownloadCtsFiles = (initialDomain?: string) => {
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
+    const [domain, setDomain] = useState<string>(initialDomain || '');
+    const { handleFiles } = useFileDrop();
+    const { config } = useConfig();
+
+    const downloadFiles = async (targetDomain?: string) => {
+        const domainToUse = targetDomain || domain;
+        
+        if (!domainToUse) {
+            setError('Domain is required to download files');
+            return;
+        }
+
+        setIsDownloading(true);
+        setError(null);
+        setDownloadedFiles([]);
+
+        try {
+            const fileShareService = new CtsFilesService();
+            await fileShareService.initialize(domainToUse, config.ctsProxyUrl);
+            const ledgerFiles = await fileShareService.listLedgerFiles();
+
+            const allDownloadedFiles: File[] = [];
+            for (const file of ledgerFiles) {
+                const { files: downloadedFiles } = await fileShareService.downloadLedgerFiles(file);
+                allDownloadedFiles.push(...downloadedFiles);
+                setDownloadedFiles((prev) => [...prev, ...downloadedFiles]);
+            }
+
+            await handleFiles(allDownloadedFiles);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Failed to download ledger files');
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
+    return { 
+        isDownloading, 
+        error, 
+        downloadedFiles, 
+        domain,
+        setDomain,
+        downloadFiles 
+    };
+};
+
 export const CtsLedgerImportView: React.FC = () => {
     const styles = useStyles();
     const clearAllDataMutation = useClearAllData();

@@ -31,13 +31,14 @@ import {
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Editor } from '@monaco-editor/react';
 import { AddFilesWizard } from './AddFilesWizard';
+
 import { CCFDatabase } from '../database/ccf-database';
 import { useAllTransactionsCount } from '../hooks/use-ccf-data';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import type { WriteReceipt } from '../types/write-receipt-types';
+import { useDownloadCtsFiles } from './CtsLedgerImportView';
 
 // Direct IndexedDB check function
 const checkIndexedDBForCheckpoints = async (): Promise<any[]> => {
@@ -76,19 +77,31 @@ const checkIndexedDBForCheckpoints = async (): Promise<any[]> => {
   });
 };
 
+const UIActionName = {
+  ImportCTS: 'importcts',
+  RunSQL: 'runsql',
+  VerifyLedger: 'verifyledger',
+  VerifyReceipt: 'verifyreceipt',
+} as const;
+
+type UIActionName = typeof UIActionName[keyof typeof UIActionName] | string;
+
+interface UIAction {
+  actionName: UIActionName;
+  actionContent?: string;
+  actionResult?: any;
+  actionError?: string;
+}
+
 interface ChatMessage {
   id: string;
   state: 'initial' | 'streaming' | 'finished';
   role: 'user' | 'assistant';
   responseId?: string;
   content: string;
-  sqlQuery?: string;
-  sqlResult?: unknown[];
   timestamp: Date;
   error?: string;
-  // New verification action fields
-  verificationAction?: 'ledger' | 'receipt';
-  verificationResult?: unknown;
+  actions?: UIAction[];
   receiptData?: {
     receipt: WriteReceipt;
     networkCert: string;
@@ -443,57 +456,6 @@ const useStyles = makeStyles({
   },
 });
 
-// Custom markdown components for syntax highlighting with Monaco
-const markdownComponents = {
-  code({ node, inline, className, children, ...props }: any) {
-    const match = /language-(\w+)/.exec(className || '');
-    const language = match ? match[1] : 'text';
-    const code = String(children).replace(/\n$/, '');
-    
-    return !inline && match ? (
-      <div style={{ margin: '12px 0', borderRadius: '8px', overflow: 'hidden' }}>
-        <Editor
-          height="auto"
-          language={language}
-          value={code}
-          theme="vs-dark"
-          options={{
-            readOnly: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            lineNumbers: 'off',
-            glyphMargin: false,
-            folding: false,
-            lineDecorationsWidth: 0,
-            lineNumbersMinChars: 0,
-            overviewRulerBorder: false,
-            hideCursorInOverviewRuler: true,
-            overviewRulerLanes: 0,
-            scrollbar: {
-              vertical: 'hidden',
-              horizontal: 'auto',
-              verticalScrollbarSize: 0,
-              horizontalScrollbarSize: 8,
-            },
-            wordWrap: 'on',
-            automaticLayout: true,
-            fontSize: 14,
-            fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
-          }}
-        />
-      </div>
-    ) : (
-      <code className={className} {...props}>
-        {children}
-      </code>
-    );
-  },
-  pre({ children }: any) {
-    // If the pre contains a code block with Monaco, don't add extra styling
-    return <>{children}</>;
-  },
-};
-
 export const AIChat: React.FC<AIChatProps> = ({ 
   database, 
   onChatStateChange, 
@@ -517,7 +479,8 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Add verification hooks
   const verification = useVerification();
   const hasMessages = messages.length > 0;
-  
+  const { error: ctsError, setDomain: setCtsDomain, downloadFiles: downloadCtsFiles } = useDownloadCtsFiles();
+
   // Force refresh checkpoints when component mounts
   useEffect(() => {
     const refreshCheckpointsOnMount = async () => {
@@ -599,15 +562,6 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   const getSystemPrompt = () => {
     return config.systemPrompt;
-  };
-
-  const executeQuery = async (sqlQuery: string): Promise<unknown[]> => {
-    try {
-      return await database.executeQuery(sqlQuery);
-    } catch (error) {
-      console.error('SQL execution error:', error);
-      throw error;
-    }
   };
 
   const executeLedgerVerification = async (): Promise<unknown> => {
@@ -833,8 +787,10 @@ export const AIChat: React.FC<AIChatProps> = ({
     // collect prior conversations as history for this question
     messages.forEach(m => {
       input += `${m.role} said: ${m.content}\n`;
-      if (m.sqlResult) {
-        input += `\nSQL Query Result: ${JSON.stringify(m.sqlResult, null, 2)}\n`;
+      if (m.actions && m.actions.length > 0) {
+        m.actions.forEach(a => {
+          input += `\nAction result for ${a.actionName} is ${a.actionResult ? JSON.stringify(a.actionResult) : 'not available'} ${a.actionError ? ` action error: ${a.actionError}` : ''} \n`;
+        });
       }
     });
 
@@ -865,27 +821,19 @@ export const AIChat: React.FC<AIChatProps> = ({
     return response;
   };
 
-  const extractSqlQuery = (content: string): string | null => {
-    const sqlMatch = content.match(/```sql\n([\s\S]*?)\n```/);
-    const query = sqlMatch ? sqlMatch[1].trim() : null;
-    
-    // Don't treat verification commands as SQL queries
-    if (query && (query.includes('VERIFY_LEDGER') || query.includes('VERIFY_RECEIPT'))) {
-      return null;
-    }
-    
-    return query;
-  };
+  const extractActions = (content: string): Array<UIAction> => {
+    const actionRegex = /```action:([a-zA-Z_][a-zA-Z0-9_]*)\n([\s\S]*?)```/g;
+    const actions: Array<UIAction> = [];
 
-  const extractVerificationCommand = (content: string): 'ledger' | 'receipt' | null => {
-    if (content.includes('VERIFY_LEDGER')) {
-      return 'ledger';
+    let match;
+    while ((match = actionRegex.exec(content)) !== null) {
+      const actionName = match[1].trim();
+      const actionContent = match[2].trim();
+      actions.push({ actionName, actionContent });
     }
-    if (content.includes('VERIFY_RECEIPT')) {
-      return 'receipt';
-    }
-    return null;
-  };
+    
+    return actions;
+  }
 
   const processResponse = async (response: Response) => {
     if (!response.body) {
@@ -977,55 +925,64 @@ export const AIChat: React.FC<AIChatProps> = ({
     } finally {
       reader.releaseLock();
     }
-      
-    // Once finished perform other actions
-    // ------------------
 
-    // Check if the response contains a SQL query
-    const sqlQuery = extractSqlQuery(fullResponseText);
-    
-    // Check if the response contains a verification command
-    const verificationCommand = extractVerificationCommand(fullResponseText);
-    
-    let sqlResult: unknown[] | undefined;
-    let verificationResult: unknown | undefined;
-    let executionError: string | undefined;
+    return fullResponseText;
+  }
 
-    // Execute SQL query if present
-    if (sqlQuery) {
-      try {
-        sqlResult = await executeQuery(sqlQuery);
-      } catch (err) {
-        executionError = err instanceof Error ? err.message : 'SQL execution failed';
-      }
-    }
-
-    // Execute verification command if present
-    if (verificationCommand) {
-      try {
-        if (verificationCommand === 'ledger') {
-          verificationResult = await executeLedgerVerification();
-        } else if (verificationCommand === 'receipt') {
-          verificationResult = await executeReceiptVerification();
+  const postprocessResponse = async (message: string) => {
+    const actions = extractActions(message);
+    for (const action of actions) {
+      if (action.actionName === UIActionName.RunSQL) {
+        const sqlQuery = action.actionContent;
+        if (!sqlQuery || !sqlQuery.trim() || !database) {
+          action.actionError = 'Could not execute SQL query.' + (database ? '' : ' Database not initialized.');
+          continue;
         }
-      } catch (err) {
-        executionError = err instanceof Error ? err.message : 'Verification execution failed';
+        try {
+          action.actionResult = await database.executeQuery(sqlQuery);
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'SQL execution failed';
+        }
+      } else if (action.actionName === UIActionName.VerifyLedger) {
+        try {
+          action.actionResult = await executeLedgerVerification();
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'Ledger verification failed';
+        }
+      } else if (action.actionName === UIActionName.VerifyReceipt) {
+        try {
+          action.actionResult = await executeReceiptVerification();
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'Receipt verification failed';
+        }
+      } else if (action.actionName === UIActionName.ImportCTS) {
+        if (!action.actionContent) {
+          action.actionError = 'CTS domain was missing';
+          continue
+        }
+        try {
+          await downloadCtsFiles(action.actionContent.trim());
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'Failed to download CTS files';
+          continue;
+        }
+        if (ctsError) {
+          action.actionError = ctsError;
+        } else {
+          action.actionResult = 'CTS files downloaded successfully';
+        }
       }
     }
-
-    setMessages(prev => {
-      const updated = [...prev];
-      const last = updated[updated.length - 1];
-      if (last) {
-        last.sqlQuery = sqlQuery || undefined;
-        last.sqlResult = sqlResult;
-        last.verificationAction = verificationCommand || undefined;
-        last.verificationResult = verificationResult;
-        last.error = executionError;
-        last.timestamp = new Date();
-      }
-      return updated;
-    });
+    if (actions.length > 0) {
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last) {
+          last.actions = actions;
+        }
+        return updated;
+      });
+    }
   }
 
   const handleSendMessage = async (optionalMessage?: string) => {
@@ -1047,7 +1004,10 @@ export const AIChat: React.FC<AIChatProps> = ({
     try {
       // Get AI response
       const aiResponse = await callOpenAIResponseAPI(messages, userMessage.content);
-      await processResponse(aiResponse);
+      // Stream response to chat
+      const messageText = await processResponse(aiResponse);
+      // Execute actions
+      await postprocessResponse(messageText);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -1210,9 +1170,9 @@ export const AIChat: React.FC<AIChatProps> = ({
           <div className={styles.starterTemplates}>
             <CompoundButton
               icon={<ChatAddRegular />}
-              secondaryContent="How does MAA's attestation work?"
+              secondaryContent="How does MAA's SGX attestation work?"
               appearance="transparent"
-              onClick={() => startFromExample("How does MAA's attestation work?")}
+              onClick={() => startFromExample("How does MAA's SGX attestation work?")}
             >
               Azure Attestation
             </CompoundButton>
@@ -1235,16 +1195,17 @@ export const AIChat: React.FC<AIChatProps> = ({
               Transparency
             </CompoundButton>
 
+            <CompoundButton
+              icon={<ChatAddRegular />}
+              secondaryContent="Can you show me the history of MAA builds?"
+              appearance="transparent"
+              onClick={() => startFromExample("Can you show me the history of MAA builds?")}
+            >
+              Transparency
+            </CompoundButton>
+
             {allTransactionsCount && allTransactionsCount > 0 ? (
               <>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="Can you show me the history of MAA builds?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("Can you show me the history of MAA builds?")}
-                >
-                  Transparency
-                </CompoundButton>
                 <CompoundButton
                   icon={<ChatAddRegular />}
                   secondaryContent="How many transactions are in the database?"
@@ -1285,73 +1246,6 @@ export const AIChat: React.FC<AIChatProps> = ({
               }}
             >
 
-            {/* Starter templates when no conversation is present */}
-            {messages.length === 0 && (
-              <div className={styles.starterTemplates}>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="How does MAA’s attestation work?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("How does MAA’s attestation work?")}
-                >
-                  Azure Attestation
-                </CompoundButton>
-
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="How can I trust MAA?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("How can I trust MAA?")}
-                >
-                  Azure Attestation
-                </CompoundButton>
-
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="Can you verify that MAA is transparent right now?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("Can you verify that MAA is transparent right now?")}
-                >
-                  Transparency
-                </CompoundButton>
-
-                { allTransactionsCount && allTransactionsCount > 0 ? (<>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="Can you show me the history of MAA builds?"
-                    appearance="transparent"
-                    onClick={() => startFromExample("Can you show me the history of MAA builds?")}
-                  >
-                    Transparency
-                  </CompoundButton>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="How many transactions are in the database?"
-                    appearance="transparent"
-                    onClick={() => startFromExample("How many transactions are in the database?")}
-                  >
-                    Ledger
-                  </CompoundButton>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="Show me recent transactions"
-                    appearance="transparent"
-                    onClick={() => startFromExample("Show me recent transactions")}
-                  >
-                    Ledger
-                  </CompoundButton>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="Find transactions with specific keys"
-                    appearance="transparent"
-                    onClick={() => startFromExample("Find transactions with specific keys")}
-                  >
-                    Ledger
-                  </CompoundButton>
-                </>) : null }
-              </div>
-            )}
-
             {messages.map((message) => (
               <div key={message.id} className={message.role === 'user' ? styles.userMessageContainer : styles.messageContainer} data-message-role={message.role} data-message-id={message.id}>
                 
@@ -1363,45 +1257,35 @@ export const AIChat: React.FC<AIChatProps> = ({
                       </Text>
                     ) : (
                       <div className={styles.markdownContent}>
-                        <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
                         </ReactMarkdown>
                       </div>
                     )}
-                    
-                    {message.sqlQuery && (
-                      <div className={styles.sqlSection}>
-                        <Text size={200} weight="semibold" className={styles.sqlHeader}>
-                          SQL Query:
-                        </Text>
-                        <pre className={styles.sqlQuery}>
-                          {message.sqlQuery}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {message.sqlResult && (
-                      <div className={styles.sqlSection}>
-                        <Text size={200} weight="semibold" className={styles.sqlResultHeader}>
-                          Result:
-                        </Text>
-                        <pre className={styles.sqlResult}>
-                          {formatSqlResult(message.sqlResult)}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {(message.verificationResult !== undefined && message.verificationResult !== null) && (
-                      <div className={styles.sqlSection}>
-                        <Text size={200} weight="semibold" className={styles.sqlResultHeader}>
-                          {message.verificationAction === 'ledger' ? 'Ledger Verification:' : 'Receipt Verification:'}
-                        </Text>
-                        <pre className={styles.sqlResult}>
-                          {typeof message.verificationResult === 'string' 
-                            ? message.verificationResult 
-                            : JSON.stringify(message.verificationResult, null, 2)}
-                        </pre>
-                      </div>
+
+                    {message.actions && message.actions.length > 0 && (
+                      <>{message.actions.map((action, index) => (
+                        <div className={styles.sqlSection}>
+                          <Text size={200} weight="semibold" className={styles.sqlHeader}>
+                            Action: {action.actionName}
+                          </Text>
+                          {action.actionResult && <pre className={styles.sqlQuery}>
+                            {action.actionName === UIActionName.RunSQL ? (
+                              <>{formatSqlResult(action.actionResult)}</>
+                            ) : (
+                              <>{typeof action.actionResult === 'string'
+                                ? action.actionResult
+                                : JSON.stringify(action.actionResult, null, 2)}</>
+                            )}
+                          </pre>}
+                          {action.actionError && (
+                            <MessageBar intent="error">
+                              <Text size={200}>Error: {action.actionError}</Text>
+                            </MessageBar>
+                          )}
+                        </div>
+                      ))}
+                      </>
                     )}
                     
                     {message.error && (
