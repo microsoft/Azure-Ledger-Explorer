@@ -20,6 +20,7 @@ import {
 import { 
   useStats,
 } from '../hooks/use-ccf-data';
+import ccfLogo from '../assets/ccf.svg';
 
 const useStyles = makeStyles({
   header: {
@@ -71,26 +72,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
-    const getActiveTab = () => {
-    if (location.pathname.startsWith('/tables')) {
-      return 'tables';
-    } else if (location.pathname.startsWith('/stats')) {
-      return 'stats';
-    } else if (location.pathname.startsWith('/chat')) {
-      return 'chat';
-    } else if (location.pathname.startsWith('/config')) {
-      return 'config';
-    } else if (location.pathname.startsWith('/files')) {
-      return 'files';
-    } else if (location.pathname.startsWith('/verification')) {
-      return 'verification';
-    } else if (location.pathname.startsWith('/write-receipt')) {
-      return 'write-receipt';
-    } else if (location.pathname.startsWith('/config')) {
-      return 'config';
-    }
-  };
-
   const handleTabChange = (tabValue: string) => {
     if (tabValue === 'files') {
       navigate('/files');
@@ -113,7 +94,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     <header className={styles.header}>
       <div className={styles.headerContent}>
         <a className={styles.logo} href="/" title='Sage'>
-          <img height={30} src="/src/assets/ccf.svg" alt="Sage Logo" />
+          <img height={30} src={ccfLogo} alt="Sage Logo" />
         </a>
       </div>
 
