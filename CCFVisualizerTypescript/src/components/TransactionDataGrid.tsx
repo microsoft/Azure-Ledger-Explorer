@@ -29,7 +29,7 @@ const useStyles = makeStyles({
   mapNameContainer: {
     fontFamily: 'monospace',
     fontSize: '13px',
-    maxWidth: '100px',
+    maxWidth: '200px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',

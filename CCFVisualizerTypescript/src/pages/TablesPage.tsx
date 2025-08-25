@@ -26,7 +26,7 @@ const useStyles = makeStyles({
     container: {
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100%',
         overflow: 'hidden',
     },
     header: {
@@ -263,7 +263,7 @@ const TablesPage: React.FC = () => {
                             <Text size={600} weight="semibold">
                                 Transaction History: {selectedKey.keyName}
                             </Text>
-                            <Text size={300} style={{ display: 'block', marginTop: '4px' }}>
+                            <Text size={300} style={{ display: 'block', marginTop: '4px'}}>
                                 Table: {selectedKey.mapName}
                             </Text>
                         </div>
@@ -463,20 +463,20 @@ const TablesPage: React.FC = () => {
                                                             <div className={classes.actionButtons}>
                                                                 <Tooltip content="View transaction history for this key" relationship="label">
                                                                     <Button
-                                                                        appearance="subtle"
+                                                                        appearance="outline"
                                                                         size="small"
                                                                         onClick={() => handleKeySelect(kv.keyName)}
                                                                     >
-                                                                        <HistoryRegular />
+                                                                        <HistoryRegular /> <span>History</span>
                                                                     </Button>
                                                                 </Tooltip>
                                                                 <Tooltip content="View transaction details" relationship="label">
                                                                     <Button
-                                                                        appearance="subtle"
+                                                                        appearance="outline"
                                                                         size="small"
                                                                         onClick={() => handleTransactionSelect(kv.transactionId)}
                                                                     >
-                                                                        <ChevronRightRegular />
+                                                                        <span>Details</span> <ChevronRightRegular />
                                                                     </Button>
                                                                 </Tooltip>
                                                             </div>

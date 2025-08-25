@@ -118,16 +118,16 @@ interface AIChatProps {
 const useStyles = makeStyles({
   container: {
     display: 'flex',
-    height: '100vh',
-    minHeight: 0,
+    minHeight: '100%',
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
   },
   containerWithMessages: {
     display: 'flex',
+    minHeight: '100%',
     height: '100vh',
-    minHeight: 0,
+    overflowY: 'auto', // Enable vertical scrolling when messages are present
     flexDirection: 'column',
     justifyContent: 'flex-start',
     alignItems: 'center',
@@ -143,18 +143,15 @@ const useStyles = makeStyles({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    minWidth: 0,
-    minHeight: 0,
     width: '100%',
     maxWidth: '830px',
-    height: '100vh',
+    marginBottom: '220px', // Space for input area
   },
   chatCard: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
-    height: '100vh',
     backgroundColor: tokens.colorNeutralBackground1,
   },
   messagesArea: {
@@ -479,7 +476,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Add verification hooks
   const verification = useVerification();
   const hasMessages = messages.length > 0;
-  const { error: ctsError, setDomain: setCtsDomain, downloadFiles: downloadCtsFiles } = useDownloadCtsFiles();
+  const { error: ctsError, downloadFiles: downloadCtsFiles } = useDownloadCtsFiles();
 
   // Force refresh checkpoints when component mounts
   useEffect(() => {
@@ -508,9 +505,11 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Auto-scroll to always keep the most recent user message at the top of the screen
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     if (messages.length > 0) {
       // Use a small delay to ensure DOM is updated
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         // Find the most recent user message and keep it at the top
         const userMessages = messages.filter(m => m.role === 'user');
         
@@ -525,13 +524,20 @@ export const AIChat: React.FC<AIChatProps> = ({
             // Always scroll to show the most recent user message at the top
             userMessageElement.scrollIntoView({ 
               behavior: 'smooth', 
-              block: 'start',
+              block: 'end', // bottom of the message, this is important when streaming content into view
               inline: 'nearest'
             });
           }
         }
       }, 150); // Slightly longer delay to ensure content is fully rendered
     }
+    
+    // Cleanup function to cancel timeout if messages change
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [messages]);
 
   // Auto-resize textarea
@@ -1264,7 +1270,7 @@ export const AIChat: React.FC<AIChatProps> = ({
                     )}
 
                     {message.actions && message.actions.length > 0 && (
-                      <>{message.actions.map((action, index) => (
+                      <>{message.actions.map((action, _) => (
                         <div className={styles.sqlSection}>
                           <Text size={200} weight="semibold" className={styles.sqlHeader}>
                             Action: {action.actionName}
