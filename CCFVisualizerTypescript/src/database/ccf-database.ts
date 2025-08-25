@@ -4,11 +4,16 @@
 import initSqlJs from 'sql.js';
 import type { Database, SqlJsStatic } from 'sql.js';
 import type { Transaction, LedgerKeyValue, DatabaseTransaction } from '../types/ccf-types';
+import { cborArrayToText } from '../parser/cose-cbor-to-text';
 
 export interface DatabaseConfig {
   filename: string;
   useOpfs?: boolean;
 }
+
+const DecodeCborTables = [
+  "public:scitt.entry",
+];
 
 export class CCFDatabase {
   private db: Database | null = null;
@@ -135,6 +140,22 @@ export class CCFDatabase {
     // `);
   }
 
+  decodeWriteTransactionValue(value: Uint8Array, table?: string): string {
+    let valueText = '';
+    if (value && value.length > 0) {
+      try {
+        if (DecodeCborTables.includes(table || '')) {
+          valueText = cborArrayToText(value);
+        } else {
+          valueText = new TextDecoder('utf-8', { fatal: false }).decode(value);
+        }
+      } catch {
+        valueText = '';
+      }
+    }
+    return valueText;
+  }
+
   /**
    * Insert a ledger file record
    */
@@ -220,15 +241,7 @@ export class CCFDatabase {
 
         // Insert writes immediately
         for (const write of transaction.publicDomain.writes) {
-          let valueText = '';
-          if (write.value && write.value.length > 0) {
-            try {
-              valueText = new TextDecoder('utf-8', { fatal: false }).decode(write.value);
-            } catch {
-              valueText = '';
-            }
-          }
-
+          let valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
           writeStmt.run([
             txId,
             write.mapName || '', // Use mapName from individual write
@@ -310,15 +323,7 @@ export class CCFDatabase {
       `);
 
       for (const write of transaction.publicDomain.writes) {
-        let valueText = '';
-        if (write.value && write.value.length > 0) {
-          try {
-            valueText = new TextDecoder('utf-8', { fatal: false }).decode(write.value);
-          } catch {
-            valueText = '';
-          }
-        }
-
+        let valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
         writeStmt.run([
           txId,
           write.mapName || '', // Use mapName from individual write
@@ -472,11 +477,11 @@ export class CCFDatabase {
         CAST(t.version AS TEXT) LIKE ? OR
         EXISTS (
           SELECT 1 FROM kv_writes kw 
-          WHERE kw.transaction_id = t.id AND kw.map_name LIKE ?
+          WHERE kw.transaction_id = t.id AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
         )
       )`;
       const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
     sql += ` ORDER BY t.id LIMIT ? OFFSET ?`;
@@ -525,11 +530,11 @@ export class CCFDatabase {
         CAST(t.version AS TEXT) LIKE ? OR
         EXISTS (
           SELECT 1 FROM kv_writes kw 
-          WHERE kw.transaction_id = t.id AND kw.map_name LIKE ?
+          WHERE kw.transaction_id = t.id AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
         )
       )`;
       const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern);
+      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
     const result = this.db.exec(sql, params);
