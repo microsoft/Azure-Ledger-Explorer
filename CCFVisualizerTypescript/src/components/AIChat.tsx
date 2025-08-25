@@ -505,7 +505,7 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Auto-scroll to always keep the most recent user message at the top of the screen
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: any;
     
     if (messages.length > 0) {
       // Use a small delay to ensure DOM is updated
