@@ -241,7 +241,7 @@ export class CCFDatabase {
 
         // Insert writes immediately
         for (const write of transaction.publicDomain.writes) {
-          let valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
+          const valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
           writeStmt.run([
             txId,
             write.mapName || '', // Use mapName from individual write
@@ -323,7 +323,7 @@ export class CCFDatabase {
       `);
 
       for (const write of transaction.publicDomain.writes) {
-        let valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
+        const valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
         writeStmt.run([
           txId,
           write.mapName || '', // Use mapName from individual write
@@ -467,7 +467,7 @@ export class CCFDatabase {
       WHERE t.file_id = ?
     `;
 
-    const params: any[] = [fileId];
+    const params: (string | number)[] = [fileId];
 
     // Add search filtering if provided
     if (searchQuery && searchQuery.trim()) {
@@ -520,7 +520,7 @@ export class CCFDatabase {
       WHERE t.file_id = ?
     `;
 
-    const params: any[] = [fileId];
+    const params: (string | number)[] = [fileId];
 
     // Add search filtering if provided
     if (searchQuery && searchQuery.trim()) {

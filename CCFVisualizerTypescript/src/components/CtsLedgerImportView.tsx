@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+/* eslint-disable react-refresh/only-export-components */
 import { CtsFilesService } from '../services/CtsFilesService';
 import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
 import {

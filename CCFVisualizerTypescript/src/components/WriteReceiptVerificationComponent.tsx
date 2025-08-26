@@ -121,7 +121,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
 
       setParseError(null);
       setParsedReceipt(parsed);
-    } catch (err) {
+    } catch {
       setParseError('Invalid JSON format');
       setParsedReceipt(null);
     }

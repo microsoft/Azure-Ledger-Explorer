@@ -4,9 +4,9 @@ function typedArrayToBuffer(array: Uint8Array): ArrayBuffer | SharedArrayBuffer 
     return array.buffer.slice(array.byteOffset, array.byteLength + array.byteOffset)
 }
 
-function cborBufferToAny(cbor: ArrayBuffer | SharedArrayBuffer): any {
+function cborBufferToAny(cbor: ArrayBuffer | SharedArrayBuffer): unknown {
     try {
-        const decoded = CBOR.decode(cbor, null, { dictionary: "object" });
+        const decoded = CBOR.decode(cbor, null, { dictionary: "object" }) as { tag?: number; value?: unknown };
         if (decoded.tag === 18) {
             // Handle COSE message
             if (!Array.isArray(decoded.value) || decoded.value.length != 4) {
@@ -30,7 +30,7 @@ function cborBufferToAny(cbor: ArrayBuffer | SharedArrayBuffer): any {
     }
 }
 
-export function cborArrayToAny(cbor: Uint8Array): any {
+export function cborArrayToAny(cbor: Uint8Array): unknown {
     return cborBufferToAny(typedArrayToBuffer(cbor));
 }
 
@@ -53,11 +53,11 @@ function arrayToTextOrHex(input: Uint8Array): string {
     try {
         const decoded = CBOR.decode(input.buffer, null, { dictionary: "object" });
         text = JSON.stringify(decoded);
-    } catch (error) {
+    } catch {
         text = new TextDecoder('utf-8', { fatal: false }).decode(input);
     }
-    return text ? text : arrayToHex(input);
-}``
+    return text || arrayToHex(input);
+}
 
 function arrayToHex(input: Uint8Array): string {
     return Array.from(input).map(b => b.toString(16).padStart(2, '0')).join('');

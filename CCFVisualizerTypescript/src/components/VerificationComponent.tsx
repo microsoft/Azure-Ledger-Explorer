@@ -64,9 +64,7 @@ const useStyles = makeStyles({
   }
 });
 
-export interface VerificationComponentProps {}
-
-export const VerificationComponent: React.FC<VerificationComponentProps> = () => {
+export const VerificationComponent: React.FC = () => {
   const styles = useStyles();
   
   // Simplified configuration without checkpointing

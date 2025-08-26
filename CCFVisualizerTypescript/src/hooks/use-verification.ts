@@ -1,7 +1,7 @@
 // Simplified React hook for verification functionality
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { verificationService, type VerificationServiceEvents } from '../services/verification-service';
+import { verificationService, type SavedProgress, type VerificationServiceEvents } from '../services/verification-service';
 import type { 
   VerificationProgress, 
   VerificationConfig 
@@ -18,7 +18,7 @@ interface UseVerificationResult {
   pause: () => void;
   resume: () => void;
   clearProgress: () => void;
-  getSavedProgress: () => { lastProcessedTransaction: number; totalTransactions: number; status?: string } | null;
+  getSavedProgress: () => SavedProgress;
   canResumeVerification: () => boolean;
 }
 
@@ -74,7 +74,7 @@ export function useVerification(): UseVerificationResult {
       const restoredProgress: VerificationProgress = {
         currentTransaction: savedProgress.lastProcessedTransaction,
         totalTransactions: savedProgress.totalTransactions,
-        status: savedProgress.status as any,
+        status: savedProgress.status as 'stopped' | 'running' | 'paused' | 'completed' | 'failed',
         startTime: Date.now() // Default to current time since we don't store startTime
       };
       setProgress(restoredProgress);

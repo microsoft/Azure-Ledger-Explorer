@@ -8,6 +8,7 @@ import type {
 } from '../types/verification-types';
 
 // Database connection in worker context
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let db: any = null;
 
 class VerificationWorker {
@@ -262,7 +263,7 @@ class VerificationWorker {
       const file = await dbFile.getFile();
       const arrayBuffer = await file.arrayBuffer();
       dbData = new Uint8Array(arrayBuffer);
-    } catch (error) {
+    } catch {
       throw new Error('Database not found. Please load ledger data first.');
     }
 

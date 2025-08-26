@@ -14,6 +14,12 @@ export interface VerificationServiceEvents {
   onStopped: () => void;
 }
 
+export interface SavedProgress {
+  lastProcessedTransaction: number;
+  totalTransactions: number;
+  status?: string;
+}
+
 export class VerificationService {
   private worker: Worker | null = null;
   private events: Partial<VerificationServiceEvents> = {};
@@ -125,12 +131,12 @@ export class VerificationService {
   /**
    * Get saved progress from browser storage with enhanced state information
    */
-  getSavedProgress(): { lastProcessedTransaction: number; totalTransactions: number; status?: string } | null {
+  getSavedProgress(): SavedProgress {
     try {
       const saved = localStorage.getItem('ccf-verification-progress');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? JSON.parse(saved) : { lastProcessedTransaction: 0, totalTransactions: 0 };
     } catch {
-      return null;
+      return { lastProcessedTransaction: 0, totalTransactions: 0 };
     }
   }
 
@@ -176,7 +182,7 @@ export class VerificationService {
         this.events.onProgress?.(message.data);
         break;
 
-      case 'paused':
+      case 'paused': {
         // Handle worker reporting it has paused
         const pausedProgress = {
           currentTransaction: message.data.currentTransaction,
@@ -188,6 +194,7 @@ export class VerificationService {
         this.saveProgressToStorage(pausedProgress);
         this.events.onProgress?.(pausedProgress);
         break;
+      }
 
       case 'completed':
         // Clear saved progress on completion

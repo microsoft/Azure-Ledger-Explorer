@@ -83,9 +83,7 @@ export const useWriteReceiptVerification = (
     })();
   }, [networkCertificate, receipt]);
 
-  const verifyWithLedgerData = React.useCallback(async (
-    _targetTransactionId?: string
-  ) => {
+  const verifyWithLedgerData = React.useCallback(async () => {
     // This will be implemented to check against actual ledger data
     // For now, return the current result
     return verificationResult;
@@ -100,7 +98,7 @@ export const useWriteReceiptVerification = (
 };
 
 // Keep the original hook for backwards compatibility
-export const useVerificationHook = (networkCertificate?: string, receipt?: any) => {
+export const useVerificationHook = (networkCertificate?: string, receipt?: unknown) => {
   const [verificationResult, setVerificationResult] = React.useState<VerificationResult>();
 
   React.useEffect(() => {

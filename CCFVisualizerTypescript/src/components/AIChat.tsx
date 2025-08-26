@@ -39,43 +39,7 @@ import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import type { WriteReceipt } from '../types/write-receipt-types';
 import { useDownloadCtsFiles } from './CtsLedgerImportView';
-
-// Direct IndexedDB check function
-const checkIndexedDBForCheckpoints = async (): Promise<any[]> => {
-  return new Promise((resolve) => {
-    const request = indexedDB.open('CCFVerificationCheckpoints', 1);
-    
-    request.onerror = () => {
-      console.error('Failed to open IndexedDB:', request.error);
-      resolve([]);
-    };
-    
-    request.onsuccess = () => {
-      const db = request.result;
-      
-      if (!db.objectStoreNames.contains('checkpoints')) {
-        console.log('No checkpoints store found');
-        resolve([]);
-        return;
-      }
-      
-      const transaction = db.transaction(['checkpoints'], 'readonly');
-      const store = transaction.objectStore('checkpoints');
-      const getAllRequest = store.getAll();
-      
-      getAllRequest.onerror = () => {
-        console.error('Failed to get checkpoints:', getAllRequest.error);
-        resolve([]);
-      };
-      
-      getAllRequest.onsuccess = () => {
-        const checkpoints = getAllRequest.result;
-        console.log('Direct IndexedDB check found checkpoints:', checkpoints);
-        resolve(checkpoints);
-      };
-    };
-  });
-};
+import type { SavedProgress } from '../services/verification-service';
 
 const UIActionName = {
   ImportCTS: 'importcts',
@@ -89,8 +53,10 @@ type UIActionName = typeof UIActionName[keyof typeof UIActionName] | string;
 interface UIAction {
   actionName: UIActionName;
   actionContent?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   actionResult?: any;
   actionError?: string;
+  cleanedResult?: string;
 }
 
 interface ChatMessage {
@@ -451,6 +417,35 @@ const useStyles = makeStyles({
     fontSize: '14px',
     color: tokens.colorNeutralForeground3,
   },
+  cleanedResult: {
+    ...shorthands.margin('8px', '0'),
+    ...shorthands.padding('12px'),
+    backgroundColor: tokens.colorNeutralBackground2,
+    ...shorthands.borderRadius('8px'),
+    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+  },
+  rawDataDetails: {
+    ...shorthands.margin('8px', '0'),
+    '& summary': {
+      cursor: 'pointer',
+      fontSize: '12px',
+      color: tokens.colorNeutralForeground3,
+      ...shorthands.padding('4px', '0'),
+      '&:hover': {
+        color: tokens.colorNeutralForeground2,
+      },
+    },
+    '& summary::-webkit-details-marker': {
+      display: 'none',
+    },
+    '& summary::before': {
+      content: '"▶ "',
+      fontSize: '10px',
+    },
+    '&[open] summary::before': {
+      content: '"▼ "',
+    },
+  },
 });
 
 export const AIChat: React.FC<AIChatProps> = ({ 
@@ -478,22 +473,6 @@ export const AIChat: React.FC<AIChatProps> = ({
   const hasMessages = messages.length > 0;
   const { error: ctsError, downloadFiles: downloadCtsFiles } = useDownloadCtsFiles();
 
-  // Force refresh checkpoints when component mounts
-  useEffect(() => {
-    const refreshCheckpointsOnMount = async () => {
-      try {
-        console.log('AI: Refreshing checkpoints on component mount...');
-        await verification.refreshCheckpoints();
-        console.log('AI: Mount refresh completed, checkpoints:', verification.checkpoints?.length || 0);
-      } catch (error) {
-        console.error('AI: Failed to refresh checkpoints on mount:', error);
-      }
-    };
-    
-    // Add a small delay to ensure everything is initialized
-    setTimeout(refreshCheckpointsOnMount, 1000);
-  }, [verification.refreshCheckpoints]);
-
   useEffect(() => {
     onChatStateChange?.(hasMessages);
   }, [hasMessages, onChatStateChange]);
@@ -505,7 +484,7 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Auto-scroll to always keep the most recent user message at the top of the screen
   useEffect(() => {
-    let timeoutId: any;
+    let timeoutId: ReturnType<typeof setTimeout>;
     
     if (messages.length > 0) {
       // Use a small delay to ensure DOM is updated
@@ -570,170 +549,16 @@ export const AIChat: React.FC<AIChatProps> = ({
     return config.systemPrompt;
   };
 
-  const executeLedgerVerification = async (): Promise<unknown> => {
+  const executeLedgerVerification = async (): Promise<SavedProgress> => {
     try {
-      console.log('AI: Checking verification status...');
-      console.log('AI: verification.isRunning:', verification.isRunning);
-      console.log('AI: verification.progress:', verification.progress);
-      console.log('AI: verification.checkpoints:', verification.checkpoints);
-      console.log('AI: verification.checkpoints.length:', verification.checkpoints?.length || 0);
-
-      // First check if there's an active verification running
-      if (verification.isRunning && verification.progress) {
-        console.log('AI: Found active verification');
-        const isComplete = verification.progress.status === 'completed';
-        const hasError = !!verification.error;
-        const progress = verification.progress.totalTransactions > 0 
-          ? (verification.progress.currentTransaction / verification.progress.totalTransactions) * 100 
-          : 0;
-        
-        return {
-          status: verification.progress.status,
-          progress: progress,
-          currentTransaction: verification.progress.currentTransaction,
-          totalTransactions: verification.progress.totalTransactions,
-          processedFiles: verification.progress.processedFiles,
-          totalFiles: verification.progress.totalFiles,
-          currentFileName: verification.progress.currentFileName,
-          isComplete,
-          isVerified: isComplete && !hasError,
-          error: verification.error,
-          message: isComplete 
-            ? (hasError ? 'Ledger verification failed' : 'Ledger verification completed successfully')
-            : `Verification in progress: ${progress.toFixed(1)}% (${verification.progress.currentTransaction}/${verification.progress.totalTransactions} transactions)`
-        };
-      }
-
-      // Check for any completed checkpoints from previous sessions
-      if (verification.checkpoints && verification.checkpoints.length > 0) {
-        console.log('AI: Found checkpoints, count:', verification.checkpoints.length);
-        console.log('AI: Checkpoints:', verification.checkpoints);
-        
-        // Find the most recent checkpoint
-        const latestCheckpoint = verification.checkpoints
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-        
-        console.log('AI: Latest checkpoint:', latestCheckpoint);
-        
-        if (latestCheckpoint) {
-          const isCompleted = latestCheckpoint.status === 'pass';
-          const hasError = latestCheckpoint.status === 'fail';
-          const isStopped = latestCheckpoint.status === 'stopped';
-          
-          return {
-            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
-            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
-            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
-            currentFileIndex: latestCheckpoint.currentFileIndex,
-            lastVerifiedFile: latestCheckpoint.lastVerifiedFile,
-            isComplete: isCompleted,
-            isVerified: isCompleted && !hasError,
-            sessionId: latestCheckpoint.id,
-            timestamp: new Date(latestCheckpoint.timestamp).toLocaleString(),
-            failureDetails: latestCheckpoint.failureDetails,
-            message: isCompleted 
-              ? 'Ledger verification completed successfully'
-              : hasError 
-                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
-                : isStopped 
-                  ? `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions. Use resume to continue.`
-                  : `Previous verification processed ${latestCheckpoint.totalTransactionsProcessed} transactions`,
-            debugInfo: {
-              checkpointStatus: latestCheckpoint.status,
-              checkpointTimestamp: latestCheckpoint.timestamp,
-              isCompleted,
-              hasError,
-              isStopped
-            }
-          };
-        }
-      }
-
-      console.log('AI: No verification or checkpoints found');
-      
-      // No verification found - but let's try to refresh checkpoints and check again
-      console.log('AI: Attempting to refresh checkpoints...');
-      try {
-        await verification.refreshCheckpoints();
-        console.log('AI: Checkpoints refreshed, new count:', verification.checkpoints?.length || 0);
-        
-        if (verification.checkpoints && verification.checkpoints.length > 0) {
-          console.log('AI: Found checkpoints after refresh!');
-          const latestCheckpoint = verification.checkpoints
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-          
-          const isCompleted = latestCheckpoint.status === 'pass';
-          const hasError = latestCheckpoint.status === 'fail';
-          
-          return {
-            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
-            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
-            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
-            message: isCompleted 
-              ? 'Ledger verification completed successfully (found after refresh)'
-              : hasError 
-                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
-                : `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions`,
-            refreshedCheckpoints: true
-          };
-        }
-      } catch (refreshError) {
-        console.error('AI: Failed to refresh checkpoints:', refreshError);
-      }
-      
-      // Direct IndexedDB check as a last resort
-      console.log('AI: Trying direct IndexedDB check...');
-      try {
-        const directCheckpoints = await checkIndexedDBForCheckpoints();
-        console.log('AI: Direct IndexedDB found:', directCheckpoints.length, 'checkpoints');
-        
-        if (directCheckpoints.length > 0) {
-          const latestCheckpoint = directCheckpoints
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-          
-          console.log('AI: Latest checkpoint from direct check:', latestCheckpoint);
-          
-          const isCompleted = latestCheckpoint.status === 'pass';
-          const hasError = latestCheckpoint.status === 'fail';
-          
-          return {
-            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
-            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
-            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
-            message: isCompleted 
-              ? 'Ledger verification completed successfully (found via direct IndexedDB check)'
-              : hasError 
-                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
-                : `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions`,
-            foundViaDirectCheck: true,
-            hookCheckpointsCount: verification.checkpoints?.length || 0
-          };
-        }
-      } catch (directError) {
-        console.error('AI: Direct IndexedDB check failed:', directError);
-      }
-
-      return {
-        status: 'not_started',
-        message: 'No ledger verification has been started. Please start verification manually from the verification page.',
-        isRunning: verification.isRunning,
-        hasProgress: !!verification.progress,
-        availableCheckpoints: verification.checkpoints?.length || 0,
-        debugInfo: {
-          hookState: {
-            isRunning: verification.isRunning,
-            hasProgress: !!verification.progress,
-            checkpointsLength: verification.checkpoints?.length || 0,
-            currentSessionId: verification.currentSessionId
-          }
-        }
-      };
+      const result = verification.getSavedProgress();
+      return result;
     } catch (error) {
       console.error('Ledger verification error:', error);
       return {
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown verification error',
-        message: 'Failed to execute ledger verification'
+        lastProcessedTransaction: 0,
+        totalTransactions: 0,
+        status: 'error'
       };
     }
   };
@@ -752,7 +577,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       let receipt: WriteReceipt;
       try {
         receipt = JSON.parse(receiptJson);
-      } catch (error) {
+      } catch {
         return {
           status: 'error',
           error: 'Invalid receipt JSON format',
@@ -846,7 +671,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       throw new Error('Response body is empty');
     }
     // Put blank message which is in progress and periodically update it
-    let message: ChatMessage = {
+    const message: ChatMessage = {
       id: (Date.now() + 1).toString(),
       state: 'streaming',
       role: 'assistant',
@@ -979,6 +804,10 @@ export const AIChat: React.FC<AIChatProps> = ({
         }
       }
     }
+
+    // Process JSON responses to make them more intelligible
+    await processJsonResponses(actions);
+
     if (actions.length > 0) {
       setMessages(prev => {
         const updated = [...prev];
@@ -988,6 +817,66 @@ export const AIChat: React.FC<AIChatProps> = ({
         }
         return updated;
       });
+    }
+  }
+
+  // Helper function to process and clean up JSON responses
+  const processJsonResponses = async (actions: UIAction[]) => {
+    for (const action of actions) {
+      if (action.actionResult && typeof action.actionResult === 'object' && !action.actionError) {
+        try {
+          const jsonString = JSON.stringify(action.actionResult);
+          
+          // Only process if the JSON is complex enough to warrant cleanup
+          if (jsonString.length > 200 && (Array.isArray(action.actionResult) || Object.keys(action.actionResult).length > 3)) {
+            const cleanedResponse = await requestJsonCleanup(jsonString, action.actionName);
+            if (cleanedResponse) {
+              // Store both the original result and the cleaned version
+              action.cleanedResult = cleanedResponse;
+            }
+          }
+        } catch (err) {
+          console.error('Error processing JSON response:', err);
+          // Don't set an error here as this is supplementary processing
+        }
+      }
+    }
+  }
+
+  // Make an AI request to clean up JSON data
+  const requestJsonCleanup = async (jsonString: string, actionName: string): Promise<string | null> => {
+    try {
+      const cleanupPrompt = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and provide context where helpful.
+
+JSON to analyze:
+${jsonString}
+
+Please provide a clean, human-readable summary that captures the essential information without overwhelming technical details.`;
+
+      const response = await fetch(config.baseUrl + '/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stream: false, // Non-streaming for cleanup requests
+          input: cleanupPrompt,
+          instructions: 'You are a helpful assistant that specializes in making complex JSON data more readable and understandable. Focus on clarity, structure, and highlighting important information.',
+          temperature: 0.1,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to request JSON cleanup:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.response?.output?.[0]?.text || null;
+    } catch (err) {
+      console.error('Error requesting JSON cleanup:', err);
+      return null;
     }
   }
 
@@ -1270,20 +1159,48 @@ export const AIChat: React.FC<AIChatProps> = ({
                     )}
 
                     {message.actions && message.actions.length > 0 && (
-                      <>{message.actions.map((action, _) => (
-                        <div className={styles.sqlSection}>
+                      <>{message.actions.map((action, index) => (
+                        <div className={styles.sqlSection} key={index}>
                           <Text size={200} weight="semibold" className={styles.sqlHeader}>
                             Action: {action.actionName}
                           </Text>
-                          {action.actionResult && <pre className={styles.sqlQuery}>
-                            {action.actionName === UIActionName.RunSQL ? (
-                              <>{formatSqlResult(action.actionResult)}</>
-                            ) : (
-                              <>{typeof action.actionResult === 'string'
-                                ? action.actionResult
-                                : JSON.stringify(action.actionResult, null, 2)}</>
-                            )}
-                          </pre>}
+                          {action.cleanedResult && (
+                            <div className={styles.cleanedResult}>
+                              <Text size={200} weight="semibold" className={styles.sqlHeader}>
+                                Summary:
+                              </Text>
+                              <div className={styles.markdownContent}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {action.cleanedResult}
+                                </ReactMarkdown>
+                              </div>
+                              <details className={styles.rawDataDetails}>
+                                <summary>
+                                  <Text size={200}>Show raw data</Text>
+                                </summary>
+                                <pre className={styles.sqlQuery}>
+                                  {action.actionName === UIActionName.RunSQL ? (
+                                    <>{formatSqlResult(action.actionResult)}</>
+                                  ) : (
+                                    <>{typeof action.actionResult === 'string'
+                                      ? action.actionResult
+                                      : JSON.stringify(action.actionResult, null, 2)}</>
+                                  )}
+                                </pre>
+                              </details>
+                            </div>
+                          )}
+                          {action.actionResult && !action.cleanedResult && (
+                            <pre className={styles.sqlQuery}>
+                              {action.actionName === UIActionName.RunSQL ? (
+                                <>{formatSqlResult(action.actionResult)}</>
+                              ) : (
+                                <>{typeof action.actionResult === 'string'
+                                  ? action.actionResult
+                                  : JSON.stringify(action.actionResult, null, 2)}</>
+                              )}
+                            </pre>
+                          )}
                           {action.actionError && (
                             <MessageBar intent="error">
                               <Text size={200}>Error: {action.actionError}</Text>
