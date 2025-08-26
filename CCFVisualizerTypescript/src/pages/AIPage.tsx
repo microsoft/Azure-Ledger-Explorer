@@ -27,11 +27,6 @@ const useStyles = makeStyles({
     ...shorthands.gap('16px'),
     color: tokens.colorPaletteRedForeground1,
   },
-  content: {
-    flex: 1,
-    overflowX: 'hidden',
-    height: '100%',
-  },
 });
 
 interface AIPageProps {
@@ -53,7 +48,7 @@ export const AIPage: React.FC<AIPageProps> = ({
       <div className={styles.container}>
         <div className={styles.loadingContainer}>
           <Spinner size="large" />
-          <Text>Initializing database...</Text>
+          <Text>Loading...</Text>
         </div>
       </div>
     );
@@ -63,9 +58,9 @@ export const AIPage: React.FC<AIPageProps> = ({
     return (
       <div className={styles.container}>
         <div className={styles.errorContainer}>
-          <Text>Database not available</Text>
+          <Text>Error</Text>
           <Text size={200}>
-            Please upload and parse some CCF ledger files first. Error: {error?.message || 'Unknown error'}
+            Error: {error?.message || 'Unknown error'}. Please try refreshing the page and/or clearing cookies and local storage.
           </Text>
         </div>
       </div>
@@ -73,15 +68,11 @@ export const AIPage: React.FC<AIPageProps> = ({
   }
 
   return (
-    <div className={styles.container}>
-      <div className={styles.content}>
-        <AIChat 
-          database={database}
-          onChatStateChange={onChatStateChange}
-          onRegisterClearChat={onRegisterClearChat}
-          clearChatFunction={clearChatFunction}
-        />
-      </div>
-    </div>
+    <AIChat 
+      database={database}
+      onChatStateChange={onChatStateChange}
+      onRegisterClearChat={onRegisterClearChat}
+      clearChatFunction={clearChatFunction}
+    />
   );
 };

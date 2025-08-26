@@ -211,7 +211,7 @@ export const CCFVisualizerApp: React.FC = () => {
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [transactionPage, setTransactionPage] = useState(0);
-  const [sidebarWidth, setSidebarWidth] = useState(290);
+  const [sidebarWidth, setSidebarWidth] = useState(300); // Default sidebar width
   const [isResizing, setIsResizing] = useState(false);
   const [selectedTypeFilters, setSelectedTypeFilters] = useState<Set<TransactionType>>(new Set());
   const pageSize = 50;

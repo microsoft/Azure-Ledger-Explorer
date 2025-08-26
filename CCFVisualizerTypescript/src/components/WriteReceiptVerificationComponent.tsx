@@ -121,7 +121,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
 
       setParseError(null);
       setParsedReceipt(parsed);
-    } catch (err) {
+    } catch {
       setParseError('Invalid JSON format');
       setParsedReceipt(null);
     }
@@ -191,12 +191,12 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
             header={
               <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS }}>
                 <DocumentSearch24Regular />
-                <Text weight="semibold" size={500}>Receipt Verification</Text>
+                <Text weight="semibold" size={500}>ACL Receipt Verification</Text>
               </div>
             }
             description={
               <Text>
-                Verify that a transaction receipt matches the data in the ledger by validating the Merkle tree proof.
+                Verify Azure Confidential Ledger receipt matches the data in the ledger by validating the Merkle tree proof.
               </Text>
             }
             />

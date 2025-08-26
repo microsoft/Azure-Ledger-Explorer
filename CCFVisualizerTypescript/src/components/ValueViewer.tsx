@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Editor } from '@monaco-editor/react';
 import {
   makeStyles,
@@ -197,7 +197,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
     }
   };
 
-  const formatContent = (data: Uint8Array, type: ContentType): { content: string; language: string } => {
+  const formatContent = useCallback((data: Uint8Array, type: ContentType): { content: string; language: string } => {
     switch (type) {
       case 'javascript': {
         try {
@@ -256,7 +256,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
         return { content: formatHex(data), language: 'plaintext' };
       }
     }
-  };
+  }, [tableName]);
 
   const formatHex = (data: Uint8Array): string => {
     if (!data || data.length === 0) return '';
@@ -311,7 +311,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
             bytes[i] = binaryString.charCodeAt(i);
           }
           lines.push(`DER Size: ${bytes.length} bytes`);
-        } catch (e) {
+        } catch {
           lines.push('Error: Invalid base64 encoding');
         }
       }
@@ -345,9 +345,9 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
     const { content, language } = formatContent(value, contentType);
     setDisplayContent(content);
     setEditorLanguage(language);
-  }, [value, contentType, tableName]);
+  }, [value, contentType, tableName, formatContent]);
 
-  const handleContentTypeChange = (_event: any, data: any) => {
+  const handleContentTypeChange = (_event: unknown, data: { optionValue?: string }) => {
     if (data.optionValue) {
       setContentType(data.optionValue as ContentType);
     }

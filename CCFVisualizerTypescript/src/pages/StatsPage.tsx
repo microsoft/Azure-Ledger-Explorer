@@ -102,6 +102,7 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
     ...shorthands.gap('16px'),
+    marginBottom: '24px',
   },
   detailCard: {
     cursor: 'default',
@@ -569,7 +570,7 @@ const StatsPage: React.FC = () => {
         <div className={classes.actionButtons}>
           <Button
             appearance="primary"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/files')}
             icon={<DocumentRegular />}
           >
             View Files

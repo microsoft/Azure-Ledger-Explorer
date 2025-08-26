@@ -1,12 +1,25 @@
-# Ledger Verification Page - Implementation Summary
+# ⚠️ LEGACY DOCUMENTATION - Ledger Verification Page Implementation
 
-This document summarizes the successful port of the LedgerVerification functionality from C# to TypeScript in the CCFVisualizerTypescript application.
+**NOTICE**: This document describes the initial implementation of ledger verification that has been **superseded by the web worker-based verification system**. 
 
-## Files Created/Modified
+The files and implementation described here have been replaced by:
+- `src/pages/VerificationPage.tsx` - Advanced verification using web workers
+- `src/workers/verification-worker.ts` - Background verification with checkpointing
+- `src/services/verification-service.ts` - Service managing the verification worker
+
+**The `LedgerVerificationPage.tsx` mentioned in this document has been removed from the codebase.**
+
+---
+
+# Original Implementation Summary
+
+This document summarizes the initial port of the LedgerVerification functionality from C# to TypeScript in the CCFVisualizerTypescript application.
+
+## Files Created/Modified (LEGACY - mostly removed or superseded)
 
 ### New Files Created:
 1. **`src/utils/merkle-tree.ts`** - TypeScript implementation of MerkleTree class
-2. **`src/pages/LedgerVerificationPage.tsx`** - Main verification page component
+2. **~~`src/pages/LedgerVerificationPage.tsx`~~ - REMOVED** - Was the main verification page component (replaced by web worker version)
 
 ### Modified Files:
 1. **`src/database/ccf-database.ts`** - Added new methods:
@@ -17,12 +30,13 @@ This document summarizes the successful port of the LedgerVerification functiona
    - `useTransactionsWithRelated(start, limit)` - Hook for getting transactions with related data
    - `useTotalTransactionsCount()` - Hook for getting total transaction count
 
-3. **`src/App.tsx`** - Added route for verification page:
-   - Import: `LedgerVerificationPage`
-   - Route: `/verification`
+3. **`src/App.tsx`** - ~~Added route for verification page~~ - Now points directly to web worker version:
+   - ~~Import: `LedgerVerificationPage`~~ - REMOVED
+   - Route: `/verification` now points directly to the advanced `VerificationPage`
 
-4. **`src/components/MenuBar.tsx`** - Added navigation support:
-   - Import: `ShieldCheckmarkRegular` icon
+4. **`src/components/MenuBar.tsx`** - ~~Added navigation support~~ - Updated to point to simplified route:
+   - Import: `ShieldCheckmarkRegular` icon - Still used
+   - Navigation now points to `/verification` (which serves the web worker version)
    - Added "Verification" tab with shield icon
    - Updated navigation logic to handle verification route
 

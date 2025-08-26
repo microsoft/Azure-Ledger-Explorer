@@ -31,50 +31,33 @@ import {
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Editor } from '@monaco-editor/react';
 import { AddFilesWizard } from './AddFilesWizard';
+
 import { CCFDatabase } from '../database/ccf-database';
 import { useAllTransactionsCount } from '../hooks/use-ccf-data';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import type { WriteReceipt } from '../types/write-receipt-types';
+import { useDownloadCtsFiles } from './CtsLedgerImportView';
+import type { SavedProgress } from '../services/verification-service';
 
-// Direct IndexedDB check function
-const checkIndexedDBForCheckpoints = async (): Promise<any[]> => {
-  return new Promise((resolve) => {
-    const request = indexedDB.open('CCFVerificationCheckpoints', 1);
-    
-    request.onerror = () => {
-      console.error('Failed to open IndexedDB:', request.error);
-      resolve([]);
-    };
-    
-    request.onsuccess = () => {
-      const db = request.result;
-      
-      if (!db.objectStoreNames.contains('checkpoints')) {
-        console.log('No checkpoints store found');
-        resolve([]);
-        return;
-      }
-      
-      const transaction = db.transaction(['checkpoints'], 'readonly');
-      const store = transaction.objectStore('checkpoints');
-      const getAllRequest = store.getAll();
-      
-      getAllRequest.onerror = () => {
-        console.error('Failed to get checkpoints:', getAllRequest.error);
-        resolve([]);
-      };
-      
-      getAllRequest.onsuccess = () => {
-        const checkpoints = getAllRequest.result;
-        console.log('Direct IndexedDB check found checkpoints:', checkpoints);
-        resolve(checkpoints);
-      };
-    };
-  });
-};
+const UIActionName = {
+  ImportCTS: 'importcts',
+  RunSQL: 'runsql',
+  VerifyLedger: 'verifyledger',
+  VerifyReceipt: 'verifyreceipt',
+} as const;
+
+type UIActionName = typeof UIActionName[keyof typeof UIActionName] | string;
+
+interface UIAction {
+  actionName: UIActionName;
+  actionContent?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  actionResult?: any;
+  actionError?: string;
+  cleanedResult?: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -82,13 +65,9 @@ interface ChatMessage {
   role: 'user' | 'assistant';
   responseId?: string;
   content: string;
-  sqlQuery?: string;
-  sqlResult?: unknown[];
   timestamp: Date;
   error?: string;
-  // New verification action fields
-  verificationAction?: 'ledger' | 'receipt';
-  verificationResult?: unknown;
+  actions?: UIAction[];
   receiptData?: {
     receipt: WriteReceipt;
     networkCert: string;
@@ -105,16 +84,16 @@ interface AIChatProps {
 const useStyles = makeStyles({
   container: {
     display: 'flex',
-    height: '100vh',
-    minHeight: 0,
+    minHeight: '100%',
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
   },
   containerWithMessages: {
     display: 'flex',
+    minHeight: '100%',
     height: '100vh',
-    minHeight: 0,
+    overflowY: 'auto', // Enable vertical scrolling when messages are present
     flexDirection: 'column',
     justifyContent: 'flex-start',
     alignItems: 'center',
@@ -130,18 +109,15 @@ const useStyles = makeStyles({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    minWidth: 0,
-    minHeight: 0,
     width: '100%',
     maxWidth: '830px',
-    height: '100vh',
+    marginBottom: '220px', // Space for input area
   },
   chatCard: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
-    height: '100vh',
     backgroundColor: tokens.colorNeutralBackground1,
   },
   messagesArea: {
@@ -442,58 +418,36 @@ const useStyles = makeStyles({
     fontSize: '14px',
     color: tokens.colorNeutralForeground3,
   },
+  cleanedResult: {
+    ...shorthands.margin('8px', '0'),
+    ...shorthands.padding('12px'),
+    backgroundColor: tokens.colorNeutralBackground2,
+    ...shorthands.borderRadius('8px'),
+    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+  },
+  rawDataDetails: {
+    ...shorthands.margin('8px', '0'),
+    '& summary': {
+      cursor: 'pointer',
+      fontSize: '12px',
+      color: tokens.colorNeutralForeground3,
+      ...shorthands.padding('4px', '0'),
+      '&:hover': {
+        color: tokens.colorNeutralForeground2,
+      },
+    },
+    '& summary::-webkit-details-marker': {
+      display: 'none',
+    },
+    '& summary::before': {
+      content: '"▶ "',
+      fontSize: '10px',
+    },
+    '&[open] summary::before': {
+      content: '"▼ "',
+    },
+  },
 });
-
-// Custom markdown components for syntax highlighting with Monaco
-const markdownComponents = {
-  code({ node, inline, className, children, ...props }: any) {
-    const match = /language-(\w+)/.exec(className || '');
-    const language = match ? match[1] : 'text';
-    const code = String(children).replace(/\n$/, '');
-    
-    return !inline && match ? (
-      <div style={{ margin: '12px 0', borderRadius: '8px', overflow: 'hidden' }}>
-        <Editor
-          height="auto"
-          language={language}
-          value={code}
-          theme="vs-dark"
-          options={{
-            readOnly: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            lineNumbers: 'off',
-            glyphMargin: false,
-            folding: false,
-            lineDecorationsWidth: 0,
-            lineNumbersMinChars: 0,
-            overviewRulerBorder: false,
-            hideCursorInOverviewRuler: true,
-            overviewRulerLanes: 0,
-            scrollbar: {
-              vertical: 'hidden',
-              horizontal: 'auto',
-              verticalScrollbarSize: 0,
-              horizontalScrollbarSize: 8,
-            },
-            wordWrap: 'on',
-            automaticLayout: true,
-            fontSize: 14,
-            fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
-          }}
-        />
-      </div>
-    ) : (
-      <code className={className} {...props}>
-        {children}
-      </code>
-    );
-  },
-  pre({ children }: any) {
-    // If the pre contains a code block with Monaco, don't add extra styling
-    return <>{children}</>;
-  },
-};
 
 export const AIChat: React.FC<AIChatProps> = ({ 
   database, 
@@ -518,22 +472,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Add verification hooks
   const verification = useVerification();
   const hasMessages = messages.length > 0;
-  
-  // Force refresh checkpoints when component mounts
-  useEffect(() => {
-    const refreshCheckpointsOnMount = async () => {
-      try {
-        console.log('AI: Refreshing checkpoints on component mount...');
-        await verification.refreshCheckpoints();
-        console.log('AI: Mount refresh completed, checkpoints:', verification.checkpoints?.length || 0);
-      } catch (error) {
-        console.error('AI: Failed to refresh checkpoints on mount:', error);
-      }
-    };
-    
-    // Add a small delay to ensure everything is initialized
-    setTimeout(refreshCheckpointsOnMount, 1000);
-  }, [verification.refreshCheckpoints]);
+  const { error: ctsError, downloadFiles: downloadCtsFiles } = useDownloadCtsFiles();
 
   useEffect(() => {
     onChatStateChange?.(hasMessages);
@@ -546,9 +485,11 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Auto-scroll to always keep the most recent user message at the top of the screen
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>;
+    
     if (messages.length > 0) {
       // Use a small delay to ensure DOM is updated
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         // Find the most recent user message and keep it at the top
         const userMessages = messages.filter(m => m.role === 'user');
         
@@ -563,13 +504,20 @@ export const AIChat: React.FC<AIChatProps> = ({
             // Always scroll to show the most recent user message at the top
             userMessageElement.scrollIntoView({ 
               behavior: 'smooth', 
-              block: 'start',
+              block: 'end', // bottom of the message, this is important when streaming content into view
               inline: 'nearest'
             });
           }
         }
       }, 150); // Slightly longer delay to ensure content is fully rendered
     }
+    
+    // Cleanup function to cancel timeout if messages change
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [messages]);
 
   // Auto-resize textarea
@@ -602,179 +550,16 @@ export const AIChat: React.FC<AIChatProps> = ({
     return config.systemPrompt;
   };
 
-  const executeQuery = async (sqlQuery: string): Promise<unknown[]> => {
+  const executeLedgerVerification = async (): Promise<SavedProgress> => {
     try {
-      return await database.executeQuery(sqlQuery);
-    } catch (error) {
-      console.error('SQL execution error:', error);
-      throw error;
-    }
-  };
-
-  const executeLedgerVerification = async (): Promise<unknown> => {
-    try {
-      console.log('AI: Checking verification status...');
-      console.log('AI: verification.isRunning:', verification.isRunning);
-      console.log('AI: verification.progress:', verification.progress);
-      console.log('AI: verification.checkpoints:', verification.checkpoints);
-      console.log('AI: verification.checkpoints.length:', verification.checkpoints?.length || 0);
-
-      // First check if there's an active verification running
-      if (verification.isRunning && verification.progress) {
-        console.log('AI: Found active verification');
-        const isComplete = verification.progress.status === 'completed';
-        const hasError = !!verification.error;
-        const progress = verification.progress.totalTransactions > 0 
-          ? (verification.progress.currentTransaction / verification.progress.totalTransactions) * 100 
-          : 0;
-        
-        return {
-          status: verification.progress.status,
-          progress: progress,
-          currentTransaction: verification.progress.currentTransaction,
-          totalTransactions: verification.progress.totalTransactions,
-          processedFiles: verification.progress.processedFiles,
-          totalFiles: verification.progress.totalFiles,
-          currentFileName: verification.progress.currentFileName,
-          isComplete,
-          isVerified: isComplete && !hasError,
-          error: verification.error,
-          message: isComplete 
-            ? (hasError ? 'Ledger verification failed' : 'Ledger verification completed successfully')
-            : `Verification in progress: ${progress.toFixed(1)}% (${verification.progress.currentTransaction}/${verification.progress.totalTransactions} transactions)`
-        };
-      }
-
-      // Check for any completed checkpoints from previous sessions
-      if (verification.checkpoints && verification.checkpoints.length > 0) {
-        console.log('AI: Found checkpoints, count:', verification.checkpoints.length);
-        console.log('AI: Checkpoints:', verification.checkpoints);
-        
-        // Find the most recent checkpoint
-        const latestCheckpoint = verification.checkpoints
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-        
-        console.log('AI: Latest checkpoint:', latestCheckpoint);
-        
-        if (latestCheckpoint) {
-          const isCompleted = latestCheckpoint.status === 'pass';
-          const hasError = latestCheckpoint.status === 'fail';
-          const isStopped = latestCheckpoint.status === 'stopped';
-          
-          return {
-            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
-            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
-            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
-            currentFileIndex: latestCheckpoint.currentFileIndex,
-            lastVerifiedFile: latestCheckpoint.lastVerifiedFile,
-            isComplete: isCompleted,
-            isVerified: isCompleted && !hasError,
-            sessionId: latestCheckpoint.id,
-            timestamp: new Date(latestCheckpoint.timestamp).toLocaleString(),
-            failureDetails: latestCheckpoint.failureDetails,
-            message: isCompleted 
-              ? 'Ledger verification completed successfully'
-              : hasError 
-                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
-                : isStopped 
-                  ? `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions. Use resume to continue.`
-                  : `Previous verification processed ${latestCheckpoint.totalTransactionsProcessed} transactions`,
-            debugInfo: {
-              checkpointStatus: latestCheckpoint.status,
-              checkpointTimestamp: latestCheckpoint.timestamp,
-              isCompleted,
-              hasError,
-              isStopped
-            }
-          };
-        }
-      }
-
-      console.log('AI: No verification or checkpoints found');
-      
-      // No verification found - but let's try to refresh checkpoints and check again
-      console.log('AI: Attempting to refresh checkpoints...');
-      try {
-        await verification.refreshCheckpoints();
-        console.log('AI: Checkpoints refreshed, new count:', verification.checkpoints?.length || 0);
-        
-        if (verification.checkpoints && verification.checkpoints.length > 0) {
-          console.log('AI: Found checkpoints after refresh!');
-          const latestCheckpoint = verification.checkpoints
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-          
-          const isCompleted = latestCheckpoint.status === 'pass';
-          const hasError = latestCheckpoint.status === 'fail';
-          
-          return {
-            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
-            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
-            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
-            message: isCompleted 
-              ? 'Ledger verification completed successfully (found after refresh)'
-              : hasError 
-                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
-                : `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions`,
-            refreshedCheckpoints: true
-          };
-        }
-      } catch (refreshError) {
-        console.error('AI: Failed to refresh checkpoints:', refreshError);
-      }
-      
-      // Direct IndexedDB check as a last resort
-      console.log('AI: Trying direct IndexedDB check...');
-      try {
-        const directCheckpoints = await checkIndexedDBForCheckpoints();
-        console.log('AI: Direct IndexedDB found:', directCheckpoints.length, 'checkpoints');
-        
-        if (directCheckpoints.length > 0) {
-          const latestCheckpoint = directCheckpoints
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-          
-          console.log('AI: Latest checkpoint from direct check:', latestCheckpoint);
-          
-          const isCompleted = latestCheckpoint.status === 'pass';
-          const hasError = latestCheckpoint.status === 'fail';
-          
-          return {
-            status: isCompleted ? 'completed' : hasError ? 'failed' : 'stopped',
-            lastVerifiedTransaction: latestCheckpoint.lastVerifiedTransaction,
-            totalTransactionsProcessed: latestCheckpoint.totalTransactionsProcessed,
-            message: isCompleted 
-              ? 'Ledger verification completed successfully (found via direct IndexedDB check)'
-              : hasError 
-                ? `Ledger verification failed: ${latestCheckpoint.failureDetails?.errorMessage || 'Unknown error'}`
-                : `Verification was stopped after processing ${latestCheckpoint.totalTransactionsProcessed} transactions`,
-            foundViaDirectCheck: true,
-            hookCheckpointsCount: verification.checkpoints?.length || 0
-          };
-        }
-      } catch (directError) {
-        console.error('AI: Direct IndexedDB check failed:', directError);
-      }
-
-      return {
-        status: 'not_started',
-        message: 'No ledger verification has been started. Please start verification manually from the verification page.',
-        isRunning: verification.isRunning,
-        hasProgress: !!verification.progress,
-        availableCheckpoints: verification.checkpoints?.length || 0,
-        debugInfo: {
-          hookState: {
-            isRunning: verification.isRunning,
-            hasProgress: !!verification.progress,
-            checkpointsLength: verification.checkpoints?.length || 0,
-            currentSessionId: verification.currentSessionId
-          }
-        }
-      };
+      const result = verification.getSavedProgress();
+      return result;
     } catch (error) {
       console.error('Ledger verification error:', error);
       return {
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown verification error',
-        message: 'Failed to execute ledger verification'
+        lastProcessedTransaction: 0,
+        totalTransactions: 0,
+        status: 'error'
       };
     }
   };
@@ -793,7 +578,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       let receipt: WriteReceipt;
       try {
         receipt = JSON.parse(receiptJson);
-      } catch (error) {
+      } catch {
         return {
           status: 'error',
           error: 'Invalid receipt JSON format',
@@ -834,8 +619,10 @@ export const AIChat: React.FC<AIChatProps> = ({
     // collect prior conversations as history for this question
     messages.forEach(m => {
       input += `${m.role} said: ${m.content}\n`;
-      if (m.sqlResult) {
-        input += `\nSQL Query Result: ${JSON.stringify(m.sqlResult, null, 2)}\n`;
+      if (m.actions && m.actions.length > 0) {
+        m.actions.forEach(a => {
+          input += `\nAction result for ${a.actionName} is ${a.actionResult ? JSON.stringify(a.actionResult) : 'not available'} ${a.actionError ? ` action error: ${a.actionError}` : ''} \n`;
+        });
       }
     });
 
@@ -866,34 +653,26 @@ export const AIChat: React.FC<AIChatProps> = ({
     return response;
   };
 
-  const extractSqlQuery = (content: string): string | null => {
-    const sqlMatch = content.match(/```sql\n([\s\S]*?)\n```/);
-    const query = sqlMatch ? sqlMatch[1].trim() : null;
-    
-    // Don't treat verification commands as SQL queries
-    if (query && (query.includes('VERIFY_LEDGER') || query.includes('VERIFY_RECEIPT'))) {
-      return null;
-    }
-    
-    return query;
-  };
+  const extractActions = (content: string): Array<UIAction> => {
+    const actionRegex = /```action:([a-zA-Z_][a-zA-Z0-9_]*)\n([\s\S]*?)```/g;
+    const actions: Array<UIAction> = [];
 
-  const extractVerificationCommand = (content: string): 'ledger' | 'receipt' | null => {
-    if (content.includes('VERIFY_LEDGER')) {
-      return 'ledger';
+    let match;
+    while ((match = actionRegex.exec(content)) !== null) {
+      const actionName = match[1].trim();
+      const actionContent = match[2].trim();
+      actions.push({ actionName, actionContent });
     }
-    if (content.includes('VERIFY_RECEIPT')) {
-      return 'receipt';
-    }
-    return null;
-  };
+    
+    return actions;
+  }
 
   const processResponse = async (response: Response) => {
     if (!response.body) {
       throw new Error('Response body is empty');
     }
     // Put blank message which is in progress and periodically update it
-    let message: ChatMessage = {
+    const message: ChatMessage = {
       id: (Date.now() + 1).toString(),
       state: 'streaming',
       role: 'assistant',
@@ -978,55 +757,134 @@ export const AIChat: React.FC<AIChatProps> = ({
     } finally {
       reader.releaseLock();
     }
-      
-    // Once finished perform other actions
-    // ------------------
 
-    // Check if the response contains a SQL query
-    const sqlQuery = extractSqlQuery(fullResponseText);
-    
-    // Check if the response contains a verification command
-    const verificationCommand = extractVerificationCommand(fullResponseText);
-    
-    let sqlResult: unknown[] | undefined;
-    let verificationResult: unknown | undefined;
-    let executionError: string | undefined;
+    return fullResponseText;
+  }
 
-    // Execute SQL query if present
-    if (sqlQuery) {
-      try {
-        sqlResult = await executeQuery(sqlQuery);
-      } catch (err) {
-        executionError = err instanceof Error ? err.message : 'SQL execution failed';
-      }
-    }
-
-    // Execute verification command if present
-    if (verificationCommand) {
-      try {
-        if (verificationCommand === 'ledger') {
-          verificationResult = await executeLedgerVerification();
-        } else if (verificationCommand === 'receipt') {
-          verificationResult = await executeReceiptVerification();
+  const postprocessResponse = async (message: string) => {
+    const actions = extractActions(message);
+    for (const action of actions) {
+      if (action.actionName === UIActionName.RunSQL) {
+        const sqlQuery = action.actionContent;
+        if (!sqlQuery || !sqlQuery.trim() || !database) {
+          action.actionError = 'Could not execute SQL query.' + (database ? '' : ' Database not initialized.');
+          continue;
         }
-      } catch (err) {
-        executionError = err instanceof Error ? err.message : 'Verification execution failed';
+        try {
+          action.actionResult = await database.executeQuery(sqlQuery);
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'SQL execution failed';
+        }
+      } else if (action.actionName === UIActionName.VerifyLedger) {
+        try {
+          action.actionResult = await executeLedgerVerification();
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'Ledger verification failed';
+        }
+      } else if (action.actionName === UIActionName.VerifyReceipt) {
+        try {
+          action.actionResult = await executeReceiptVerification();
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'Receipt verification failed';
+        }
+      } else if (action.actionName === UIActionName.ImportCTS) {
+        if (!action.actionContent) {
+          action.actionError = 'CTS domain was missing';
+          continue
+        }
+        try {
+          await downloadCtsFiles(action.actionContent.trim());
+        } catch (err) {
+          action.actionError = err instanceof Error ? err.message : 'Failed to download CTS files';
+          continue;
+        }
+        if (ctsError) {
+          action.actionError = ctsError;
+        } else {
+          action.actionResult = 'CTS files downloaded successfully';
+        }
       }
     }
 
-    setMessages(prev => {
-      const updated = [...prev];
-      const last = updated[updated.length - 1];
-      if (last) {
-        last.sqlQuery = sqlQuery || undefined;
-        last.sqlResult = sqlResult;
-        last.verificationAction = verificationCommand || undefined;
-        last.verificationResult = verificationResult;
-        last.error = executionError;
-        last.timestamp = new Date();
+    // Process JSON responses to make them more intelligible
+    await processJsonResponses(actions);
+
+    if (actions.length > 0) {
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last) {
+          last.actions = actions;
+        }
+        return updated;
+      });
+    }
+  }
+
+  // Helper function to process and clean up JSON responses
+  const processJsonResponses = async (actions: UIAction[]) => {
+    for (const action of actions) {
+      if (action.actionResult && typeof action.actionResult === 'object' && !action.actionError) {
+        try {
+          const jsonString = JSON.stringify(action.actionResult);
+          
+          // Only process if the JSON is complex enough to warrant cleanup
+          //if (jsonString.length > 200 && (Array.isArray(action.actionResult) || Object.keys(action.actionResult).length > 3)) {
+            const cleanedResponse = await requestJsonCleanup(jsonString, action.actionName);
+            if (cleanedResponse) {
+              // Store both the original result and the cleaned version
+              action.cleanedResult = cleanedResponse;
+            }
+          //}
+        } catch (err) {
+          console.error('Error processing JSON response:', err);
+          // Don't set an error here as this is supplementary processing
+        }
       }
-      return updated;
-    });
+    }
+  }
+
+  // Make an AI request to clean up JSON data
+  const requestJsonCleanup = async (jsonString: string, actionName: string): Promise<string | null> => {
+    try {
+      const cleanupPrompt = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and provide context where helpful.
+
+JSON to analyze:
+${jsonString}
+
+Please provide a clean, human-readable summary that captures the essential information without overwhelming technical details.`;
+
+      const response = await fetch(config.baseUrl + '/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          stream: false, // Non-streaming for cleanup requests
+          input: cleanupPrompt,
+          instructions: 'You are a helpful assistant that specializes in making complex JSON data more readable and understandable. Focus on clarity, structure, and highlighting important information.',
+          temperature: 0.1,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to request JSON cleanup:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      for (const output of data.output) {
+        if (output?.role == "assistant") {
+          // Process the assistant's output
+          return output?.content[0]?.text;
+        }
+      }
+      return null;
+    } catch (err) {
+      console.error('Error requesting JSON cleanup:', err);
+      return null;
+    }
   }
 
   const handleSendMessage = async (optionalMessage?: string) => {
@@ -1048,7 +906,10 @@ export const AIChat: React.FC<AIChatProps> = ({
     try {
       // Get AI response
       const aiResponse = await callOpenAIResponseAPI(messages, userMessage.content);
-      await processResponse(aiResponse);
+      // Stream response to chat
+      const messageText = await processResponse(aiResponse);
+      // Execute actions
+      await postprocessResponse(messageText);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -1211,9 +1072,9 @@ export const AIChat: React.FC<AIChatProps> = ({
           <div className={styles.starterTemplates}>
             <CompoundButton
               icon={<ChatAddRegular />}
-              secondaryContent="How does MAA's attestation work?"
+              secondaryContent="How does MAA's SGX attestation work?"
               appearance="transparent"
-              onClick={() => startFromExample("How does MAA's attestation work?")}
+              onClick={() => startFromExample("How does MAA's SGX attestation work?")}
             >
               Azure Attestation
             </CompoundButton>
@@ -1236,16 +1097,17 @@ export const AIChat: React.FC<AIChatProps> = ({
               Transparency
             </CompoundButton>
 
+            <CompoundButton
+              icon={<ChatAddRegular />}
+              secondaryContent="Can you show me the history of MAA builds?"
+              appearance="transparent"
+              onClick={() => startFromExample("Can you show me the history of MAA builds?")}
+            >
+              Transparency
+            </CompoundButton>
+
             {allTransactionsCount && allTransactionsCount > 0 ? (
               <>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="Can you show me the history of MAA builds?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("Can you show me the history of MAA builds?")}
-                >
-                  Transparency
-                </CompoundButton>
                 <CompoundButton
                   icon={<ChatAddRegular />}
                   secondaryContent="How many transactions are in the database?"
@@ -1286,73 +1148,6 @@ export const AIChat: React.FC<AIChatProps> = ({
               }}
             >
 
-            {/* Starter templates when no conversation is present */}
-            {messages.length === 0 && (
-              <div className={styles.starterTemplates}>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="How does MAA’s attestation work?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("How does MAA’s attestation work?")}
-                >
-                  Azure Attestation
-                </CompoundButton>
-
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="How can I trust MAA?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("How can I trust MAA?")}
-                >
-                  Azure Attestation
-                </CompoundButton>
-
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="Can you verify that MAA is transparent right now?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("Can you verify that MAA is transparent right now?")}
-                >
-                  Transparency
-                </CompoundButton>
-
-                { allTransactionsCount && allTransactionsCount > 0 ? (<>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="Can you show me the history of MAA builds?"
-                    appearance="transparent"
-                    onClick={() => startFromExample("Can you show me the history of MAA builds?")}
-                  >
-                    Transparency
-                  </CompoundButton>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="How many transactions are in the database?"
-                    appearance="transparent"
-                    onClick={() => startFromExample("How many transactions are in the database?")}
-                  >
-                    Ledger
-                  </CompoundButton>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="Show me recent transactions"
-                    appearance="transparent"
-                    onClick={() => startFromExample("Show me recent transactions")}
-                  >
-                    Ledger
-                  </CompoundButton>
-                  <CompoundButton
-                    icon={<ChatAddRegular />}
-                    secondaryContent="Find transactions with specific keys"
-                    appearance="transparent"
-                    onClick={() => startFromExample("Find transactions with specific keys")}
-                  >
-                    Ledger
-                  </CompoundButton>
-                </>) : null }
-              </div>
-            )}
-
             {messages.map((message) => (
               <div key={message.id} className={message.role === 'user' ? styles.userMessageContainer : styles.messageContainer} data-message-role={message.role} data-message-id={message.id}>
                 
@@ -1364,45 +1159,63 @@ export const AIChat: React.FC<AIChatProps> = ({
                       </Text>
                     ) : (
                       <div className={styles.markdownContent}>
-                        <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
                           {message.content}
                         </ReactMarkdown>
                       </div>
                     )}
-                    
-                    {message.sqlQuery && (
-                      <div className={styles.sqlSection}>
-                        <Text size={200} weight="semibold" className={styles.sqlHeader}>
-                          SQL Query:
-                        </Text>
-                        <pre className={styles.sqlQuery}>
-                          {message.sqlQuery}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {message.sqlResult && (
-                      <div className={styles.sqlSection}>
-                        <Text size={200} weight="semibold" className={styles.sqlResultHeader}>
-                          Result:
-                        </Text>
-                        <pre className={styles.sqlResult}>
-                          {formatSqlResult(message.sqlResult)}
-                        </pre>
-                      </div>
-                    )}
-                    
-                    {(message.verificationResult !== undefined && message.verificationResult !== null) && (
-                      <div className={styles.sqlSection}>
-                        <Text size={200} weight="semibold" className={styles.sqlResultHeader}>
-                          {message.verificationAction === 'ledger' ? 'Ledger Verification:' : 'Receipt Verification:'}
-                        </Text>
-                        <pre className={styles.sqlResult}>
-                          {typeof message.verificationResult === 'string' 
-                            ? message.verificationResult 
-                            : JSON.stringify(message.verificationResult, null, 2)}
-                        </pre>
-                      </div>
+
+                    {message.actions && message.actions.length > 0 && (
+                      <>{message.actions.map((action, index) => (
+                        <div className={styles.sqlSection} key={index}>
+                          <Text size={200} weight="semibold" className={styles.sqlHeader}>
+                            Action: {action.actionName}
+                          </Text>
+                          {action.cleanedResult && (
+                            <div className={styles.cleanedResult}>
+                              <Text size={200} weight="semibold" className={styles.sqlHeader}>
+                                Summary:
+                              </Text>
+                              <div className={styles.markdownContent}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {action.cleanedResult}
+                                </ReactMarkdown>
+                              </div>
+                              <details className={styles.rawDataDetails}>
+                                <summary>
+                                  <Text size={200}>Show raw data</Text>
+                                </summary>
+                                <pre className={styles.sqlQuery}>
+                                  {action.actionName === UIActionName.RunSQL ? (
+                                    <>{formatSqlResult(action.actionResult)}</>
+                                  ) : (
+                                    <>{typeof action.actionResult === 'string'
+                                      ? action.actionResult
+                                      : JSON.stringify(action.actionResult, null, 2)}</>
+                                  )}
+                                </pre>
+                              </details>
+                            </div>
+                          )}
+                          {action.actionResult && !action.cleanedResult && (
+                            <pre className={styles.sqlQuery}>
+                              {action.actionName === UIActionName.RunSQL ? (
+                                <>{formatSqlResult(action.actionResult)}</>
+                              ) : (
+                                <>{typeof action.actionResult === 'string'
+                                  ? action.actionResult
+                                  : JSON.stringify(action.actionResult, null, 2)}</>
+                              )}
+                            </pre>
+                          )}
+                          {action.actionError && (
+                            <MessageBar intent="error">
+                              <Text size={200}>Error: {action.actionError}</Text>
+                            </MessageBar>
+                          )}
+                        </div>
+                      ))}
+                      </>
                     )}
                     
                     {message.error && (

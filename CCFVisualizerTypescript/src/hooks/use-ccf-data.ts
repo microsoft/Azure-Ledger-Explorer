@@ -6,6 +6,7 @@ import { CCFDatabase } from '../database/ccf-database';
 import { LedgerChunkV2 } from '../parser/ledger-chunk';
 import type { Transaction } from '../types/ccf-types';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
+import { verificationService } from '../services/verification-service';
 
 // Global database instance (singleton pattern)
 let dbInstance: CCFDatabase | null = null;
@@ -282,6 +283,9 @@ export const useClearAllData = () => {
     mutationFn: async () => {
       const db = await getDatabase();
       await db.clearAllData();
+      
+      // Clear verification progress since data is cleared
+      verificationService.clearSavedProgress();
     },
     onSuccess: () => {
       // Invalidate all queries to refresh the UI
@@ -303,6 +307,9 @@ export const useDropDatabase = () => {
     mutationFn: async () => {
       const db = await getDatabase();
       await db.dropDatabase();
+      
+      // Clear verification progress since database is reset
+      verificationService.clearSavedProgress();
     },
     onSuccess: () => {
       // Invalidate all queries to refresh the UI

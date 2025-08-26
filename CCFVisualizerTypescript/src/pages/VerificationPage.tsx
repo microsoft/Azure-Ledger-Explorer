@@ -8,15 +8,15 @@ export const VerificationPage: React.FC = () => {
     <div style={{ padding: '20px' }}>
       <h1>CCF Ledger Verification</h1>
       <p>
-        This tool allows you to verify CCF ledger files in the background using a web worker.
+        This tool allows you to verify CCF ledger data stored in the database using a web worker.
         The verification process includes:
       </p>
       <ul>
         <li>Transaction digest validation</li>
-        <li>Automatic checkpointing every 100 transactions</li>
+        <li>Merkle tree verification against signature transactions</li>
         <li>Progress reporting every 50 transactions</li>
-        <li>Failure detection and reporting</li>
-        <li>Resume protection (cannot resume after failure)</li>
+        <li>Simple resume capability using browser storage</li>
+        <li>Background processing with pause/resume controls</li>
       </ul>
       
       <VerificationComponent />

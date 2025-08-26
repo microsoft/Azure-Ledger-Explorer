@@ -26,6 +26,54 @@ npm run dev
 3. **AI Queries**: Ask natural language questions about your data
 4. **Search & Filter**: Find specific transactions and analyze patterns
 
+## 🚀 Deployment
+
+### Azure Static Web Apps Deployment
+
+The project includes an automated PowerShell deployment script (`deploy-to-azure.ps1`) for deploying to Azure Static Web Apps.
+
+#### Prerequisites
+- **Azure CLI**: Install from [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+- **Azure Subscription**: authenticate using `az login --use-device-code`
+- **PowerShell**
+
+**Using the script**
+- (Windows) `./deploy-to-azure.ps1 ...` used in examples below
+- (Linux) `pwsh deploy-to-azure.ps1 ...`
+
+#### Deployment Options (on Linux use pwsh)
+
+**First-time deployment (creates resources and deploys):**
+```powershell
+./deploy-to-azure.ps1 -CreateResources -BuildFirst
+```
+
+**Deploy to existing Static Web App:**
+```powershell
+./deploy-to-azure.ps1 -BuildFirst
+```
+
+**Deploy to preview environment:**
+```powershell
+# Deploy to auto-generated preview environment
+./deploy-to-azure.ps1 -DeployToPreview -BuildFirst
+
+# Deploy to named preview environment
+./deploy-to-azure.ps1 -DeployToPreview -PreviewEnvironment "feature-testing" -BuildFirst
+```
+
+#### Script Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `-ResourceGroupName` | Azure resource group name | `sage-transparency-demo-rg` |
+| `-StaticWebAppName` | Static Web App name | `ccfvisualizer` |
+| `-Location` | Azure region | `East US 2` |
+| `-CreateResources` | Create Azure resources if they don't exist | `false` |
+| `-BuildFirst` | Build the application before deployment | `false` |
+| `-DeployToPreview` | Deploy to preview environment | `false` |
+| `-PreviewEnvironment` | Custom preview environment name | Auto-generated |
+
 ## 📚 Documentation
 
 **IMPORTANT**: Before contributing to this project, you MUST read the documentation in the `/docs` folder:

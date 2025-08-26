@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { makeStyles, shorthands, mergeClasses } from '@fluentui/react-components';
+import { makeStyles, mergeClasses } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
   layout: {
@@ -22,8 +22,7 @@ const useStyles = makeStyles({
   main: { 
     gridArea: 'main',
     overflow: 'hidden',
-    minHeight: 0,
-    ...shorthands.margin('0px','0px','150px'),
+    minHeight: '50vh',
   },
   right: { 
     gridArea: 'right',
