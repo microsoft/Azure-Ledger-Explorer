@@ -1,38 +1,23 @@
-// Verification Service - Manages the verification web worker
+// Simplified Verification Service - Manages the verification web worker
 
 import type { 
   WorkerInMessage, 
   WorkerOutMessage, 
   VerificationProgress, 
-  VerificationCheckpoint, 
   VerificationConfig 
 } from '../types/verification-types';
-import { checkpointService } from './verification-checkpoint';
 
 export interface VerificationServiceEvents {
   onProgress: (progress: VerificationProgress) => void;
-  onCheckpoint: (checkpoint: VerificationCheckpoint) => void;
-  onCompleted: (data: { success: boolean; finalCheckpoint: VerificationCheckpoint }) => void;
-  onError: (data: { message: string; checkpoint?: VerificationCheckpoint }) => void;
+  onCompleted: (data: { success: boolean; totalTransactions: number }) => void;
+  onError: (data: { message: string }) => void;
   onStopped: () => void;
 }
 
 export class VerificationService {
   private worker: Worker | null = null;
   private events: Partial<VerificationServiceEvents> = {};
-  private currentSessionId: string | null = null;
-
-  constructor() {
-    this.initializeCheckpointService();
-  }
-
-  private async initializeCheckpointService() {
-    try {
-      await checkpointService.init();
-    } catch (error) {
-      console.error('Failed to initialize checkpoint service:', error);
-    }
-  }
+  private lastProgress: VerificationProgress | null = null;
 
   /**
    * Set event handlers
@@ -42,212 +27,206 @@ export class VerificationService {
   }
 
   /**
-   * Start verification process
+   * Start verification process - uses database with simple progress tracking
    */
-  async startVerification(
-    files: File[], 
-    config: Partial<VerificationConfig> = {},
-    sessionId?: string,
-    resumeFromCheckpoint: boolean = false
-  ): Promise<string> {
+  async startVerification(config: Partial<VerificationConfig> = {}): Promise<void> {
     if (this.worker) {
-      throw new Error('Verification is already running');
+      console.warn('Verification already in progress');
+      return;
     }
 
-    // Generate session ID if not provided
-    const sid = sessionId || `verification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    this.currentSessionId = sid;
+    // Check for saved progress
+    const savedProgress = this.getSavedProgress();
+    const resumeFromTransaction = savedProgress?.lastProcessedTransaction || 0;
 
-    // Check for existing failed checkpoint
-    if (await checkpointService.hasFailedCheckpoint(sid)) {
-      throw new Error('Cannot start verification: Previous session failed. Please clear checkpoints first.');
-    }
-
-    const defaultConfig: VerificationConfig = {
-      checkpointInterval: 100,
+    // Default configuration
+    const fullConfig: VerificationConfig = {
       progressReportInterval: 50,
-      resumeFromCheckpoint: resumeFromCheckpoint
+      resumeFromTransaction,
+      ...config
     };
 
-    const finalConfig = { ...defaultConfig, ...config };
-
     try {
-      // Create and start worker
+      // Create worker
       this.worker = new Worker(
         new URL('../workers/verification-worker.ts', import.meta.url),
         { type: 'module' }
       );
 
-      this.worker.onmessage = this.handleWorkerMessage.bind(this);
-      this.worker.onerror = this.handleWorkerError.bind(this);
-
-      // Start the verification
-      const message: WorkerInMessage = {
-        type: 'start',
-        files,
-        config: finalConfig,
-        sessionId: sid
+      this.worker.onmessage = (event: MessageEvent<WorkerOutMessage>) => {
+        this.handleWorkerMessage(event.data);
       };
 
-      this.worker.postMessage(message);
+      this.worker.onerror = (error) => {
+        console.error('Worker error:', error);
+        this.events.onError?.({ message: 'Worker error occurred' });
+        this.cleanup();
+      };
 
-      return sid;
+      // Start verification
+      const startMessage: WorkerInMessage = {
+        type: 'start',
+        config: fullConfig
+      };
+
+      this.worker.postMessage(startMessage);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      this.events.onError?.({ message: errorMessage });
       this.cleanup();
-      throw error;
     }
   }
 
   /**
-   * Resume verification from the last checkpoint
-   */
-  async resumeVerificationFromCheckpoint(sessionId: string, files: File[]): Promise<string> {
-    // Check if we can resume from this session
-    if (await checkpointService.hasFailedCheckpoint(sessionId)) {
-      throw new Error('Cannot resume verification: Session has failed. Please clear checkpoints first.');
-    }
-
-    if (!(await checkpointService.canResumeFromCheckpoint(sessionId))) {
-      throw new Error('Cannot resume verification: No resumable checkpoint found.');
-    }
-
-    // Start verification with resume flag
-    return this.startVerification(files, {}, sessionId, true);
-  }
-
-  /**
-   * Stop verification process
+   * Stop verification
    */
   stopVerification(): void {
     if (this.worker) {
-      const message: WorkerInMessage = { type: 'stop' };
-      this.worker.postMessage(message);
+      // Immediately save current state before stopping
+      this.saveCurrentStateAsStoppedProgress();
+      this.worker.postMessage({ type: 'stop' });
     }
   }
 
   /**
-   * Pause verification process
+   * Pause verification
    */
   pauseVerification(): void {
     if (this.worker) {
-      const message: WorkerInMessage = { type: 'pause' };
-      this.worker.postMessage(message);
+      // Immediately save current state as paused
+      this.saveCurrentStateAsPausedProgress();
+      this.worker.postMessage({ type: 'pause' });
     }
   }
 
   /**
-   * Resume paused verification process
+   * Resume verification
    */
   resumeVerification(): void {
     if (this.worker) {
-      const message: WorkerInMessage = { type: 'resume' };
-      this.worker.postMessage(message);
+      this.worker.postMessage({ type: 'resume' });
     }
   }
 
   /**
-   * Check if verification is currently running
+   * Check if verification is running
    */
   isRunning(): boolean {
     return this.worker !== null;
   }
 
   /**
-   * Get the current session ID
+   * Clear saved progress from browser storage
    */
-  getCurrentSessionId(): string | null {
-    return this.currentSessionId;
+  clearSavedProgress(): void {
+    localStorage.removeItem('ccf-verification-progress');
   }
 
   /**
-   * Get all checkpoints
+   * Get saved progress from browser storage with enhanced state information
    */
-  async getAllCheckpoints(): Promise<VerificationCheckpoint[]> {
-    return checkpointService.getAllCheckpoints();
+  getSavedProgress(): { lastProcessedTransaction: number; totalTransactions: number; status?: string } | null {
+    try {
+      const saved = localStorage.getItem('ccf-verification-progress');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   }
 
   /**
-   * Get latest checkpoint for a session
+   * Check if there's a verification that can be resumed
    */
-  async getLatestCheckpoint(sessionId: string): Promise<VerificationCheckpoint | null> {
-    return checkpointService.getLatestCheckpoint(sessionId);
+  canResumeVerification(): boolean {
+    const saved = this.getSavedProgress();
+    return saved !== null && saved.lastProcessedTransaction > 0;
   }
 
-  /**
-   * Delete a checkpoint
-   */
-  async deleteCheckpoint(sessionId: string): Promise<void> {
-    return checkpointService.deleteCheckpoint(sessionId);
+  private saveCurrentStateAsStoppedProgress(): void {
+    if (this.lastProgress) {
+      const progressData = {
+        lastProcessedTransaction: this.lastProgress.currentTransaction,
+        totalTransactions: this.lastProgress.totalTransactions,
+        startTime: this.lastProgress.startTime,
+        status: 'stopped'
+      };
+      localStorage.setItem('ccf-verification-progress', JSON.stringify(progressData));
+    }
   }
 
-  /**
-   * Clear all checkpoints
-   */
-  async clearAllCheckpoints(): Promise<void> {
-    return checkpointService.clearAllCheckpoints();
+  private saveCurrentStateAsPausedProgress(): void {
+    if (this.lastProgress) {
+      const progressData = {
+        lastProcessedTransaction: this.lastProgress.currentTransaction,
+        totalTransactions: this.lastProgress.totalTransactions,
+        startTime: this.lastProgress.startTime,
+        status: 'paused'
+      };
+      localStorage.setItem('ccf-verification-progress', JSON.stringify(progressData));
+    }
   }
 
-  /**
-   * Check if a session has a failed checkpoint
-   */
-  async hasFailedCheckpoint(sessionId: string): Promise<boolean> {
-    return checkpointService.hasFailedCheckpoint(sessionId);
-  }
-
-  /**
-   * Check if a session can be resumed from checkpoint
-   */
-  async canResumeFromCheckpoint(sessionId: string): Promise<boolean> {
-    return checkpointService.canResumeFromCheckpoint(sessionId);
-  }
-
-  private handleWorkerMessage(event: MessageEvent<WorkerOutMessage>) {
-    const message = event.data;
-
+  private handleWorkerMessage(message: WorkerOutMessage): void {
     switch (message.type) {
       case 'progress':
+        // Store the latest progress for state management
+        this.lastProgress = message.data;
+        // Save progress to localStorage when we receive progress updates
+        this.saveProgressToStorage(message.data);
         this.events.onProgress?.(message.data);
         break;
-      case 'checkpoint':
-        this.events.onCheckpoint?.(message.data);
+
+      case 'paused':
+        // Handle worker reporting it has paused
+        const pausedProgress = {
+          currentTransaction: message.data.currentTransaction,
+          totalTransactions: message.data.totalTransactions,
+          status: 'paused' as const,
+          startTime: this.lastProgress?.startTime || Date.now()
+        };
+        this.lastProgress = pausedProgress;
+        this.saveProgressToStorage(pausedProgress);
+        this.events.onProgress?.(pausedProgress);
         break;
+
       case 'completed':
+        // Clear saved progress on completion
+        this.clearSavedProgress();
         this.events.onCompleted?.(message.data);
         this.cleanup();
         break;
+
       case 'error':
+        // Keep progress saved on error so user can resume
         this.events.onError?.(message.data);
         this.cleanup();
         break;
+
       case 'stopped':
+        // Keep progress saved when stopped so user can resume
         this.events.onStopped?.();
         this.cleanup();
         break;
     }
   }
 
-  private handleWorkerError(error: ErrorEvent) {
-    console.error('Worker error:', error);
-    this.events.onError?.({ message: `Worker error: ${error.message}` });
-    this.cleanup();
+  private saveProgressToStorage(progress: VerificationProgress): void {
+    const progressData = {
+      lastProcessedTransaction: progress.currentTransaction,
+      totalTransactions: progress.totalTransactions,
+      startTime: progress.startTime,
+      status: progress.status
+    };
+    localStorage.setItem('ccf-verification-progress', JSON.stringify(progressData));
   }
 
-  private cleanup() {
+  private cleanup(): void {
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
     }
-    this.currentSessionId = null;
-  }
-
-  /**
-   * Cleanup resources
-   */
-  destroy() {
-    this.cleanup();
-    checkpointService.close();
   }
 }
 
-// Export a singleton instance
+// Create singleton instance
 export const verificationService = new VerificationService();

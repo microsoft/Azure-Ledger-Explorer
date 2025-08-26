@@ -8,7 +8,6 @@ import TablesPage from './pages/TablesPage';
 import StatsPage from './pages/StatsPage';
 import { AIPage } from './pages/AIPage';
 import { StartPage } from './pages/StartPage';
-import { LedgerVerificationPage } from './pages/LedgerVerificationPage';
 import { VerificationPage } from './pages/VerificationPage';
 import { WriteReceiptVerificationPage } from './pages/WriteReceiptVerificationPage';
 import { MenuBar } from './components/MenuBar';
@@ -75,8 +74,7 @@ function App() {
                 <Route path="/tables" element={<TablesPage />} />
                 <Route path="/tables/:tableName" element={<TablesPage />} />
                 <Route path="/stats" element={<StatsPage />} />
-                <Route path="/verification" element={<LedgerVerificationPage />} />
-                <Route path="/verification-worker" element={<VerificationPage />} />
+                <Route path="/verification" element={<VerificationPage />} />
                 <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
                 <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
                 <Route path="/config" element={<ConfigPage />} />

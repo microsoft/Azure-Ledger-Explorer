@@ -1,10 +1,9 @@
-// React hook for verification functionality
+// Simplified React hook for verification functionality
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { verificationService, type VerificationServiceEvents } from '../services/verification-service';
 import type { 
   VerificationProgress, 
-  VerificationCheckpoint, 
   VerificationConfig 
 } from '../types/verification-types';
 
@@ -12,31 +11,22 @@ interface UseVerificationResult {
   // State
   isRunning: boolean;
   progress: VerificationProgress | null;
-  checkpoints: VerificationCheckpoint[];
-  lastCheckpoint: VerificationCheckpoint | null;
   error: string | null;
-  currentSessionId: string | null;
 
   // Actions
-  startVerification: (files: File[], config?: Partial<VerificationConfig>, sessionId?: string) => Promise<string>;
-  resumeFromCheckpoint: (sessionId: string, files: File[]) => Promise<string>;
-  stopVerification: () => void;
-  pauseVerification: () => void;
-  resumeVerification: () => void;
-  clearAllCheckpoints: () => Promise<void>;
-  deleteCheckpoint: (sessionId: string) => Promise<void>;
-  refreshCheckpoints: () => Promise<void>;
-  canResume: (sessionId: string) => Promise<boolean>;
-  canResumeFromCheckpoint: (sessionId: string) => Promise<boolean>;
+  start: (config?: Partial<VerificationConfig>) => Promise<void>;
+  stop: () => void;
+  pause: () => void;
+  resume: () => void;
+  clearProgress: () => void;
+  getSavedProgress: () => { lastProcessedTransaction: number; totalTransactions: number; status?: string } | null;
+  canResumeVerification: () => boolean;
 }
 
 export function useVerification(): UseVerificationResult {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState<VerificationProgress | null>(null);
-  const [checkpoints, setCheckpoints] = useState<VerificationCheckpoint[]>([]);
-  const [lastCheckpoint, setLastCheckpoint] = useState<VerificationCheckpoint | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
   const eventsSetRef = useRef(false);
 
@@ -49,28 +39,25 @@ export function useVerification(): UseVerificationResult {
         setProgress(progressData);
         setError(null);
       },
-      onCheckpoint: (checkpoint) => {
-        setLastCheckpoint(checkpoint);
-        refreshCheckpoints();
-      },
+      
       onCompleted: (data) => {
+        console.log('Verification completed:', data);
+        setIsRunning(false);
         setProgress(prev => prev ? { ...prev, status: 'completed' } : null);
-        setLastCheckpoint(data.finalCheckpoint);
-        setIsRunning(false);
-        refreshCheckpoints();
+        setError(null);
       },
-      onError: (data) => {
-        setError(data.message);
+      
+      onError: (errorData) => {
+        console.error('Verification error:', errorData);
+        setError(errorData.message);
+        setIsRunning(false);
         setProgress(prev => prev ? { ...prev, status: 'failed' } : null);
-        setIsRunning(false);
-        if (data.checkpoint) {
-          setLastCheckpoint(data.checkpoint);
-          refreshCheckpoints();
-        }
       },
+      
       onStopped: () => {
-        setProgress(prev => prev ? { ...prev, status: 'stopped' } : null);
+        console.log('Verification stopped');
         setIsRunning(false);
+        setProgress(prev => prev ? { ...prev, status: 'stopped' } : null);
       }
     };
 
@@ -78,143 +65,83 @@ export function useVerification(): UseVerificationResult {
     eventsSetRef.current = true;
   }, []);
 
-  // Load checkpoints on mount
+  // Initialize running state from service and restore saved progress
   useEffect(() => {
-    refreshCheckpoints();
-  }, []);
-
-  const refreshCheckpoints = useCallback(async () => {
-    try {
-      const allCheckpoints = await verificationService.getAllCheckpoints();
-      setCheckpoints(allCheckpoints);
-    } catch (err) {
-      console.error('Failed to refresh checkpoints:', err);
+    setIsRunning(verificationService.isRunning());
+    
+    // Restore progress state from localStorage when component mounts
+    const savedProgress = verificationService.getSavedProgress();
+    if (savedProgress && savedProgress.status) {
+      const restoredProgress: VerificationProgress = {
+        currentTransaction: savedProgress.lastProcessedTransaction,
+        totalTransactions: savedProgress.totalTransactions,
+        status: savedProgress.status as any,
+        startTime: Date.now() // Default to current time since we don't store startTime
+      };
+      setProgress(restoredProgress);
+      
+      // If it was paused/stopped, user can resume
+      if (savedProgress.status === 'paused' || savedProgress.status === 'stopped') {
+        setIsRunning(false);
+      }
     }
   }, []);
 
-  const startVerification = useCallback(async (
-    files: File[], 
-    config?: Partial<VerificationConfig>,
-    sessionId?: string
-  ): Promise<string> => {
+  const start = useCallback(async (config?: Partial<VerificationConfig>) => {
     try {
       setError(null);
       setIsRunning(true);
-      
-      const sid = await verificationService.startVerification(files, config, sessionId);
-      setCurrentSessionId(sid);
-      
-      return sid;
+      await verificationService.startVerification(config);
     } catch (err) {
-      setIsRunning(false);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start verification';
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
+      setIsRunning(false);
       throw err;
     }
   }, []);
 
-  const stopVerification = useCallback(() => {
+  const stop = useCallback(() => {
     verificationService.stopVerification();
   }, []);
 
-  const pauseVerification = useCallback(() => {
+  const pause = useCallback(() => {
     verificationService.pauseVerification();
+    // Don't immediately set UI state - wait for worker to report paused status
   }, []);
 
-  const resumeVerification = useCallback(() => {
+  const resume = useCallback(() => {
     verificationService.resumeVerification();
+    setProgress(prev => prev ? { ...prev, status: 'running' } : null);
   }, []);
 
-  const clearAllCheckpoints = useCallback(async () => {
-    try {
-      await verificationService.clearAllCheckpoints();
-      setCheckpoints([]);
-      setLastCheckpoint(null);
-      setError(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to clear checkpoints';
-      setError(errorMessage);
-      throw err;
-    }
+  const clearProgress = useCallback(() => {
+    verificationService.clearSavedProgress();
+    setProgress(null);
+    setError(null);
   }, []);
 
-  const deleteCheckpoint = useCallback(async (sessionId: string) => {
-    try {
-      await verificationService.deleteCheckpoint(sessionId);
-      await refreshCheckpoints();
-      
-      // Clear last checkpoint if it was the deleted one
-      if (lastCheckpoint?.id === sessionId) {
-        setLastCheckpoint(null);
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete checkpoint';
-      setError(errorMessage);
-      throw err;
-    }
-  }, [lastCheckpoint?.id, refreshCheckpoints]);
-
-  const canResume = useCallback(async (sessionId: string): Promise<boolean> => {
-    try {
-      const hasFailed = await verificationService.hasFailedCheckpoint(sessionId);
-      return !hasFailed;
-    } catch (err) {
-      console.error('Failed to check if session can be resumed:', err);
-      return false;
-    }
+  const getSavedProgress = useCallback(() => {
+    return verificationService.getSavedProgress();
   }, []);
-
-  const resumeFromCheckpoint = useCallback(async (sessionId: string, files: File[]): Promise<string> => {
-    try {
-      setError(null);
-      setIsRunning(true);
-      
-      const sid = await verificationService.resumeVerificationFromCheckpoint(sessionId, files);
-      setCurrentSessionId(sid);
-      
-      return sid;
-    } catch (err) {
-      setIsRunning(false);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to resume verification from checkpoint';
-      setError(errorMessage);
-      throw err;
-    }
-  }, []);
-
-  const canResumeFromCheckpoint = useCallback(async (sessionId: string): Promise<boolean> => {
-    try {
-      return await verificationService.canResumeFromCheckpoint(sessionId);
-    } catch (err) {
-      console.error('Failed to check if session can be resumed from checkpoint:', err);
-      return false;
-    }
-  }, []);
-
-  // Update current session ID from service
-  useEffect(() => {
-    const serviceSessionId = verificationService.getCurrentSessionId();
-    setCurrentSessionId(serviceSessionId);
-  }, [isRunning]);
 
   return {
     // State
     isRunning,
     progress,
-    checkpoints,
-    lastCheckpoint,
     error,
-    currentSessionId,
 
     // Actions
-    startVerification,
-    resumeFromCheckpoint,
-    stopVerification,
-    pauseVerification,
-    resumeVerification,
-    clearAllCheckpoints,
-    deleteCheckpoint,
-    refreshCheckpoints,
-    canResume,
-    canResumeFromCheckpoint
+    start,
+    stop,
+    pause,
+    resume,
+    clearProgress,
+    canResumeVerification: () => {
+      const savedProgress = verificationService.getSavedProgress();
+      return savedProgress !== null && 
+             (savedProgress.status === 'paused' || savedProgress.status === 'stopped') &&
+             savedProgress.lastProcessedTransaction > 0;
+    },
+    getSavedProgress
   };
 }

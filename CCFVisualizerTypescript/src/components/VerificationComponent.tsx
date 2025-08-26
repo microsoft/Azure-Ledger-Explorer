@@ -1,6 +1,6 @@
-// Verification Component - UI for ledger verification with progress tracking
+// Simplified Verification Component - UI for ledger verification without checkpointing
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Button,
   Card,
@@ -11,39 +11,21 @@ import {
   MessageBar,
   MessageBarBody,
   Badge,
-  Table,
-  TableHeader,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  TableCellLayout,
-  Dialog,
-  DialogTrigger,
-  DialogSurface,
-  DialogTitle,
-  DialogContent,
-  DialogBody,
-  DialogActions,
   Field,
   Input,
   makeStyles,
-  tokens,
-  Tooltip
+  tokens
 } from '@fluentui/react-components';
 import {
   Play24Regular,
   Stop24Regular,
   Pause24Regular,
-  Document24Regular,
   Checkmark24Regular,
   ErrorCircle24Regular,
-  Delete24Regular,
-  Info24Regular,
-  ArrowClockwise24Regular
+  Delete24Regular
 } from '@fluentui/react-icons';
 import { useVerification } from '../hooks/use-verification';
-import type { VerificationConfig, VerificationCheckpoint } from '../types/verification-types';
+import type { VerificationConfig } from '../types/verification-types';
 
 const useStyles = makeStyles({
   container: {
@@ -51,507 +33,202 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalL,
+    maxWidth: '800px',
+    margin: '0 auto'
   },
   card: {
-    maxWidth: '800px',
+    width: '100%'
   },
-  controlsSection: {
+  progressContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS
+  },
+  controls: {
     display: 'flex',
     gap: tokens.spacingHorizontalM,
     alignItems: 'center',
-    flexWrap: 'wrap',
+    flexWrap: 'wrap'
   },
-  progressSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalS,
-  },
-  checkpointsSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: tokens.spacingVerticalM,
-  },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: tokens.spacingHorizontalM,
-  },
-  statCard: {
+  configSection: {
     padding: tokens.spacingVerticalM,
-    textAlign: 'center',
+    borderRadius: tokens.borderRadiusMedium,
+    backgroundColor: tokens.colorNeutralBackground2,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalS
   },
-  configGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: tokens.spacingHorizontalM,
-  },
-  checkpointTable: {
-    maxHeight: '300px',
-    overflowY: 'auto',
-  },
-  statusBadge: {
-    minWidth: '60px',
+  progressInfo: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
   }
 });
 
-export const VerificationComponent: React.FC = () => {
-  const classes = useStyles();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const [showResumeDialog, setShowResumeDialog] = useState(false);
-  const [selectedCheckpoint, setSelectedCheckpoint] = useState<VerificationCheckpoint | null>(null);
-  const [config, setConfig] = useState<Partial<VerificationConfig>>({
-    checkpointInterval: 100,
-    progressReportInterval: 50,
-    resumeFromCheckpoint: false
+export interface VerificationComponentProps {}
+
+export const VerificationComponent: React.FC<VerificationComponentProps> = () => {
+  const styles = useStyles();
+  
+  // Simplified configuration without checkpointing
+  const [config, setConfig] = useState<VerificationConfig>({
+    progressReportInterval: 50
   });
 
   const {
-    isRunning,
     progress,
-    checkpoints,
+    isRunning,
     error,
-    startVerification,
-    resumeFromCheckpoint,
-    stopVerification,
-    pauseVerification,
-    resumeVerification,
-    clearAllCheckpoints,
-    deleteCheckpoint,
-    refreshCheckpoints
+    start: startVerification,
+    stop: stopVerification,
+    pause: pauseVerification,
+    resume: resumeVerification,
+    clearProgress
   } = useVerification();
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    setSelectedFiles(files);
-  };
-
-  const handleStartVerification = async () => {
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
+  const handleStart = async () => {
     try {
-      // Check if there are resumable checkpoints first
-      const resumableCheckpoints = getResumableCheckpoints();
-      if (resumableCheckpoints.length > 0) {
-        // Get the most recent resumable checkpoint
-        const latestCheckpoint = resumableCheckpoints.sort((a, b) => b.timestamp - a.timestamp)[0];
-        console.log('Auto-resuming from latest checkpoint:', latestCheckpoint);
-        await resumeFromCheckpoint(latestCheckpoint.id, selectedFiles);
-      } else {
-        // No resumable checkpoints, start fresh
-        await startVerification(selectedFiles, config);
-      }
-    } catch (err) {
-      console.error('Failed to start verification:', err);
+      await startVerification(config);
+    } catch (error) {
+      console.error('Failed to start verification:', error);
     }
   };
 
-  const handleStartFresh = async () => {
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
-    try {
-      await startVerification(selectedFiles, config);
-    } catch (err) {
-      console.error('Failed to start fresh verification:', err);
-    }
+  const handleStop = () => {
+    stopVerification();
   };
 
-  const handleResumeFromCheckpoint = async (checkpoint: VerificationCheckpoint) => {
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
-    try {
-      await resumeFromCheckpoint(checkpoint.id, selectedFiles);
-      setShowResumeDialog(false);
-    } catch (err) {
-      console.error('Failed to resume verification:', err);
-    }
+  const handlePause = () => {
+    pauseVerification();
   };
 
-  const getResumableCheckpoints = () => {
-    return checkpoints.filter(cp => cp.status === 'stopped' || cp.status === 'pass');
+  const handleResume = () => {
+    resumeVerification();
   };
 
-  const formatDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
+  const handleClearProgress = () => {
+    clearProgress();
   };
 
-  const formatTimestamp = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleString();
-  };
-
-  const getStatusIcon = (status: string) => {
+  const getStatusBadge = () => {
+    if (!progress) return null;
+    
+    const { status } = progress;
+    
     switch (status) {
-      case 'pass':
-        return <Checkmark24Regular style={{ color: tokens.colorPaletteGreenForeground1 }} />;
-      case 'fail':
-        return <ErrorCircle24Regular style={{ color: tokens.colorPaletteRedForeground1 }} />;
+      case 'running':
+        return <Badge appearance="filled" color="brand">Running</Badge>;
+      case 'paused':
+        return <Badge appearance="filled" color="warning">Paused</Badge>;
+      case 'completed':
+        return <Badge appearance="filled" color="success" icon={<Checkmark24Regular />}>Completed</Badge>;
+      case 'failed':
+        return <Badge appearance="filled" color="danger" icon={<ErrorCircle24Regular />}>Failed</Badge>;
       case 'stopped':
-        return <Pause24Regular style={{ color: tokens.colorPaletteYellowForeground1 }} />;
+        return <Badge appearance="filled" color="subtle">Stopped</Badge>;
       default:
-        return <Info24Regular />;
+        return null;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const color = status === 'pass' ? tokens.colorPaletteGreenForeground1 : 
-                  status === 'fail' ? tokens.colorPaletteRedForeground1 : 
-                  status === 'stopped' ? tokens.colorPaletteYellowForeground1 :
-                  tokens.colorNeutralForeground1;
-    return (
-      <Badge className={classes.statusBadge} style={{ color }}>
-        {status.toUpperCase()}
-      </Badge>
-    );
-  };
-
-  const progressPercentage = progress 
-    ? Math.round((progress.currentTransaction / progress.totalTransactions) * 100)
-    : 0;
-
-  const elapsedTime = progress 
-    ? Date.now() - progress.startTime 
-    : 0;
+  const progressPercentage = progress ? Math.round((progress.currentTransaction / progress.totalTransactions) * 100) : 0;
 
   return (
-    <div className={classes.container}>
-      {/* File Selection */}
-      <Card className={classes.card}>
+    <div className={styles.container}>
+      <Card className={styles.card}>
         <CardHeader
-          header={<Text weight="semibold">Select Ledger Files</Text>}
-          description="Choose CCF ledger files to verify"
+          header={<Text size={600}>Ledger Verification</Text>}
+          description="Verify the integrity of the ledger data using database-stored transactions"
         />
         <CardPreview>
-          <div style={{ padding: tokens.spacingVerticalM }}>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".committed"
-              onChange={handleFileSelect}
-              style={{ marginBottom: tokens.spacingVerticalM }}
-            />
-            {selectedFiles.length > 0 && (
-              <Text>
-                Selected {selectedFiles.length} file(s): {selectedFiles.map(f => f.name).join(', ')}
-              </Text>
-            )}
-          </div>
-        </CardPreview>
-      </Card>
+          <div className={styles.progressContainer}>
+            {/* Configuration Section */}
+            <div className={styles.configSection}>
+              <Text size={500} weight="semibold">Configuration</Text>
+              <Field label="Progress Report Interval" hint="Number of transactions between progress updates">
+                <Input
+                  type="number"
+                  value={config.progressReportInterval.toString()}
+                  onChange={(_, data) => setConfig(prev => ({ 
+                    ...prev, 
+                    progressReportInterval: parseInt(data.value) || 50 
+                  }))}
+                  disabled={isRunning}
+                />
+              </Field>
+            </div>
 
-      {/* Controls */}
-      <Card className={classes.card}>
-        <CardHeader
-          header={<Text weight="semibold">Verification Controls</Text>}
-        />
-        <CardPreview>
-          <div className={classes.controlsSection}>
-            <Button
-              appearance="primary"
-              icon={<Play24Regular />}
-              disabled={isRunning || selectedFiles.length === 0}
-              onClick={handleStartVerification}
-            >
-              {getResumableCheckpoints().length > 0 ? 'Resume Verification' : 'Start Verification'}
-            </Button>
-
-            {getResumableCheckpoints().length > 0 && (
-              <Button
-                appearance="secondary"
-                icon={<ArrowClockwise24Regular />}
-                disabled={isRunning || selectedFiles.length === 0}
-                onClick={handleStartFresh}
-              >
-                Start Fresh
-              </Button>
+            {/* Progress Section */}
+            {progress && (
+              <div className={styles.progressContainer}>
+                <div className={styles.progressInfo}>
+                  <Text size={400}>
+                    Transaction {progress.currentTransaction.toLocaleString()} of {progress.totalTransactions.toLocaleString()} 
+                    ({progressPercentage}%)
+                  </Text>
+                  {getStatusBadge()}
+                </div>
+                <ProgressBar value={progressPercentage} />
+              </div>
             )}
 
-            <Dialog open={showResumeDialog} onOpenChange={(_, data) => setShowResumeDialog(data.open)}>
-              <DialogTrigger disableButtonEnhancement>
-                <Button
-                  icon={<Play24Regular />}
-                  disabled={isRunning || selectedFiles.length === 0 || getResumableCheckpoints().length === 0}
+            {/* Error Display */}
+            {error && (
+              <MessageBar intent="error">
+                <MessageBarBody>
+                  <strong>Verification Error:</strong> {error}
+                </MessageBarBody>
+              </MessageBar>
+            )}
+
+            {/* Controls */}
+            <div className={styles.controls}>
+              {!isRunning ? (
+                <Button 
+                  appearance="primary" 
+                  icon={<Play24Regular />} 
+                  onClick={handleStart}
                 >
-                  Resume from Checkpoint
+                  Start Verification
                 </Button>
-              </DialogTrigger>
-              <DialogSurface>
-                <DialogTitle>Resume from Checkpoint</DialogTitle>
-                <DialogBody>
-                  <DialogContent>
-                    <Text>Select a checkpoint to resume verification from:</Text>
-                    <div style={{ marginTop: tokens.spacingVerticalM }}>
-                      {getResumableCheckpoints().map((checkpoint) => (
-                        <Card 
-                          key={checkpoint.id}
-                          style={{ marginBottom: tokens.spacingVerticalS, cursor: 'pointer' }}
-                          onClick={() => setSelectedCheckpoint(checkpoint)}
-                          appearance={selectedCheckpoint?.id === checkpoint.id ? 'filled' : 'outline'}
-                        >
-                          <CardHeader
-                            header={<Text size={300}>Session: {checkpoint.id.slice(0, 20)}...</Text>}
-                            description={
-                              <div>
-                                <Text size={200}>
-                                  Last verified: Transaction {checkpoint.lastVerifiedTransaction.toLocaleString()}
-                                </Text>
-                                <br />
-                                <Text size={200}>
-                                  Status: {getStatusBadge(checkpoint.status)} • {formatTimestamp(checkpoint.timestamp)}
-                                </Text>
-                              </div>
-                            }
-                          />
-                        </Card>
-                      ))}
-                    </div>
-                  </DialogContent>
-                </DialogBody>
-                <DialogActions>
-                  <Button appearance="secondary" onClick={() => setShowResumeDialog(false)}>
-                    Cancel
-                  </Button>
+              ) : (
+                <>
                   <Button 
-                    appearance="primary" 
-                    disabled={!selectedCheckpoint}
-                    onClick={() => selectedCheckpoint && handleResumeFromCheckpoint(selectedCheckpoint)}
+                    appearance="secondary" 
+                    icon={<Stop24Regular />} 
+                    onClick={handleStop}
                   >
-                    Resume
+                    Stop
                   </Button>
-                </DialogActions>
-              </DialogSurface>
-            </Dialog>
-            
-            <Button
-              icon={<Pause24Regular />}
-              disabled={!isRunning || progress?.status !== 'running'}
-              onClick={pauseVerification}
-            >
-              Pause
-            </Button>
-            
-            <Button
-              icon={<Play24Regular />}
-              disabled={!isRunning || progress?.status !== 'paused'}
-              onClick={resumeVerification}
-            >
-              Resume
-            </Button>
-            
-            <Button
-              icon={<Stop24Regular />}
-              disabled={!isRunning}
-              onClick={stopVerification}
-            >
-              Stop
-            </Button>
-
-            <Dialog open={showConfigDialog} onOpenChange={(_, data) => setShowConfigDialog(data.open)}>
-              <DialogTrigger disableButtonEnhancement>
-                <Button>Configure</Button>
-              </DialogTrigger>
-              <DialogSurface>
-                <DialogTitle>Verification Configuration</DialogTitle>
-                <DialogBody>
-                  <DialogContent>
-                    <div className={classes.configGrid}>
-                      <Field label="Checkpoint Interval">
-                        <Input
-                          type="number"
-                          value={config.checkpointInterval?.toString() || '100'}
-                          onChange={(_, data) => setConfig(prev => ({ 
-                            ...prev, 
-                            checkpointInterval: parseInt(data.value) || 100 
-                          }))}
-                        />
-                      </Field>
-                      <Field label="Progress Report Interval">
-                        <Input
-                          type="number"
-                          value={config.progressReportInterval?.toString() || '50'}
-                          onChange={(_, data) => setConfig(prev => ({ 
-                            ...prev, 
-                            progressReportInterval: parseInt(data.value) || 50 
-                          }))}
-                        />
-                      </Field>
-                    </div>
-                  </DialogContent>
-                </DialogBody>
-                <DialogActions>
-                  <Button appearance="secondary" onClick={() => setShowConfigDialog(false)}>
-                    Cancel
-                  </Button>
-                  <Button appearance="primary" onClick={() => setShowConfigDialog(false)}>
-                    Save
-                  </Button>
-                </DialogActions>
-              </DialogSurface>
-            </Dialog>
-          </div>
-        </CardPreview>
-      </Card>
-
-      {/* Error Display */}
-      {error && (
-        <MessageBar intent="error">
-          <MessageBarBody>
-            <strong>Error:</strong> {error}
-          </MessageBarBody>
-        </MessageBar>
-      )}
-
-      {/* Progress */}
-      {progress && (
-        <Card className={classes.card}>
-          <CardHeader
-            header={<Text weight="semibold">Verification Progress</Text>}
-          />
-          <CardPreview>
-            <div className={classes.progressSection}>
-              <div className={classes.statsGrid}>
-                <div className={classes.statCard}>
-                  <Text size={400} weight="semibold">Status</Text>
-                  <br />
-                  <Badge style={{ 
-                    color: progress.status === 'running' ? tokens.colorPaletteGreenForeground1 : tokens.colorNeutralForeground1 
-                  }}>
-                    {progress.status.toUpperCase()}
-                  </Badge>
-                </div>
-                <div className={classes.statCard}>
-                  <Text size={400} weight="semibold">Progress</Text>
-                  <br />
-                  <Text size={300}>
-                    {progress.currentTransaction.toLocaleString()} / {progress.totalTransactions.toLocaleString()}
-                  </Text>
-                </div>
-                <div className={classes.statCard}>
-                  <Text size={400} weight="semibold">Files</Text>
-                  <br />
-                  <Text size={300}>
-                    {progress.processedFiles} / {progress.totalFiles}
-                  </Text>
-                </div>
-                <div className={classes.statCard}>
-                  <Text size={400} weight="semibold">Elapsed Time</Text>
-                  <br />
-                  <Text size={300}>{formatDuration(elapsedTime)}</Text>
-                </div>
-              </div>
-
-              <ProgressBar value={progressPercentage} max={100} />
-              <Text size={200}>
-                {progressPercentage}% - Currently processing: {progress.currentFileName}
-              </Text>
-            </div>
-          </CardPreview>
-        </Card>
-      )}
-
-      {/* Checkpoints */}
-      <Card className={classes.card}>
-        <CardHeader
-          header={<Text weight="semibold">Checkpoints</Text>}
-          action={
-            <div style={{ display: 'flex', gap: tokens.spacingHorizontalS }}>
-              <Button
-                size="small"
-                icon={<Document24Regular />}
-                onClick={refreshCheckpoints}
+                  {progress?.status === 'running' ? (
+                    <Button 
+                      appearance="secondary" 
+                      icon={<Pause24Regular />} 
+                      onClick={handlePause}
+                    >
+                      Pause
+                    </Button>
+                  ) : progress?.status === 'paused' ? (
+                    <Button 
+                      appearance="secondary" 
+                      icon={<Play24Regular />} 
+                      onClick={handleResume}
+                    >
+                      Resume
+                    </Button>
+                  ) : null}
+                </>
+              )}
+              
+              <Button 
+                appearance="outline" 
+                icon={<Delete24Regular />} 
+                onClick={handleClearProgress}
+                disabled={isRunning}
               >
-                Refresh
-              </Button>
-              <Button
-                size="small"
-                icon={<Delete24Regular />}
-                onClick={clearAllCheckpoints}
-                disabled={checkpoints.length === 0}
-              >
-                Clear All
+                Clear Progress
               </Button>
             </div>
-          }
-        />
-        <CardPreview>
-          <div className={classes.checkpointsSection}>
-            {checkpoints.length === 0 ? (
-              <Text>No checkpoints found</Text>
-            ) : (
-              <div className={classes.checkpointTable}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHeaderCell>Status</TableHeaderCell>
-                      <TableHeaderCell>Session ID</TableHeaderCell>
-                      <TableHeaderCell>Last Transaction</TableHeaderCell>
-                      <TableHeaderCell>Timestamp</TableHeaderCell>
-                      <TableHeaderCell>Actions</TableHeaderCell>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {checkpoints.map((checkpoint) => (
-                      <TableRow key={checkpoint.id}>
-                        <TableCell>
-                          <TableCellLayout media={getStatusIcon(checkpoint.status)}>
-                            {getStatusBadge(checkpoint.status)}
-                          </TableCellLayout>
-                        </TableCell>
-                        <TableCell>
-                          <TableCellLayout>
-                            <Tooltip content={checkpoint.id} relationship="label">
-                              <Text size={200} style={{ fontFamily: 'monospace' }}>
-                                {checkpoint.id.slice(0, 20)}...
-                              </Text>
-                            </Tooltip>
-                          </TableCellLayout>
-                        </TableCell>
-                        <TableCell>
-                          <TableCellLayout>
-                            {checkpoint.lastVerifiedTransaction.toLocaleString()}
-                          </TableCellLayout>
-                        </TableCell>
-                        <TableCell>
-                          <TableCellLayout>
-                            <Text size={200}>
-                              {formatTimestamp(checkpoint.timestamp)}
-                            </Text>
-                          </TableCellLayout>
-                        </TableCell>
-                        <TableCell>
-                          <TableCellLayout>
-                            <Button
-                              size="small"
-                              icon={<Delete24Regular />}
-                              onClick={() => deleteCheckpoint(checkpoint.id)}
-                            >
-                              Delete
-                            </Button>
-                          </TableCellLayout>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </div>
         </CardPreview>
       </Card>
