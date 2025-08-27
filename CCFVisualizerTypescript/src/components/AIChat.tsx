@@ -28,6 +28,7 @@ import {
   DocumentAdd24Regular,
   DatabaseArrowDownRegular,
   Edit24Regular,
+  Stop24Regular,
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -379,6 +380,7 @@ const useStyles = makeStyles({
     whiteSpace: 'pre-wrap',
     overflowWrap: 'break-word',
     overflowY: 'auto',
+    color: tokens.colorNeutralForeground1,
     '&:focus': {
       outline: 'none',
     },
@@ -400,6 +402,14 @@ const useStyles = makeStyles({
     '&:hover:not(:disabled)': {
       backgroundColor: tokens.colorBrandBackgroundHover,
     },
+  },
+  stopButton: {
+    minWidth: '32px',
+    height: '32px',
+    ...shorthands.borderRadius('50%'),
+    backgroundColor: tokens.colorPaletteBlueBorderActive,
+    ...shorthands.border('none'),
+    color: tokens.colorNeutralForegroundInverted,
   },
   newConversationButton: {
     minWidth: '32px',
@@ -462,6 +472,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Add state for Plus button dropdown and dialogs
   const [showUploadDialog, setShowUploadDialog] = useState(false);
@@ -608,7 +619,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     }
   };
 
-  const callOpenAIResponseAPI = async (messages: ChatMessage[], newMessage: string): Promise<Response> => {
+  const callOpenAIResponseAPI = async (messages: ChatMessage[], newMessage: string, signal?: AbortSignal): Promise<Response> => {
     if (!config.baseUrl) {
       throw new Error('Base URL is required to send the request');
     }
@@ -642,6 +653,7 @@ export const AIChat: React.FC<AIChatProps> = ({
         temperature: 0.1,
         max_tokens: 2000,
       }),
+      signal: signal, // Add abort signal support
     });
 
     if (!response.ok) {
@@ -666,7 +678,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     return actions;
   }
 
-  const processResponse = async (response: Response) => {
+  const processResponse = async (response: Response, signal?: AbortSignal) => {
     if (!response.body) {
       throw new Error('Response body is empty');
     }
@@ -691,6 +703,11 @@ export const AIChat: React.FC<AIChatProps> = ({
     let responseId: string;
     try {
       while (true) {
+        // Check if we should abort
+        if (signal?.aborted) {
+          break;
+        }
+
         const { done, value } = await reader.read();
         if (done) {
           setMessages(prev => {
@@ -755,6 +772,20 @@ export const AIChat: React.FC<AIChatProps> = ({
       }
     } finally {
       reader.releaseLock();
+      // Mark the message as finished if it was aborted
+      if (signal?.aborted) {
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.state === 'streaming') {
+            last.state = 'finished';
+            if (!last.content.trim()) {
+              last.content = '*Response was stopped by user*';
+            }
+          }
+          return updated;
+        });
+      }
     }
 
     return fullResponseText;
@@ -902,16 +933,33 @@ Please provide a clean, human-readable summary that captures the essential infor
     setIsLoading(true);
     setError(null);
 
+    // Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       // Get AI response
-      const aiResponse = await callOpenAIResponseAPI(messages, userMessage.content);
+      const aiResponse = await callOpenAIResponseAPI(messages, userMessage.content, abortController.signal);
       // Stream response to chat
-      const messageText = await processResponse(aiResponse);
-      // Execute actions
-      await postprocessResponse(messageText);
+      const messageText = await processResponse(aiResponse, abortController.signal);
+      // Execute actions only if not aborted
+      if (!abortController.signal.aborted) {
+        await postprocessResponse(messageText);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      // Don't show error if request was aborted by user
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setError(err.message);
+      }
     } finally {
+      setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleStopResponse = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
       setIsLoading(false);
     }
   };
@@ -934,6 +982,12 @@ Please provide a clean, human-readable summary that captures the essential infor
       // Clear messages and reset error state
       setMessages([]);
       setError(null);
+      
+      // Abort any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        setIsLoading(false);
+      }
   };
 
   // Register clearChat function with parent component
@@ -941,6 +995,15 @@ Please provide a clean, human-readable summary that captures the essential infor
     onRegisterClearChat?.(() => clearChat);
     return () => onRegisterClearChat?.(null);
   }, [onRegisterClearChat]);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const handleDropDatabase = async () => {
     try {
@@ -1056,10 +1119,11 @@ Please provide a clean, human-readable summary that captures the essential infor
                 {/* Send button on right */}
                 <Button
                   appearance="primary"
-                  icon={<Send24Regular />}
-                  onClick={() => handleSendMessage()}
-                  disabled={!currentMessage.trim() || isLoading || !config.baseUrl}
-                  className={styles.sendButton}
+                  icon={isLoading ? <Stop24Regular /> : <Send24Regular />}
+                  onClick={isLoading ? handleStopResponse : () => handleSendMessage()}
+                  disabled={(!currentMessage.trim() && !isLoading) || !config.baseUrl}
+                  className={isLoading ? styles.stopButton : styles.sendButton}
+                  title={isLoading ? "Stop response" : "Send message"}
                 />
               </div>
             </div>
