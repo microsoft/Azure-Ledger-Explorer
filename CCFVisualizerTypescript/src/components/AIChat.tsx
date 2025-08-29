@@ -42,6 +42,14 @@ import type { WriteReceipt } from '../types/write-receipt-types';
 import { useDownloadMstFiles } from './MstLedgerImportView';
 import type { SavedProgress } from '../services/verification-service';
 
+// Max tokens we have is 720K per minute
+// Which is a very rough limit of 720k*4=2.88M characters
+// Assuming 10 parallel clients for demo lets say we have 288k characters per minute
+// If one request takes ~10 sec for the user to scan through then the limit could be 288k/6=48k characters per request
+const MAX_INPUT_LENGTH = 48000;
+const MAX_OUTPUT_TOKENS = 2000;
+const AI_TEMPERATURE = 0.1; // less means more deterministic
+
 const UIActionName = {
   ImportMST: 'importmst',
   RunSQL: 'runsql',
@@ -317,7 +325,7 @@ const useStyles = makeStyles({
     ...shorthands.borderTop('0px', 'solid', tokens.colorNeutralStroke2),
     marginBottom: '24px',
   },
-  
+
   starterTemplates: {
     display: 'flex',
     flexDirection: 'row',
@@ -458,11 +466,11 @@ const useStyles = makeStyles({
   },
 });
 
-export const AIChat: React.FC<AIChatProps> = ({ 
-  database, 
-  onChatStateChange, 
+export const AIChat: React.FC<AIChatProps> = ({
+  database,
+  onChatStateChange,
   onRegisterClearChat,
-  clearChatFunction 
+  clearChatFunction
 }) => {
   const styles = useStyles();
   const { config } = useConfig();
@@ -473,7 +481,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   // Add state for Plus button dropdown and dialogs
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showDropDbDialog, setShowDropDbDialog] = useState(false);
@@ -496,24 +504,24 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Auto-scroll to always keep the most recent user message at the top of the screen
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
-    
+
     if (messages.length > 0) {
       // Use a small delay to ensure DOM is updated
       timeoutId = setTimeout(() => {
         // Find the most recent user message and keep it at the top
         const userMessages = messages.filter(m => m.role === 'user');
-        
+
         if (userMessages.length > 0) {
           const lastUserMessage = userMessages[userMessages.length - 1];
           const messageElements = document.querySelectorAll('[data-message-role]');
-          const userMessageElement = Array.from(messageElements).find(el => 
+          const userMessageElement = Array.from(messageElements).find(el =>
             el.getAttribute('data-message-id') === lastUserMessage.id
           ) as HTMLElement;
-          
+
           if (userMessageElement) {
             // Always scroll to show the most recent user message at the top
-            userMessageElement.scrollIntoView({ 
-              behavior: 'smooth', 
+            userMessageElement.scrollIntoView({
+              behavior: 'smooth',
               block: 'end', // bottom of the message, this is important when streaming content into view
               inline: 'nearest'
             });
@@ -521,7 +529,7 @@ export const AIChat: React.FC<AIChatProps> = ({
         }
       }, 150); // Slightly longer delay to ensure content is fully rendered
     }
-    
+
     // Cleanup function to cancel timeout if messages change
     return () => {
       if (timeoutId) {
@@ -536,17 +544,17 @@ export const AIChat: React.FC<AIChatProps> = ({
     if (textarea) {
       // Reset height to calculate scrollHeight properly
       textarea.style.height = '24px'; // 1 line
-      
+
       // Calculate the required height
       const scrollHeight = textarea.scrollHeight;
       const lineHeight = 24;
       const minHeight = lineHeight; // 1 line
       const maxHeight = lineHeight * 3; // 3 lines
-      
+
       // Set height between min and max, allow scrolling beyond max
       const newHeight = Math.min(Math.max(scrollHeight, minHeight), maxHeight);
       textarea.style.height = newHeight + 'px';
-      
+
       // Show scrollbar if content exceeds 3 lines
       if (scrollHeight > maxHeight) {
         textarea.style.overflowY = 'auto';
@@ -619,26 +627,62 @@ export const AIChat: React.FC<AIChatProps> = ({
     }
   };
 
+  const historicChatToPromptText = (messages: ChatMessage[], availableCharLimit: number): string => {
+    let charLimit = availableCharLimit;
+    let input = '';
+    // collect prior conversations as history for this question
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      let addition = `${m.role} said: ${m.content}\n`;
+      charLimit -= addition.length;
+      if (charLimit < 0) {
+        // If we exceeded the limit, skip this message
+        continue;
+      }
+
+      // include the results to factor in success or failure
+      if (m.actions && m.actions.length > 0) {
+        m.actions.forEach(a => {
+          let actionResultText = `Action result for ${a.actionName} was `;
+          if (a.cleanedResult) {
+            actionResultText += a.cleanedResult;
+          } else if (a.actionResult) {
+            actionResultText += JSON.stringify(a.actionResult);
+          } else if (a.actionError) {
+            actionResultText += ` action error: ${a.actionError}`;
+          } else {
+            actionResultText += ' not available';
+          }
+          addition += actionResultText + `\n`;
+          charLimit -= actionResultText.length;
+          // If we exceeded the limit, skip this action result
+          if (charLimit > 0) {
+            addition += actionResultText;
+          }
+        });
+      }
+
+      // the text is going in reverse hence the prior message content staying at the end
+      input = addition + input;
+    }
+
+    return input;
+  }
+
   const callOpenAIResponseAPI = async (messages: ChatMessage[], newMessage: string, signal?: AbortSignal): Promise<Response> => {
     if (!config.baseUrl) {
       throw new Error('Base URL is required to send the request');
     }
 
-    // FIXME: limit the messages to not hit the context limit
-    let input = '';
-    // collect prior conversations as history for this question
-    messages.forEach(m => {
-      input += `${m.role} said: ${m.content}\n`;
-      if (m.actions && m.actions.length > 0) {
-        m.actions.forEach(a => {
-          input += `\nAction result for ${a.actionName} is ${a.actionResult ? JSON.stringify(a.actionResult) : 'not available'} ${a.actionError ? ` action error: ${a.actionError}` : ''} \n`;
-        });
-      }
-    });
+    let input = `User asks: ${newMessage}`;
+    if (allTransactionsCount && allTransactionsCount > 0) {
+      input = `Note: there is access to the imported ledger data.\n` + input;
+    } else {
+      input = `Note: ledger data was not imported yet and querying is not possible.\n` + input;
+    }
+    input = historicChatToPromptText(messages, MAX_INPUT_LENGTH - input.length) + input;
 
     const previousResponseId = messages.length > 0 ? messages[messages.length - 1].responseId : null;
-
-    input += `User asks: ${newMessage}\n`;
 
     const response = await fetch(config.baseUrl + '/v1/responses', {
       method: 'POST',
@@ -650,8 +694,8 @@ export const AIChat: React.FC<AIChatProps> = ({
         input: input,
         instructions: getSystemPrompt(),
         previous_response_id: previousResponseId,
-        temperature: 0.1,
-        max_tokens: 2000,
+        temperature: AI_TEMPERATURE,
+        max_tokens: MAX_OUTPUT_TOKENS,
       }),
       signal: signal, // Add abort signal support
     });
@@ -674,7 +718,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       const actionContent = match[2].trim();
       actions.push({ actionName, actionContent });
     }
-    
+
     return actions;
   }
 
@@ -721,7 +765,7 @@ export const AIChat: React.FC<AIChatProps> = ({
           console.log('Stream finished');
           break;
         }
-        
+
         // Handle SSE value
         const chunk = decoder.decode(value);
         // split by new lines
@@ -857,15 +901,10 @@ export const AIChat: React.FC<AIChatProps> = ({
       if (action.actionResult && typeof action.actionResult === 'object' && !action.actionError) {
         try {
           const jsonString = JSON.stringify(action.actionResult);
-          
-          // Only process if the JSON is complex enough to warrant cleanup
-          //if (jsonString.length > 200 && (Array.isArray(action.actionResult) || Object.keys(action.actionResult).length > 3)) {
-            const cleanedResponse = await requestJsonCleanup(jsonString, action.actionName);
-            if (cleanedResponse) {
-              // Store both the original result and the cleaned version
-              action.cleanedResult = cleanedResponse;
-            }
-          //}
+          const cleanedResponse = await requestJsonCleanup(jsonString, action.actionName);
+          if (cleanedResponse) {
+            action.cleanedResult = cleanedResponse;
+          }
         } catch (err) {
           console.error('Error processing JSON response:', err);
           // Don't set an error here as this is supplementary processing
@@ -876,6 +915,11 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Make an AI request to clean up JSON data
   const requestJsonCleanup = async (jsonString: string, actionName: string): Promise<string | null> => {
+    if (jsonString && jsonString.length > MAX_INPUT_LENGTH) {
+      console.warn('JSON response too large to process for cleanup:', jsonString.length, 'limit:', MAX_INPUT_LENGTH);
+      return null;
+    }
+
     try {
       const cleanupPrompt = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and provide context where helpful.
 
@@ -893,8 +937,8 @@ Please provide a clean, human-readable summary that captures the essential infor
           stream: false, // Non-streaming for cleanup requests
           input: cleanupPrompt,
           instructions: 'You are a helpful assistant that specializes in making complex JSON data more readable and understandable. Focus on clarity, structure, and highlighting important information.',
-          temperature: 0.1,
-          max_tokens: 1000,
+          temperature: AI_TEMPERATURE,
+          max_tokens: MAX_OUTPUT_TOKENS,
         }),
       });
 
@@ -978,16 +1022,16 @@ Please provide a clean, human-readable summary that captures the essential infor
     handleSendMessage(example);
   };
 
-  const clearChat = () => {      
-      // Clear messages and reset error state
-      setMessages([]);
-      setError(null);
-      
-      // Abort any ongoing requests
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        setIsLoading(false);
-      }
+  const clearChat = () => {
+    // Clear messages and reset error state
+    setMessages([]);
+    setError(null);
+
+    // Abort any ongoing requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsLoading(false);
+    }
   };
 
   // Register clearChat function with parent component
@@ -1058,7 +1102,7 @@ Please provide a clean, human-readable summary that captures the essential infor
               </MessageBar>
             </div>
           )}
-          
+
           <div className={styles.chatInputContainer}>
             {/* Text input on top */}
             <div className={styles.inputTextareaContainer}>
@@ -1204,118 +1248,118 @@ Please provide a clean, human-readable summary that captures the essential infor
         {hasMessages && (
           <div className={styles.chatPane}>
             {/* Messages Area */}
-            <div 
+            <div
               className={styles.messagesArea}
               style={{
                 paddingTop: '20px' // Always add padding when messages exist
               }}
             >
 
-            {messages.map((message) => (
-              <div key={message.id} className={message.role === 'user' ? styles.userMessageContainer : styles.messageContainer} data-message-role={message.role} data-message-id={message.id}>
-                
-                <div className={message.role === 'user' ? styles.userMessageContent : styles.messageContent}>
-                  <div className={`${styles.messageBubble} ${message.role === 'user' ? styles.userBubble : styles.assistantBubble}`}>
-                    {message.role === 'user' ? (
-                      <Text className={styles.messageText}>
-                        {message.content}
-                      </Text>
-                    ) : (
-                      <div className={styles.markdownContent}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {message.content}
-                        </ReactMarkdown>
-                      </div>
-                    )}
+              {messages.map((message) => (
+                <div key={message.id} className={message.role === 'user' ? styles.userMessageContainer : styles.messageContainer} data-message-role={message.role} data-message-id={message.id}>
 
-                    {message.actions && message.actions.length > 0 && (
-                      <>{message.actions.map((action, index) => (
-                        <div className={styles.sqlSection} key={index}>
-                          <Text size={200} weight="semibold" className={styles.sqlHeader}>
-                            Action: {action.actionName}
-                          </Text>
-                          {action.cleanedResult && (
-                            <div className={styles.cleanedResult}>
-                              <Text size={200} weight="semibold" className={styles.sqlHeader}>
-                                Summary:
-                              </Text>
-                              <div className={styles.markdownContent}>
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                  {action.cleanedResult}
-                                </ReactMarkdown>
-                              </div>
-                              <details className={styles.rawDataDetails}>
-                                <summary>
-                                  <Text size={200}>Show raw data</Text>
-                                </summary>
-                                <pre className={styles.sqlQuery}>
-                                  {action.actionName === UIActionName.RunSQL ? (
-                                    <>{formatSqlResult(action.actionResult)}</>
-                                  ) : (
-                                    <>{typeof action.actionResult === 'string'
-                                      ? action.actionResult
-                                      : JSON.stringify(action.actionResult, null, 2)}</>
-                                  )}
-                                </pre>
-                              </details>
-                            </div>
-                          )}
-                          {action.actionResult && !action.cleanedResult && (
-                            <pre className={styles.sqlQuery}>
-                              {action.actionName === UIActionName.RunSQL ? (
-                                <>{formatSqlResult(action.actionResult)}</>
-                              ) : (
-                                <>{typeof action.actionResult === 'string'
-                                  ? action.actionResult
-                                  : JSON.stringify(action.actionResult, null, 2)}</>
-                              )}
-                            </pre>
-                          )}
-                          {action.actionError && (
-                            <MessageBar intent="error">
-                              <Text size={200}>Error: {action.actionError}</Text>
-                            </MessageBar>
-                          )}
+                  <div className={message.role === 'user' ? styles.userMessageContent : styles.messageContent}>
+                    <div className={`${styles.messageBubble} ${message.role === 'user' ? styles.userBubble : styles.assistantBubble}`}>
+                      {message.role === 'user' ? (
+                        <Text className={styles.messageText}>
+                          {message.content}
+                        </Text>
+                      ) : (
+                        <div className={styles.markdownContent}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
                         </div>
-                      ))}
-                      </>
-                    )}
-                    
-                    {message.error && (
-                      <div className={styles.errorSection}>
-                        <MessageBar intent="error">
-                          <Text size={200}>Error: {message.error}</Text>
-                        </MessageBar>
-                      </div>
-                    )}
+                      )}
+
+                      {message.actions && message.actions.length > 0 && (
+                        <>{message.actions.map((action, index) => (
+                          <div className={styles.sqlSection} key={index}>
+                            <Text size={200} weight="semibold" className={styles.sqlHeader}>
+                              Action: {action.actionName}
+                            </Text>
+                            {action.cleanedResult && (
+                              <div className={styles.cleanedResult}>
+                                <Text size={200} weight="semibold" className={styles.sqlHeader}>
+                                  Summary:
+                                </Text>
+                                <div className={styles.markdownContent}>
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {action.cleanedResult}
+                                  </ReactMarkdown>
+                                </div>
+                                <details className={styles.rawDataDetails}>
+                                  <summary>
+                                    <Text size={200}>Show raw data</Text>
+                                  </summary>
+                                  <pre className={styles.sqlQuery}>
+                                    {action.actionName === UIActionName.RunSQL ? (
+                                      <>{formatSqlResult(action.actionResult)}</>
+                                    ) : (
+                                      <>{typeof action.actionResult === 'string'
+                                        ? action.actionResult
+                                        : JSON.stringify(action.actionResult, null, 2)}</>
+                                    )}
+                                  </pre>
+                                </details>
+                              </div>
+                            )}
+                            {action.actionResult && !action.cleanedResult && (
+                              <pre className={styles.sqlQuery}>
+                                {action.actionName === UIActionName.RunSQL ? (
+                                  <>{formatSqlResult(action.actionResult)}</>
+                                ) : (
+                                  <>{typeof action.actionResult === 'string'
+                                    ? action.actionResult
+                                    : JSON.stringify(action.actionResult, null, 2)}</>
+                                )}
+                              </pre>
+                            )}
+                            {action.actionError && (
+                              <MessageBar intent="error">
+                                <Text size={200}>Error: {action.actionError}</Text>
+                              </MessageBar>
+                            )}
+                          </div>
+                        ))}
+                        </>
+                      )}
+
+                      {message.error && (
+                        <div className={styles.errorSection}>
+                          <MessageBar intent="error">
+                            <Text size={200}>Error: {message.error}</Text>
+                          </MessageBar>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
-                  
                 </div>
-              </div>
-            ))}
-            
-            {isLoading && (
-              <div className={styles.messageContainer}>
-                <div className={styles.messageContent}>
-                  <div className={`${styles.messageBubble} ${styles.assistantBubble}`}>
-                    <div className={styles.loadingContainer}>
-                      <Spinner size="tiny" />
-                      <Text size={200}>AI is thinking...</Text>
+              ))}
+
+              {isLoading && (
+                <div className={styles.messageContainer}>
+                  <div className={styles.messageContent}>
+                    <div className={`${styles.messageBubble} ${styles.assistantBubble}`}>
+                      <div className={styles.loadingContainer}>
+                        <Spinner size="tiny" />
+                        <Text size={200}>AI is thinking...</Text>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
           </div>
         )}
       </div>
 
       {/* Dialogs */}
-      <AddFilesWizard 
-        open={showUploadDialog} 
+      <AddFilesWizard
+        open={showUploadDialog}
         onOpenChange={setShowUploadDialog}
       />
 
@@ -1337,7 +1381,7 @@ Please provide a clean, human-readable summary that captures the essential infor
               </Body1>
             </DialogBody>
             <DialogActions>
-              <Button 
+              <Button
                 appearance="secondary"
                 onClick={() => setShowDropDbDialog(false)}
               >
