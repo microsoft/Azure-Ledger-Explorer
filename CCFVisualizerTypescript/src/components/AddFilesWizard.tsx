@@ -20,7 +20,7 @@ import {
 } from '@fluentui/react-icons';
 import { FileUploadArea } from './FileUploadArea';
 import { LedgerBackupView } from './LedgerBackupView';
-import { CtsLedgerImportView } from './CtsLedgerImportView';
+import { MstLedgerImportView } from './MstLedgerImportView';
 
 
 const useStyles = makeStyles({
@@ -193,13 +193,13 @@ Please follow the following:
           `.trim(),
         };
 
-      case 'cts':
+      case 'mst':
         return {
-          title: 'Code Transparency Service',
+          title: 'Microsoft\'s Signing Transparency',
           content: `
-### About Code Transparency Service
+### About Microsoft\'s Signing Transparency
 
-Code Transparency Service provides transparency and auditability for software supply chain security, maintaining tamper-evident logs of software artifacts.
+Microsoft\'s Signing Transparency provides transparency and auditability for software supply chain security, maintaining tamper-evident logs of software artifacts.
           `.trim(),
         };
       case 'local':
@@ -255,8 +255,8 @@ The system will check for:
     switch (selectedTab) {
       case 'azure':
         return <LedgerBackupView />;
-      case 'cts':
-        return <CtsLedgerImportView />;
+      case 'mst':
+        return <MstLedgerImportView />;
       case 'local':
       default:
         return <FileUploadArea />;
@@ -290,8 +290,8 @@ The system will check for:
               <Tab value="azure" icon={<CloudRegular />}>
                 Azure Confidential Ledger
               </Tab>
-              <Tab value="cts" icon={<ShieldCheckmarkRegular />}>
-                Code Transparency Service
+              <Tab value="mst" icon={<ShieldCheckmarkRegular />}>
+                Microsoft's Signing Transparency
               </Tab>
               <Tab value="local" icon={<FolderRegular />}>
                 Local Files

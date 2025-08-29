@@ -101,7 +101,7 @@ const useStyles = makeStyles({
 interface AppConfig {
   baseUrl: string;
   systemPrompt: string;
-  ctsProxyUrl: string;
+  mstProxyUrl: string;
 }
 
 // Custom hook for managing configuration state
@@ -109,12 +109,12 @@ export const useConfig = () => {
   const [config, setConfig] = useState<AppConfig>({
     baseUrl: localStorage.getItem('chat_base_url') || '',
     systemPrompt: localStorage.getItem('chat_system_prompt') || defaultSystemPrompt,
-    ctsProxyUrl: localStorage.getItem('cts_proxy_url') || '',
+    mstProxyUrl: localStorage.getItem('mst_proxy_url') || '',
   });
 
   useEffect(() => {
     localStorage.setItem('chat_base_url', config.baseUrl);
-    localStorage.setItem('cts_proxy_url', config.ctsProxyUrl);
+    localStorage.setItem('mst_proxy_url', config.mstProxyUrl);
     if (config.systemPrompt) {
       localStorage.setItem('chat_system_prompt', config.systemPrompt);
     } else {
@@ -297,7 +297,7 @@ export const ConfigPage: React.FC = () => {
             <Field label="Base URL for chat integration">
               <Input
                 type="url"
-                placeholder="https://xyz.cognitiveservices.azure.com/"
+                placeholder="https://sageendpoint.com/"
                 value={config.baseUrl}
                 onChange={(_, data) => setConfig(prev => ({ ...prev, baseUrl: data.value }))} />
               
@@ -358,21 +358,21 @@ export const ConfigPage: React.FC = () => {
             header={
               <div className={styles.configHeader}>
                 <Settings24Regular />
-                <Text weight="semibold">CTS proxy configuration</Text>
+                <Text weight="semibold">Ledger proxy configuration</Text>
               </div>
             }
           />
           <div className={styles.configContent}>
             <Text size={200}>
-              Configure CTS file proxy as it might use self signed TLS certs
+              Configure ledger proxy due to the use of self signed TLS certs, to be able to connect from the browser.
             </Text>
 
             <Field label="Proxy URL for ledger file downloads">
               <Input
                 type="url"
-                placeholder="https://foo.bar.com/proxy/"
-                value={config.ctsProxyUrl}
-                onChange={(_, data) => setConfig(prev => ({ ...prev, ctsProxyUrl: data.value }))} />
+                placeholder="https://sageendpoint.com/mstproxy/"
+                value={config.mstProxyUrl}
+                onChange={(_, data) => setConfig(prev => ({ ...prev, mstProxyUrl: data.value }))} />
             </Field>
           </div>
         </Card>

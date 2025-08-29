@@ -39,11 +39,11 @@ import { useAllTransactionsCount } from '../hooks/use-ccf-data';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import type { WriteReceipt } from '../types/write-receipt-types';
-import { useDownloadCtsFiles } from './CtsLedgerImportView';
+import { useDownloadMstFiles } from './MstLedgerImportView';
 import type { SavedProgress } from '../services/verification-service';
 
 const UIActionName = {
-  ImportCTS: 'importcts',
+  ImportMST: 'importmst',
   RunSQL: 'runsql',
   VerifyLedger: 'verifyledger',
   VerifyReceipt: 'verifyreceipt',
@@ -482,7 +482,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Add verification hooks
   const verification = useVerification();
   const hasMessages = messages.length > 0;
-  const { error: ctsError, downloadFiles: downloadCtsFiles } = useDownloadCtsFiles();
+  const { error: mstError, downloadFiles: downloadMstFiles } = useDownloadMstFiles();
 
   useEffect(() => {
     onChatStateChange?.(hasMessages);
@@ -817,21 +817,21 @@ export const AIChat: React.FC<AIChatProps> = ({
         } catch (err) {
           action.actionError = err instanceof Error ? err.message : 'Receipt verification failed';
         }
-      } else if (action.actionName === UIActionName.ImportCTS) {
+      } else if (action.actionName === UIActionName.ImportMST) {
         if (!action.actionContent) {
-          action.actionError = 'CTS domain was missing';
+          action.actionError = 'MST domain was missing';
           continue
         }
         try {
-          await downloadCtsFiles(action.actionContent.trim());
+          await downloadMstFiles(action.actionContent.trim());
         } catch (err) {
-          action.actionError = err instanceof Error ? err.message : 'Failed to download CTS files';
+          action.actionError = err instanceof Error ? err.message : 'Failed to download MST files';
           continue;
         }
-        if (ctsError) {
-          action.actionError = ctsError;
+        if (mstError) {
+          action.actionError = mstError;
         } else {
-          action.actionResult = 'CTS files downloaded successfully';
+          action.actionResult = 'MST files downloaded successfully';
         }
       }
     }

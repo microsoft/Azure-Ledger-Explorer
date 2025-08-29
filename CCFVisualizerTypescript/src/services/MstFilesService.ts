@@ -11,7 +11,7 @@ interface NginxFileEntry {
 
 type NginxDirectoryResponse = NginxFileEntry[];
 
-// File info interface for CtsClient
+// File info interface for MstClient
 interface FileInfo {
   name: string;
   kind: 'file' | 'directory';
@@ -23,13 +23,13 @@ interface DownloadResponse {
   blobBody: Promise<Blob>;
 }
 
-interface ICtsClient {
+interface IMstClient {
   listAllLedgerFiles(): AsyncGenerator<FileInfo>;
   downloadFile(filename: string): Promise<DownloadResponse>;
 }
 
-// CtsClient implementation using fetch to access NGINX-indexed ledger files
-class CtsClient implements ICtsClient {
+// MstClient implementation using fetch to access NGINX-indexed ledger files
+class MstClient implements IMstClient {
   private ledgerFilesUrl: string;
   private proxyUrl: string | null;
 
@@ -124,12 +124,12 @@ class CtsClient implements ICtsClient {
   }
 }
 
-export class CtsFilesService {
-  private ctsClient: ICtsClient | null = null;
+export class MstFilesService {
+  private mstClient: IMstClient | null = null;
 
   async initialize(domain: string, proxyUrl?: string): Promise<void> {
     try {
-      this.ctsClient = new CtsClient(domain, proxyUrl);
+      this.mstClient = new MstClient(domain, proxyUrl);
     } catch (error) {
       console.error('Initialization error:', error);
       throw new Error(
@@ -139,13 +139,13 @@ export class CtsFilesService {
   }
 
   async listLedgerFiles(): Promise<LedgerFileInfo[]> {
-    if (!this.ctsClient) {
+    if (!this.mstClient) {
       throw new Error('File share client not initialized');
     }
 
     const files: LedgerFileInfo[] = [];
 
-    for await (const f of this.ctsClient.listAllLedgerFiles()) {
+    for await (const f of this.mstClient.listAllLedgerFiles()) {
       if (f.kind === "file" && f.name.endsWith('.committed')) {
         files.push({
           ...parseLedgerFilename(f.name)
@@ -160,7 +160,7 @@ export class CtsFilesService {
   }
 
   async downloadLedgerFiles(ledgerFile: LedgerFileInfo): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
-    if (!this.ctsClient) {
+    if (!this.mstClient) {
       throw new Error('File share client not initialized');
     }
 
@@ -176,7 +176,7 @@ export class CtsFilesService {
       for (const downloadFile of ledgerFileToDownloadFromStorage) {
         filesDownloaded.push(downloadFile);
         console.log(`Downloading file: ${downloadFile.filename}`);
-        const downloadResponse = await this.ctsClient.downloadFile(downloadFile.filename);
+        const downloadResponse = await this.mstClient.downloadFile(downloadFile.filename);
         const blob = await downloadResponse.blobBody;
         if (!blob) {
           console.error(`Failed to download file: ${downloadFile.filename}`);

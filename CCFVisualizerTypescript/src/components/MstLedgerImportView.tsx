@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 /* eslint-disable react-refresh/only-export-components */
-import { CtsFilesService } from '../services/CtsFilesService';
+import { MstFilesService } from '../services/MstFilesService';
 import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
 import {
     makeStyles,
@@ -96,7 +96,7 @@ const useStyles = makeStyles({
     },
 });
 
-export const useDownloadCtsFiles = (initialDomain?: string) => {
+export const useDownloadMstFiles = (initialDomain?: string) => {
     const [isDownloading, setIsDownloading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [downloadedFiles, setDownloadedFiles] = useState<File[]>([]);
@@ -117,8 +117,8 @@ export const useDownloadCtsFiles = (initialDomain?: string) => {
         setDownloadedFiles([]);
 
         try {
-            const fileShareService = new CtsFilesService();
-            await fileShareService.initialize(domainToUse, config.ctsProxyUrl);
+            const fileShareService = new MstFilesService();
+            await fileShareService.initialize(domainToUse, config.mstProxyUrl);
             const ledgerFiles = await fileShareService.listLedgerFiles();
 
             const allDownloadedFiles: File[] = [];
@@ -146,7 +146,7 @@ export const useDownloadCtsFiles = (initialDomain?: string) => {
     };
 };
 
-export const CtsLedgerImportView: React.FC = () => {
+export const MstLedgerImportView: React.FC = () => {
     const styles = useStyles();
     const clearAllDataMutation = useClearAllData();
     const [ledgerDomain, setLedgerDomain] = useState<string>('');
@@ -156,18 +156,18 @@ export const CtsLedgerImportView: React.FC = () => {
     const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
     const [selectedLedgerFile, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
-    const fileShareService = React.useMemo(() => new CtsFilesService(), []);
+    const fileShareService = React.useMemo(() => new MstFilesService(), []);
     const { handleFiles } = useFileDrop();
     const { config } = useConfig();
 
     const verifyAccess = async () => {
         const domainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
         if (!ledgerDomain || !domainRegex.test(ledgerDomain)) {
-            setVerificationError('Please enter a valid CTS domain, e.g. mycts.confidential-ledger.azure.com');
+            setVerificationError('Please enter a valid MST domain, e.g myledger.confidential-ledger.azure.com');
             setFiles([]);
             setIsVerifying(false);
             setIsDownloading(false);
-            console.warn('Invalid CTS domain format', ledgerDomain);
+            console.warn('Invalid MST domain format', ledgerDomain);
             return;
         }
 
@@ -178,7 +178,7 @@ export const CtsLedgerImportView: React.FC = () => {
 
         try {
             await clearAllDataMutation.mutateAsync();
-            await fileShareService.initialize(ledgerDomain, config.ctsProxyUrl);
+            await fileShareService.initialize(ledgerDomain, config.mstProxyUrl);
             const ledgerFiles = await fileShareService.listLedgerFiles();
             setFiles(ledgerFiles);
             setVerificationError(null);
@@ -213,7 +213,7 @@ export const CtsLedgerImportView: React.FC = () => {
             </div>
             <div style={{ width: '100%', maxWidth: '400px', margin: '20px 0' }}>
                 <Field
-                    label="CTS ledger domain name"
+                    label="MST ledger domain name"
                     validationMessage={verificationError}
                     validationState={verificationError ? "error" : "none"}
                 >
@@ -221,7 +221,7 @@ export const CtsLedgerImportView: React.FC = () => {
                         type="url"
                         value={ledgerDomain}
                         onChange={(_, data) => setLedgerDomain(data.value)}
-                        placeholder="Enter your CTS ledger domain name"
+                        placeholder="Enter your MST ledger domain name"
                         style={{ width: '100%' }}
                     />
                 </Field>
@@ -234,7 +234,7 @@ export const CtsLedgerImportView: React.FC = () => {
                     {isVerifying ? <Spinner size="tiny" /> : 'Import Files'}
                 </Button>
             </div>
-            {/* Create Table to List all the ledger files present in the backup based on the CTS domain provided */}
+            {/* Create Table to List all the ledger files present in the backup based on the MST domain provided */}
             {ledgerFiles.length > 0 && (
                 <div
                     style={{
