@@ -35,6 +35,22 @@ class MstClient implements IMstClient {
 
   constructor(domain: string, proxyUrl?: string) {
     // Prefix domain with 'ledger-files-' and construct base URL
+    // parse domain to avoid double protocol
+    if (domain.startsWith('http://')) {
+      domain = domain.slice('http://'.length);
+    } else if (domain.startsWith('https://')) {
+      domain = domain.slice('https://'.length);
+    }
+    // remove trailing slash if present
+    if (domain.endsWith('/')) {
+      domain = domain.slice(0, -1);
+    }
+    // try parsing domain to ensure it's valid
+    try {
+      new URL(`https://${domain}`);
+    } catch (error) {
+      throw new Error(`Invalid domain provided: ${domain}`);
+    }
     this.ledgerFilesUrl = `https://ledger-files-${domain}/ledger/`;
     this.proxyUrl = proxyUrl || null;
   }
@@ -133,7 +149,7 @@ export class MstFilesService {
     } catch (error) {
       console.error('Initialization error:', error);
       throw new Error(
-        'Failed to initialize file share client. Please ensure your SAS token is valid and has Read/List permissions.'
+        'Failed to initialize MST client. Please ensure your domain and proxy URL are correct.'
       );
     }
   }

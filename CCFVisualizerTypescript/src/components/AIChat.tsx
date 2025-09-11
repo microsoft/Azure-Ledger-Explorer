@@ -491,7 +491,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   // Add verification hooks
   const verification = useVerification();
   const hasMessages = messages.length > 0;
-  const { error: mstError, downloadFiles: downloadMstFiles } = useDownloadMstFiles();
+  const { downloadFiles: downloadMstFiles } = useDownloadMstFiles();
 
     // Register clearChat function with parent component
   useEffect(() => {
@@ -570,8 +570,18 @@ export const AIChat: React.FC<AIChatProps> = ({
     }
   }, [currentMessage]);
 
+  const getImportedDataStatus = () => {
+    if (allTransactionsCount && allTransactionsCount > 0) {
+      return `\n## State of imported data\nThere is access to the imported ledger data to run queries.\n`;
+    } else {
+      return `\n## State of imported data\nLedger data was not imported and querying is not possible. Do not attempt to query the ledger and suggest the user to import the data if the question is asking for it.\n`;
+    }
+  };
+
   const getSystemPrompt = () => {
-    return config.systemPrompt;
+    let systemPrompt = config.systemPrompt || '';
+    systemPrompt += getImportedDataStatus();
+    return systemPrompt;
   };
 
   const executeLedgerVerification = async (): Promise<SavedProgress> => {
@@ -633,60 +643,12 @@ export const AIChat: React.FC<AIChatProps> = ({
     }
   };
 
-  const historicChatToPromptText = (messages: ChatMessage[], availableCharLimit: number): string => {
-    let charLimit = availableCharLimit;
-    let input = '';
-    // collect prior conversations as history for this question
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      let addition = `${m.role} said: ${m.content}\n`;
-      charLimit -= addition.length;
-      if (charLimit < 0) {
-        // If we exceeded the limit, skip this message
-        continue;
-      }
-
-      // include the results to factor in success or failure
-      if (m.actions && m.actions.length > 0) {
-        m.actions.forEach(a => {
-          let actionResultText = `Action result for ${a.actionName} was `;
-          if (a.cleanedResult) {
-            actionResultText += a.cleanedResult;
-          } else if (a.actionResult) {
-            actionResultText += JSON.stringify(a.actionResult);
-          } else if (a.actionError) {
-            actionResultText += ` action error: ${a.actionError}`;
-          } else {
-            actionResultText += ' not available';
-          }
-          addition += actionResultText + `\n`;
-          charLimit -= actionResultText.length;
-          // If we exceeded the limit, skip this action result
-          if (charLimit > 0) {
-            addition += actionResultText;
-          }
-        });
-      }
-
-      // the text is going in reverse hence the prior message content staying at the end
-      input = addition + input;
-    }
-
-    return input;
-  }
-
   const callOpenAIResponseAPI = async (messages: ChatMessage[], newMessage: string, signal?: AbortSignal): Promise<Response> => {
     if (!config.baseUrl) {
       throw new Error('Base URL is required to send the request');
     }
 
-    let input = `User asks: ${newMessage}`;
-    if (allTransactionsCount && allTransactionsCount > 0) {
-      input = `Note: there is access to the imported ledger data.\n` + input;
-    } else {
-      input = `Note: ledger data was not imported yet and querying is not possible.\n` + input;
-    }
-    input = historicChatToPromptText(messages, MAX_INPUT_LENGTH - input.length) + input;
+    let input = `## User asks:\n${newMessage}`;
 
     const previousResponseId = messages.length > 0 ? messages[messages.length - 1].responseId : null;
 
@@ -884,11 +846,7 @@ export const AIChat: React.FC<AIChatProps> = ({
           action.actionError = err instanceof Error ? err.message : 'Failed to download MST files';
           continue;
         }
-        if (mstError) {
-          action.actionError = mstError;
-        } else {
-          action.actionResult = 'MST files downloaded successfully';
-        }
+        action.actionResult = 'MST files downloaded successfully';
       }
     }
 
