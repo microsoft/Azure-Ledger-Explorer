@@ -150,6 +150,7 @@ export class CCFDatabase {
           valueText = new TextDecoder('utf-8', { fatal: false }).decode(value);
         }
       } catch {
+        console.warn("Error decoding value for table:", table, value);
         valueText = '';
       }
     }
