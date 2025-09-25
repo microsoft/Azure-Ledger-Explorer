@@ -118,7 +118,7 @@ You have access to a SQLite database with the following schema:
 
 TABLES:
 - `ledger_files`: Contains uploaded ledger files (id, filename, file_size, created_at, updated_at)
-- `transactions`: Contains parsed transactions (id, file_id, version, flags, size, entry_type, tx_version, max_conflict_version, tx_digest, created_at)
+- `transactions`: Contains parsed transactions (id, file_id, version, flags, size, entry_type, tx_version, max_conflict_version, tx_digest, tx_id, created_at)
 - `kv_writes`: Contains key-value write operations (id, transaction_id, map_name, key_name, value_text, version, created_at)
 - `kv_deletes`: Contains key-value delete operations (id, transaction_id, map_name, key_name, version, created_at)
 

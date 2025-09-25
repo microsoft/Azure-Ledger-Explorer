@@ -105,7 +105,7 @@ export const TransactionDetailsPage: React.FC = () => {
         >
           Back
         </Button>
-        <div className={styles.title}>Transaction Details - ID: {transaction.id}</div>
+        <div className={styles.title}>Transaction Details - {transaction.txId}</div>
       </div>
       <div className={styles.content}>
         <TransactionViewer 
