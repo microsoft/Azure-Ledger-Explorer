@@ -87,6 +87,7 @@ export class CCFDatabase {
         tx_version INTEGER NOT NULL,
         max_conflict_version INTEGER,
         tx_digest BLOB,
+        tx_id STRING,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (file_id) REFERENCES ledger_files(id) ON DELETE CASCADE
       );
@@ -207,8 +208,8 @@ export class CCFDatabase {
         INSERT INTO transactions (
           file_id, version, flags, size,
           entry_type, tx_version, max_conflict_version,
-          tx_digest
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          tx_digest, tx_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const writeStmt = this.db.prepare(`
@@ -235,6 +236,7 @@ export class CCFDatabase {
           transaction.publicDomain.txVersion,
           transaction.publicDomain.maxConflictVersion,
           transaction.txDigest,
+          transaction.gcmHeader.view + '.' + transaction.gcmHeader.seqNo,
         ]);
 
         const txId = this.db.exec('SELECT last_insert_rowid() as id')[0].values[0][0] as number;
@@ -299,8 +301,8 @@ export class CCFDatabase {
         INSERT INTO transactions (
           file_id, version, flags, size,
           entry_type, tx_version, max_conflict_version,
-          tx_digest
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          tx_digest, tx_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       txStmt.run([
@@ -312,6 +314,7 @@ export class CCFDatabase {
         transaction.publicDomain.txVersion,
         transaction.publicDomain.maxConflictVersion,
         transaction.txDigest,
+        transaction.gcmHeader.view + '.' + transaction.gcmHeader.seqNo,
       ]);
       txStmt.free();
 
@@ -417,7 +420,7 @@ export class CCFDatabase {
     const result = this.db.exec(`
       SELECT 
         id, version, flags, size,
-        entry_type, tx_version, max_conflict_version
+        entry_type, tx_version, max_conflict_version, tx_id
       FROM transactions
       WHERE file_id = ?
       ORDER BY id
@@ -434,6 +437,7 @@ export class CCFDatabase {
       entryType: row[4] as number,
       txVersion: row[5] as number,
       maxConflictVersion: row[6] as number,
+      txId: row[7] as string,
     }));
   }
 
@@ -459,7 +463,7 @@ export class CCFDatabase {
     let sql = `
       SELECT DISTINCT
         t.id, t.file_id, f.filename, t.version, t.flags, t.size,
-        t.entry_type, t.tx_version, t.max_conflict_version,
+        t.entry_type, t.tx_version, t.max_conflict_version, t.tx_id,
         (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
         (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
         (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
@@ -502,9 +506,10 @@ export class CCFDatabase {
       entryType: row[6] as number,
       txVersion: row[7] as number,
       maxConflictVersion: row[8] as number,
-      writeCount: row[9] as number,
-      deleteCount: row[10] as number,
-      mapName: row[11] as string || undefined,
+      txId: row[9] as string,
+      writeCount: row[10] as number,
+      deleteCount: row[11] as number,
+      mapName: row[12] as string || undefined,
     }));
   }
 
@@ -599,7 +604,7 @@ export class CCFDatabase {
 
     const result = this.db.exec(`
       SELECT t.id, t.file_id, lf.filename, t.version, t.flags,
-             t.size, t.entry_type, t.tx_version, t.max_conflict_version,
+             t.size, t.entry_type, t.tx_version, t.max_conflict_version, t.tx_id,
              (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
              (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
              lf.file_size
@@ -622,9 +627,10 @@ export class CCFDatabase {
       entryType: row[6] as number,
       txVersion: row[7] as number,
       maxConflictVersion: row[8] as number,
-      writeCount: row[9] as number,
-      deleteCount: row[10] as number,
-      fileSize: row[11] as number,
+      txId: row[9] as string,
+      writeCount: row[10] as number,
+      deleteCount: row[11] as number,
+      fileSize: row[12] as number,
     };
   }
 
@@ -928,7 +934,7 @@ export class CCFDatabase {
     let sql = `
       SELECT DISTINCT
         t.id, t.file_id, f.filename, t.version, t.flags, t.size,
-        t.entry_type, t.tx_version, t.max_conflict_version,
+        t.entry_type, t.tx_version, t.max_conflict_version, t.tx_id,
         (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
         (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
         (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
@@ -974,9 +980,10 @@ export class CCFDatabase {
       entryType: row[6] as number,
       txVersion: row[7] as number,
       maxConflictVersion: row[8] as number,
-      writeCount: row[9] as number,
-      deleteCount: row[10] as number,
-      mapName: row[11] as string,
+      txId: row[9] as string,
+      writeCount: row[10] as number,
+      deleteCount: row[11] as number,
+      mapName: row[12] as string,
     }));
   }
 

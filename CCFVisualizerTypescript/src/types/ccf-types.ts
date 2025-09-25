@@ -51,6 +51,7 @@ export interface DatabaseTransaction {
   entryType: number;
   txVersion: number;
   maxConflictVersion: number;
+  txId: string;
   writeCount: number;
   deleteCount: number;
   fileSize: number;
