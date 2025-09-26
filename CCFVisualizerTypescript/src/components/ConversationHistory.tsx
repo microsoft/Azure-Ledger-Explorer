@@ -96,13 +96,13 @@ const useStyles = makeStyles({
   },
 });
 
-const formatDisplayDate = (iso: string) => {
-  const date = new Date(iso);
+const formatDisplayDate = (before: Date) => {
+  if (!(before instanceof Date)) before = new Date(before);
   const now = new Date();
-  const diffHours = (now.getTime() - date.getTime()) / 36e5;
-  if (diffHours < 24) return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diffHours < 24 * 7) return date.toLocaleDateString([], { weekday: 'short' });
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const diffHours = (now.getTime() - before.getTime()) / 36e5;
+  if (diffHours < 24) return before.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (diffHours < 24 * 7) return before.toLocaleDateString([], { weekday: 'short' });
+  return before.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
 export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
@@ -140,9 +140,9 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const updated = conversations.filter(c => c.id !== id);
-      setConversations(updated);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      const remainingConversations = conversations.filter(c => c.id !== id);
+      setConversations(remainingConversations);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingConversations));
       if (activeConversationId === id) onNewConversation();
     } catch(err) {
       console.error(err);
@@ -173,7 +173,7 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
         ) : conversations.length === 0 ? (
           <div className={styles.empty}>
             <ChatRegular style={{ fontSize: 32 }} />
-            <Text>No conversations yet. Start chatting.</Text>
+            <Text>Older conversations will appear here.</Text>
           </div>
         ) : (
           conversations.map(c => (
@@ -185,7 +185,7 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
               onMouseLeave={() => setHoveredId(id => (id === c.id ? null : id))}
             >
               <Text className={styles.itemTitle}>{c.title}</Text>
-              <Text className={styles.date}>{formatDisplayDate(c.updatedAt)}</Text>
+              <Text className={styles.date}>Started {formatDisplayDate(c.createdAt)} (last update {formatDisplayDate(c.updatedAt)})</Text>
               <Button
                 appearance="subtle"
                 icon={<DeleteRegular />}
@@ -205,33 +205,22 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
 // Helper for saving conversations
 export const saveConversationToHistory = (messages: ChatMessage[]) => {
   if (!messages.length) return;
-  const firstUser = messages.find(m => m.role === 'user');
-  const titleBase = firstUser?.content?.trim() || 'New Conversation';
+  const firstUserMessage = messages.find(m => m.role === 'user');
+  const titleBase = firstUserMessage?.content?.trim() || 'New Conversation';
   const title = titleBase.slice(0, 30) + (titleBase.length > 30 ? '...' : '');
   const id = 'conv-' + Date.now();
-  const now = new Date().toISOString();
-  const toStore: SavedConversation = {
+  const conversation: SavedConversation = {
     id,
     title,
-    messages: messages.map(m => ({
-      id: m.id,
-      state: (m as any).state || 'finished',
-      role: m.role as 'user' | 'assistant',
-      responseId: (m as any).responseId,
-      content: m.content,
-      timestamp: (m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp)).toISOString(),
-      error: (m as any).error,
-      actions: (m as any).actions,
-      receiptData: (m as any).receiptData,
-    })),
-    createdAt: now,
-    updatedAt: now,
+    messages: messages,
+    createdAt: firstUserMessage?.timestamp || new Date(),
+    updatedAt: new Date(),
   };
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const existing: SavedConversation[] = raw ? JSON.parse(raw) : [];
-    existing.unshift(toStore);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+    const savedConversationsJson = localStorage.getItem(STORAGE_KEY);
+    const savedConversations: SavedConversation[] = savedConversationsJson ? JSON.parse(savedConversationsJson) : [];
+    savedConversations.unshift(conversation);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedConversations));
   } catch (e) {
     console.error('Failed to save conversation', e);
   }

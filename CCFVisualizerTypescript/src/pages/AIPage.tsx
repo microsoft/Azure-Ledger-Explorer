@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AIChat } from '../components/AIChat';
 import type { ChatMessage } from '../components/AIChat';
 import { ConversationHistory, saveConversationToHistory } from '../components/ConversationHistory';
+import type { SavedConversation } from '../types/conversation-types';
 import { useDatabase } from '../hooks/use-ccf-data';
 import { Spinner, Text, makeStyles, tokens, shorthands } from '@fluentui/react-components';
 
@@ -37,10 +38,10 @@ interface AIPageProps {
   clearChatFunction?: (() => void) | null;
 }
 
-export const AIPage: React.FC<AIPageProps> = ({ 
-  onChatStateChange, 
+export const AIPage: React.FC<AIPageProps> = ({
+  onChatStateChange,
   onRegisterClearChat,
-  clearChatFunction 
+  clearChatFunction
 }) => {
   const { data: database, isLoading, error } = useDatabase();
   const styles = useStyles();
@@ -54,16 +55,15 @@ export const AIPage: React.FC<AIPageProps> = ({
   const handleSaveConversation = (messages: ChatMessage[]) => {
     if (!messages.length) return;
     // Save to history and refresh sidebar
-  saveConversationToHistory(messages);
+    saveConversationToHistory(messages);
     setRefreshSignal(r => r + 1);
     // Reset active conversation (new thread)
     setActiveConversationId(undefined);
   };
 
-  const handleConversationSelect = (conv: any) => {
+  const handleConversationSelect = (conv: SavedConversation) => {
     setActiveConversationId(conv.id);
-    // Convert timestamps back to Date objects
-    setLoadedMessages(conv.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
+    setLoadedMessages(conv.messages || []);
   };
 
   const handleNewConversation = () => {
