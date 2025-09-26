@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     tokens,
@@ -18,9 +18,18 @@ import {
     MessageBar,
     SearchBox,
     Tooltip,
+    Dialog,
+    DialogSurface,
+    DialogTitle,
+    DialogContent,
+    DialogBody,
+    DialogActions,
+    Field,
+    Textarea,
 } from '@fluentui/react-components';
 import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular } from '@fluentui/react-icons';
-import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions } from '../hooks/use-ccf-data';
+import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase } from '../hooks/use-ccf-data';
+import type { DialogOpenChangeData } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
     container: {
@@ -52,6 +61,9 @@ const useStyles = makeStyles({
         ...shorthands.padding('16px'),
         ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
         backgroundColor: tokens.colorNeutralBackground2,
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center'
     },
     sidebarContent: {
         ...shorthands.padding('8px'),
@@ -166,6 +178,40 @@ const useStyles = makeStyles({
         display: 'flex',
         ...shorthands.gap('8px'),
     },
+    sqlDialogSurface: {
+        width: '800px',
+        maxWidth: '90vw',
+    },
+    sqlDialogBody: {
+        display: 'flex',
+        flexDirection: 'column',
+        ...shorthands.gap('12px'),
+    },
+    sqlTextarea: {
+        fontFamily: 'monospace',
+    },
+    sqlExecutionStatus: {
+        display: 'flex',
+        alignItems: 'center',
+        ...shorthands.gap('8px'),
+        color: tokens.colorNeutralForeground2,
+    },
+    sqlResultContainer: {
+        maxHeight: '320px',
+        overflow: 'auto',
+        ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+        ...shorthands.borderRadius('6px'),
+        ...shorthands.padding('12px'),
+        backgroundColor: tokens.colorNeutralBackground2,
+    },
+    sqlResultCell: {
+        fontFamily: 'monospace',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        verticalAlign: 'top',
+        fontSize: '10px',
+        lineHeight: '1',
+    },
 });
 
 const TablesPage: React.FC = () => {
@@ -176,6 +222,12 @@ const TablesPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedKey, setSelectedKey] = useState<{ mapName: string; keyName: string } | null>(null);
+    const [isSqlDialogOpen, setIsSqlDialogOpen] = useState(false);
+    const [sqlQuery, setSqlQuery] = useState('');
+    const [sqlResult, setSqlResult] = useState<unknown[] | null>(null);
+    const [sqlError, setSqlError] = useState<string | null>(null);
+    const [hasExecutedSql, setHasExecutedSql] = useState(false);
+    const [isExecutingSql, setIsExecutingSql] = useState(false);
     const itemsPerPage = 50;
     const offset = (currentPage - 1) * itemsPerPage;
 
@@ -197,6 +249,7 @@ const TablesPage: React.FC = () => {
         100,
         0
     );
+    const { data: database, isLoading: databaseLoading, error: databaseError } = useDatabase();
 
     // Pagination calculations
     const totalPages = Math.ceil((totalKeyCount || 0) / itemsPerPage);
@@ -251,6 +304,103 @@ const TablesPage: React.FC = () => {
             return hex.length > 100 ? hex.substring(0, 100) + '...' : hex;
         }
     };
+
+    const formatSqlValue = (value: unknown): string => {
+        if (value === null || value === undefined) {
+            return 'NULL';
+        }
+
+        if (typeof value === 'object') {
+            try {
+                return JSON.stringify(value, null, 2);
+            } catch {
+                return String(value);
+            }
+        }
+
+        return String(value);
+    };
+
+    const sqlResultColumns = useMemo(() => {
+        if (!sqlResult || sqlResult.length === 0) {
+            return [] as string[];
+        }
+
+        const columnSet = new Set<string>();
+
+        sqlResult.forEach(row => {
+            if (row && typeof row === 'object') {
+                Object.keys(row as Record<string, unknown>).forEach(column => columnSet.add(column));
+            }
+        });
+
+        return Array.from(columnSet);
+    }, [sqlResult]);
+
+    const databaseErrorMessage = databaseError instanceof Error ? databaseError.message : null;
+
+    const closeSqlRunnerDialog = useCallback(() => {
+        setIsSqlDialogOpen(false);
+        setIsExecutingSql(false);
+        setSqlError(null);
+        setHasExecutedSql(false);
+    }, []);
+
+    const handleSqlDialogOpenChange = useCallback((_: React.SyntheticEvent | undefined, data: DialogOpenChangeData) => {
+        if (data.open) {
+            setIsSqlDialogOpen(true);
+        } else {
+            closeSqlRunnerDialog();
+        }
+    }, [closeSqlRunnerDialog]);
+
+    const openSqlRunnerDialog = useCallback(() => {
+        setIsSqlDialogOpen(true);
+        setSqlError(null);
+        setSqlResult(null);
+        setHasExecutedSql(false);
+        setIsExecutingSql(false);
+        setSqlQuery(prev => {
+            if (prev.trim().length > 0) {
+                return prev;
+            }
+
+            if (tableName && tableName.length > 0) {
+                return `SELECT * FROM "${tableName}" LIMIT 100;`;
+            }
+
+            return `SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;`;
+        });
+    }, [tableName]);
+
+    const handleExecuteSql = useCallback(async () => {
+        const trimmedQuery = sqlQuery.trim();
+
+        if (!trimmedQuery) {
+            setSqlError('Please enter a SQL query to run.');
+            return;
+        }
+
+        if (!database) {
+            setSqlError('Database is not ready yet. Please try again in a moment.');
+            return;
+        }
+
+        setIsExecutingSql(true);
+        setSqlError(null);
+        setSqlResult(null);
+        setHasExecutedSql(true);
+
+        try {
+            const result = await database.executeQuery(sqlQuery);
+            setSqlResult(result);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error executing query.';
+            setSqlError(message);
+        } finally {
+            setIsExecutingSql(false);
+        }
+    }, [database, sqlQuery]);
 
     const renderKeyTransactionsModal = () => {
         if (!selectedKey) return null;
@@ -344,16 +494,129 @@ const TablesPage: React.FC = () => {
         );
     };
 
+    const renderSqlRunnerDialog = () => {
+        const placeholder = tableName && tableName.length > 0
+            ? `SELECT * FROM "${tableName}" LIMIT 10;`
+            : `SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;`;
+
+        return (
+            <Dialog open={isSqlDialogOpen} onOpenChange={handleSqlDialogOpenChange}>
+                <DialogSurface className={classes.sqlDialogSurface}>
+                    <DialogTitle>Run SQL query</DialogTitle>
+                    <DialogContent>
+                        <DialogBody className={classes.sqlDialogBody}>
+                            <Field label="SQL query" required>
+                                <Textarea
+                                    value={sqlQuery}
+                                    onChange={(_, data) => setSqlQuery(data.value)}
+                                    placeholder={placeholder}
+                                    resize="vertical"
+                                    rows={6}
+                                    className={classes.sqlTextarea}
+                                />
+                            </Field>
+
+                            {databaseLoading && (
+                                <div className={classes.sqlExecutionStatus}>
+                                    <Spinner size="tiny" />
+                                    <Text size={200}>Loading database...</Text>
+                                </div>
+                            )}
+
+                            {databaseErrorMessage && (
+                                <MessageBar intent="error">
+                                    Unable to load database: {databaseErrorMessage}
+                                </MessageBar>
+                            )}
+
+                            {sqlError && (
+                                <MessageBar intent="error">
+                                    {sqlError}
+                                </MessageBar>
+                            )}
+
+                            {isExecutingSql && !databaseLoading && (
+                                <div className={classes.sqlExecutionStatus}>
+                                    <Spinner size="tiny" />
+                                    <Text size={200}>Running query...</Text>
+                                </div>
+                            )}
+
+                            {!isExecutingSql && hasExecutedSql && !sqlError && sqlResult && sqlResult.length === 0 && (
+                                <MessageBar intent="info">
+                                    No rows returned for this query.
+                                </MessageBar>
+                            )}
+
+                            {sqlResult && sqlResult.length > 0 && (
+                                <div className={classes.sqlResultContainer}>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                {sqlResultColumns.map(column => (
+                                                    <TableHeaderCell key={column}>{column}</TableHeaderCell>
+                                                ))}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {sqlResult.map((row, rowIndex) => {
+                                                const record = (row && typeof row === 'object') ? row as Record<string, unknown> : {};
+                                                return (
+                                                    <TableRow key={rowIndex}>
+                                                        {sqlResultColumns.map(column => (
+                                                            <TableCell key={column}>
+                                                                <TableCellLayout className={classes.sqlResultCell}>
+                                                                    {formatSqlValue(record[column])}
+                                                                </TableCellLayout>
+                                                            </TableCell>
+                                                        ))}
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </DialogBody>
+                        <DialogActions>
+                            <Button appearance="secondary" onClick={closeSqlRunnerDialog} disabled={isExecutingSql}>
+                                Close
+                            </Button>
+                            <Button
+                                appearance="primary"
+                                onClick={handleExecuteSql}
+                                disabled={
+                                    isExecutingSql ||
+                                    !sqlQuery.trim() ||
+                                    databaseLoading ||
+                                    Boolean(databaseErrorMessage)
+                                }
+                            >
+                                {isExecutingSql ? 'Running...' : 'Run query'}
+                            </Button>
+                        </DialogActions>
+                    </DialogContent>
+                </DialogSurface>
+            </Dialog>
+        );
+    };
+
     return (
         <div className={classes.container}>
             <div className={classes.content}>
                 {/* Sidebar with tables list */}
                 <div className={classes.sidebar}>
-                    <div className={classes.sidebarHeader}>
+                    <div className={classes.sidebarHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <Text size={600} weight="semibold">
                             <DatabaseRegular style={{ marginRight: '8px' }} />
                             Tables
                         </Text>
+                        <Button
+                            appearance="secondary"
+                            onClick={openSqlRunnerDialog}
+                        >
+                            Run SQL
+                        </Button>
                     </div>
                     <div className={classes.sidebarContent}>
                         {tablesLoading ? (
@@ -542,6 +805,7 @@ const TablesPage: React.FC = () => {
                 </div>
             </div>
 
+            {renderSqlRunnerDialog()}
             {renderKeyTransactionsModal()}
         </div>
     );
