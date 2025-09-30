@@ -73,7 +73,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   responseId?: string;
   content: string;
-  annotations?: Map<string, ChatAnnotation>;
+  annotations?: Record<string, ChatAnnotation>;
   timestamp: Date;
   error?: string;
   actions?: UIAction[];
@@ -766,7 +766,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     const sseDataPrefix = 'data: ';
     let fullResponseText = '';
     let responseId: string;
-    let annotations: Map<string, ChatAnnotation> = new Map();
+    let annotations: Record<string, ChatAnnotation> = {};
     try {
       while (true) {
         // Check if we should abort
@@ -781,9 +781,7 @@ export const AIChat: React.FC<AIChatProps> = ({
             const last = updated[updated.length - 1];
             if (last) {
               last.state = 'finished';
-              if (annotations.size > 0) {
-                last.annotations = annotations;
-              }
+              last.annotations = annotations;
             }
             return updated;
           });
@@ -814,18 +812,17 @@ export const AIChat: React.FC<AIChatProps> = ({
                   let annotationref = data.annotation_index + 1;
                   textDelta += ` [${annotationref}]`;
 
-                  if (!annotations.has(data.annotation.file_id))   {
-                    annotations.set(data.annotation.file_id, {
+                  if (!annotations[data.annotation.file_id]) {
+                    annotations[data.annotation.file_id] = {
                       file_id: data.annotation.file_id,
                       filename: data.annotation.filename,
                       refs: [annotationref]
-                    });
+                    };
                   } else {
-                    const existing = annotations.get(data.annotation.file_id);
+                    const existing = annotations[data.annotation.file_id];
                     if (existing) {
                       existing.refs = existing.refs || [];
                       existing.refs.push(annotationref);
-                      annotations.set(data.annotation.file_id, existing);
                     }
                   }
                 }
@@ -1281,13 +1278,11 @@ Please provide a clean, human-readable summary that captures the essential infor
                         </div>
                       )}
 
-                      {message.annotations && message.annotations.size > 0 && (
+                      {message.annotations && Object.keys(message.annotations).length > 0 && (
                         <div className={styles.annotationsSection}>
-                          <Text className={styles.annotationsHeader}>
-                            References:
-                          </Text>
+                          <Text className={styles.annotationsHeader}>References:</Text>
                           <ul className={styles.annotationsList}>
-                            {Array.from(message.annotations.values()).map((annotation) => (
+                            {Object.values(message.annotations).map((annotation) => (
                               <li key={annotation.file_id} className={styles.annotationItem}>
                                 {annotation.refs && annotation.refs.length > 0 ? annotation.refs.map(r => `[${r}]`).join(', ') : ''} {annotation.filename}
                               </li>
