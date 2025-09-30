@@ -87,7 +87,7 @@ export class CCFDatabase {
         tx_version INTEGER NOT NULL,
         max_conflict_version INTEGER,
         tx_digest BLOB,
-        tx_id STRING,
+        transaction_id STRING,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (file_id) REFERENCES ledger_files(id) ON DELETE CASCADE
       );
@@ -208,7 +208,7 @@ export class CCFDatabase {
         INSERT INTO transactions (
           file_id, version, flags, size,
           entry_type, tx_version, max_conflict_version,
-          tx_digest, tx_id
+          tx_digest, transaction_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
@@ -301,7 +301,7 @@ export class CCFDatabase {
         INSERT INTO transactions (
           file_id, version, flags, size,
           entry_type, tx_version, max_conflict_version,
-          tx_digest, tx_id
+          tx_digest, transaction_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
@@ -419,8 +419,8 @@ export class CCFDatabase {
 
     const result = this.db.exec(`
       SELECT 
-        id, version, flags, size,
-        entry_type, tx_version, max_conflict_version, tx_id
+  id, version, flags, size,
+  entry_type, tx_version, max_conflict_version, transaction_id as tx_id
       FROM transactions
       WHERE file_id = ?
       ORDER BY id
@@ -462,8 +462,8 @@ export class CCFDatabase {
 
     let sql = `
       SELECT DISTINCT
-        t.id, t.file_id, f.filename, t.version, t.flags, t.size,
-        t.entry_type, t.tx_version, t.max_conflict_version, t.tx_id,
+  t.id, t.file_id, f.filename, t.version, t.flags, t.size,
+  t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id,
         (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
         (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
         (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
@@ -604,7 +604,7 @@ export class CCFDatabase {
 
     const result = this.db.exec(`
       SELECT t.id, t.file_id, lf.filename, t.version, t.flags,
-             t.size, t.entry_type, t.tx_version, t.max_conflict_version, t.tx_id,
+        t.size, t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id,
              (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
              (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
              lf.file_size
@@ -746,7 +746,8 @@ export class CCFDatabase {
       const writable = await fileHandle.createWritable();
       
       const data = this.db.export();
-      await writable.write(data);
+  // Cast to ArrayBuffer for FS writer to avoid TS mismatch with SharedArrayBuffer union
+  await writable.write(data.buffer as ArrayBuffer);
       await writable.close();
     } catch (error) {
       console.error('Failed to save database to OPFS:', error);
@@ -933,8 +934,8 @@ export class CCFDatabase {
 
     let sql = `
       SELECT DISTINCT
-        t.id, t.file_id, f.filename, t.version, t.flags, t.size,
-        t.entry_type, t.tx_version, t.max_conflict_version, t.tx_id,
+  t.id, t.file_id, f.filename, t.version, t.flags, t.size,
+  t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id,
         (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
         (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
         (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
