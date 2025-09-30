@@ -142,7 +142,7 @@ When using `action:runsql`:
 4. The map_name field typically contains CCF table names like 'public:ccf.gov.nodes', 'public:ccf.internal.consensus', etc.
 5. The value_text field contains UTF-8 decoded values from the ledger
 6. CCF transactions can contain multiple key-value operations
-7. If the query requires usage of the kv_writes.key_name, always surround the key_name with double quotes (") e.g. SELECT * FROM kv_writes WHERE kv_writes.key_name = '"key_name"'. This is because the key_name is stored in the database with extra quotes.
+7. In the kv_writes table, the key_name column can sometimes be stored with extra double quotes. If the query requires usage of the kv_writes.key_name, always craft a query that checks the key_name with and without the extra quotes. e.g. e.g. SELECT * FROM kv_writes WHERE kv_writes.key_name = '"key_name"' OR kv_writes.key_name = 'key_name'.
 
 Examples for types of queries you could do:
 - Transaction counts and statistics
