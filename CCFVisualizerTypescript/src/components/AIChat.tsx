@@ -872,7 +872,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     }
 
     // Process JSON responses to make them more intelligible
-    await processJsonResponses(actions);
+    await processJsonResponses(actions, message);
 
     if (actions.length > 0) {
       setMessages(prev => {
@@ -887,12 +887,12 @@ export const AIChat: React.FC<AIChatProps> = ({
   }
 
   // Helper function to process and clean up JSON responses
-  const processJsonResponses = async (actions: UIAction[]) => {
+  const processJsonResponses = async (actions: UIAction[], message: string) => {
     for (const action of actions) {
       if (action.actionResult && typeof action.actionResult === 'object' && !action.actionError) {
         try {
           const jsonString = JSON.stringify(action.actionResult);
-          const cleanedResponse = await requestJsonCleanup(jsonString, action.actionName);
+          const cleanedResponse = await requestJsonCleanup(jsonString, action.actionName, message);
           if (cleanedResponse) {
             action.cleanedResult = cleanedResponse;
           }
@@ -905,19 +905,19 @@ export const AIChat: React.FC<AIChatProps> = ({
   }
 
   // Make an AI request to clean up JSON data
-  const requestJsonCleanup = async (jsonString: string, actionName: string): Promise<string | null> => {
+  const requestJsonCleanup = async (jsonString: string, actionName: string, message: string): Promise<string | null> => {
     if (jsonString && jsonString.length > MAX_INPUT_LENGTH) {
       console.warn('JSON response too large to process for cleanup:', jsonString.length, 'limit:', MAX_INPUT_LENGTH);
       return null;
     }
 
     try {
-      const cleanupPrompt = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and provide context where helpful.
+      const cleanupPrompt = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and answer the user's question: ${message}.
 
 JSON to analyze:
 ${jsonString}
 
-Please provide a clean, human-readable summary that captures the essential information without overwhelming technical details.`;
+Please provide a clean, human-readable summary that captures the essential information without overwhelming technical details. `;
 
       const response = await fetch(config.baseUrl + '/v1/responses', {
         method: 'POST',

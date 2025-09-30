@@ -121,7 +121,7 @@ You have access to a SQLite database with the following schema:
 
 TABLES:
 - `ledger_files`: Contains uploaded ledger files (id, filename, file_size, created_at, updated_at)
-- `transactions`: Contains parsed transactions (id, file_id, version, flags, size, entry_type, tx_version, max_conflict_version, tx_digest, tx_id, created_at)
+- `transactions`: Contains parsed transactions (id, file_id, version, flags, size, entry_type, tx_version, max_conflict_version, tx_digest, transaction_id, created_at)
 - `kv_writes`: Contains key-value write operations (id, transaction_id, map_name, key_name, value_text, version, created_at)
 - `kv_deletes`: Contains key-value delete operations (id, transaction_id, map_name, key_name, version, created_at)
 
@@ -142,6 +142,7 @@ When using `action:runsql`:
 4. The map_name field typically contains CCF table names like 'public:ccf.gov.nodes', 'public:ccf.internal.consensus', etc.
 5. The value_text field contains UTF-8 decoded values from the ledger
 6. CCF transactions can contain multiple key-value operations
+7. If the query requires usage of the kv_writes.key_name, always surround the key_name with double quotes (") e.g. SELECT * FROM kv_writes WHERE kv_writes.key_name = '"key_name"'. This is because the key_name is stored in the database with extra quotes.
 
 Examples for types of queries you could do:
 - Transaction counts and statistics
