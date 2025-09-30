@@ -61,12 +61,19 @@ interface UIAction {
   cleanedResult?: string;
 }
 
+interface ChatAnnotation {
+  refs?: number[]; // references in text, multiple per file
+  file_id?: string;
+  filename?: string;
+}
+
 export interface ChatMessage {
   id: string;
   state: 'initial' | 'streaming' | 'finished';
   role: 'user' | 'assistant';
   responseId?: string;
   content: string;
+  annotations?: Map<string, ChatAnnotation>;
   timestamp: Date;
   error?: string;
   actions?: UIAction[];
@@ -236,6 +243,25 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground2,
       fontWeight: '600',
     },
+  },
+  annotationsSection: {
+    ...shorthands.margin('12px', '0', '0', '0'),
+  },
+  annotationsHeader: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: tokens.colorNeutralForeground3,
+  },
+  annotationsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    ...shorthands.gap('8px'),
+    padding: '0',
+  },
+  annotationItem: {
+    fontSize: '14px',
+    color: tokens.colorNeutralForeground3,
+    listStyleType: 'none',
   },
   sqlSection: {
     ...shorthands.margin('12px', '0', '0', '0'),
@@ -740,6 +766,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     const sseDataPrefix = 'data: ';
     let fullResponseText = '';
     let responseId: string;
+    let annotations: Map<string, ChatAnnotation> = new Map();
     try {
       while (true) {
         // Check if we should abort
@@ -754,6 +781,9 @@ export const AIChat: React.FC<AIChatProps> = ({
             const last = updated[updated.length - 1];
             if (last) {
               last.state = 'finished';
+              if (annotations.size > 0) {
+                last.annotations = annotations;
+              }
             }
             return updated;
           });
@@ -778,6 +808,27 @@ export const AIChat: React.FC<AIChatProps> = ({
               console.log(data.type, data);
               if (data.type === 'response.output_text.delta') {
                 textDelta += data.delta || '';
+              } else if (data.type === 'response.output_text.annotation.added') {
+                // print annotation/reference/footnote in text
+                if (data.annotation_index >= 0) {
+                  let annotationref = data.annotation_index + 1;
+                  textDelta += ` [${annotationref}]`;
+
+                  if (!annotations.has(data.annotation.file_id))   {
+                    annotations.set(data.annotation.file_id, {
+                      file_id: data.annotation.file_id,
+                      filename: data.annotation.filename,
+                      refs: [annotationref]
+                    });
+                  } else {
+                    const existing = annotations.get(data.annotation.file_id);
+                    if (existing) {
+                      existing.refs = existing.refs || [];
+                      existing.refs.push(annotationref);
+                      annotations.set(data.annotation.file_id, existing);
+                    }
+                  }
+                }
               } else if (data.type === 'response.output_item.added') {
                 if (data.item.type === 'mcp_list_tools' || data.item.type === 'message') {
                   continue;
@@ -1227,6 +1278,21 @@ Please provide a clean, human-readable summary that captures the essential infor
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {message.content}
                           </ReactMarkdown>
+                        </div>
+                      )}
+
+                      {message.annotations && message.annotations.size > 0 && (
+                        <div className={styles.annotationsSection}>
+                          <Text className={styles.annotationsHeader}>
+                            References:
+                          </Text>
+                          <ul className={styles.annotationsList}>
+                            {Array.from(message.annotations.values()).map((annotation) => (
+                              <li key={annotation.file_id} className={styles.annotationItem}>
+                                {annotation.refs && annotation.refs.length > 0 ? annotation.refs.map(r => `[${r}]`).join(', ') : ''} {annotation.filename}
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
 
