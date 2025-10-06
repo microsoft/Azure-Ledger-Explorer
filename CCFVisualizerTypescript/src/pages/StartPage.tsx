@@ -97,7 +97,7 @@ export const StartPage: React.FC = () => {
         <div className={styles.cardsContainer}>
 
           {/* Automated Way Card */}
-          <Card className={styles.card} onClick={handleAutomatedClick}>
+          { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Card className={styles.card} onClick={handleAutomatedClick}>
             <div className={styles.cardContent}>
               <Bot24Filled className={styles.cardIcon} />
               <Text className={styles.cardTitle}>Automated Analysis</Text>
@@ -110,7 +110,7 @@ export const StartPage: React.FC = () => {
                 Start Chat
               </Button>
             </CardFooter>
-          </Card>
+          </Card> }
 
           {/* Manual Way Card */}
           <Card className={styles.card} onClick={handleManualClick}>

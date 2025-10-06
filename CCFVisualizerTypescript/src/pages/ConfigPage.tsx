@@ -45,6 +45,14 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     height: '100%',
     overflow: 'hidden',
+    alignItems: 'center',
+  },
+  cardsContainer: {
+    display: 'flex',
+    ...shorthands.gap('24px'),
+    padding: '24px',
+    width: '100%',
+    flexDirection: 'column',
   },
   loadingContainer: {
     display: 'flex',
@@ -161,242 +169,244 @@ export const ConfigPage: React.FC = () => {
   return (
     <div className={styles.container}>
       <div className={styles.content}>
-        <Card>
-          <CardHeader
-            header={
-              <div className={styles.configHeader}>
-                <Settings24Regular />
-                <Text weight="semibold">Ledger data configuration</Text>
-              </div>
-            }
-          />
-          <div className={styles.configContent}>
-            <Text size={200}>
-              Ledger data gets imported and then is exposed in various pages. It can also be queried.
-            </Text>
-
-            { allTransactionsCount && allTransactionsCount > 0 ? <Text size={200}>Imported transactions: {allTransactionsCount}</Text> : <Text size={200}>No imported data found</Text> }
-            
-            <div>
-              {/* Upload Files Button */}
-              <Button
-                appearance="outline"
-                icon={<DocumentAdd24Regular />}
-                onClick={() => setShowUploadDialog(true)}
-              >
-                Add Files
-              </Button>
-
-              <AddFilesWizard 
-                open={showUploadDialog} 
-                onOpenChange={setShowUploadDialog}
-              />
-
-              {/* Clear All Data Button */}
-              { hasData && <Dialog>
-                <DialogTrigger disableButtonEnhancement>
-                  <Button
-                    appearance="outline"
-                    icon={<Delete24Regular />}
-                    disabled={clearAllDataMutation.isPending}
-                  >
-                    Clear All Data
-                  </Button>
-                </DialogTrigger>
-                <DialogSurface>
-                  <DialogTitle>Clear All Data</DialogTitle>
-                  <DialogContent>
-                    <DialogBody>
-                      <Body1>
-                        Are you sure you want to clear all data? This will permanently delete:
-                      </Body1>
-                      <ul>
-                        <li>{stats.fileCount} ledger file{stats.fileCount !== 1 ? 's' : ''}</li>
-                        <li>{stats.transactionCount} transaction{stats.transactionCount !== 1 ? 's' : ''}</li>
-                        <li>{stats.writeCount} write operation{stats.writeCount !== 1 ? 's' : ''}</li>
-                        <li>{stats.deleteCount} delete operation{stats.deleteCount !== 1 ? 's' : ''}</li>
-                      </ul>
-                      <Body1>This action cannot be undone.</Body1>
-                    </DialogBody>
-                    <DialogActions>
-                      <DialogTrigger disableButtonEnhancement>
-                        <Button appearance="secondary">Cancel</Button>
-                      </DialogTrigger>
-                      <Button
-                        appearance="primary"
-                        onClick={handleClearAllData}
-                        disabled={clearAllDataMutation.isPending}
-                      >
-                        {clearAllDataMutation.isPending ? 'Clearing...' : 'Clear All Data'}
-                      </Button>
-                    </DialogActions>
-                  </DialogContent>
-                </DialogSurface>
-              </Dialog>
+        <div className={styles.cardsContainer}>
+          <Card>
+            <CardHeader
+              header={
+                <div className={styles.configHeader}>
+                  <Settings24Regular />
+                  <Text weight="semibold">Ledger data configuration</Text>
+                </div>
               }
+            />
+            <div className={styles.configContent}>
+              <Text size={200}>
+                Ledger data gets imported and then is exposed in various pages. It can also be queried.
+              </Text>
 
-              {/* Drop Database Button */}
-              <Dialog>
-                <DialogTrigger disableButtonEnhancement>
-                  <Button
-                    appearance="outline"
-                    icon={<DatabaseArrowDownRegular />}
-                    disabled={dropDatabaseMutation.isPending}
-                  >
-                    Drop DB
-                  </Button>
-                </DialogTrigger>
-                <DialogSurface>
-                  <DialogTitle>Drop Database</DialogTitle>
-                  <DialogContent>
-                    <DialogBody>
-                      <Body1>
-                        Are you sure you want to drop the entire database? This will:
-                      </Body1>
-                      <ul>
-                        <li>Remove all tables and data completely</li>
-                        <li>Reset the database schema to its initial state</li>
-                        <li>Free up all storage space used by the database</li>
-                      </ul>
-                      <Body1>
-                        This is more thorough than "Clear All Data" and will completely reset the database structure.
-                        This action cannot be undone.
-                      </Body1>
-                    </DialogBody>
-                    <DialogActions>
-                      <DialogTrigger disableButtonEnhancement>
-                        <Button appearance="secondary">Cancel</Button>
-                      </DialogTrigger>
-                      <Button
-                        appearance="primary"
-                        onClick={handleDropDatabase}
-                        disabled={dropDatabaseMutation.isPending}
-                      >
-                        {dropDatabaseMutation.isPending ? 'Dropping...' : 'Drop Database'}
-                      </Button>
-                    </DialogActions>
-                  </DialogContent>
-                </DialogSurface>
-              </Dialog>
-            </div>
-          </div>
-        </Card>
-
-
-        <Card>
-          <CardHeader
-            header={
-              <div className={styles.configHeader}>
-                <Settings24Regular />
-                <Text weight="semibold">Agent configuration</Text>
-              </div>
-            }
-          />
-          <div className={styles.configContent}>
-            <Text size={200}>
-              Configuration for the AI chat. Set the base URL for the OpenAI API and tweak the system prompt.
-            </Text>
-
-            <Field label="Base URL for chat integration">
-              <Input
-                type="url"
-                placeholder="https://sageendpoint.com/"
-                value={config.baseUrl}
-                onChange={(_, data) => setConfig(prev => ({ ...prev, baseUrl: data.value }))} />
+              { allTransactionsCount && allTransactionsCount > 0 ? <Text size={200}>Imported transactions: {allTransactionsCount}</Text> : <Text size={200}>No imported data found</Text> }
               
-              {/* Tools status and list */}
-              {config.baseUrl && (
-                <>
-                  {isLoadingTools && (
-                    <div className={styles.statusMessage}>
-                      <Spinner size="tiny" />
-                      <Caption1>Loading available tools...</Caption1>
-                    </div>
-                  )}
-                  
-                  {toolsError && (
-                    <div className={styles.statusMessage}>
-                      <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
-                      <Caption1 style={{ color: tokens.colorPaletteRedForeground1 }}>
-                        Failed to fetch tools: {toolsError.message}
-                      </Caption1>
-                    </div>
-                  )}
-                  
-                  {toolsData?.tools && toolsData.tools.length > 0 && (
-                    <div className={styles.toolsList}>
-                      <Caption1>
-                        <span>Available tools ({toolsData.tools.length}):</span>{' '}
-                        {toolsData.tools.map((tool, index) => (
-                          <span key={index} className={styles.toolItem}>
-                            {tool.name}
-                          </span>
-                        ))}
-                      </Caption1>
-                    </div>
-                  )}
-                  
-                  {toolsData?.tools && toolsData.tools.length === 0 && (
-                    <div className={styles.statusMessage}>
-                      <Caption1>No tools available, check if server is running or can access MCP tools</Caption1>
-                    </div>
-                  )}
-                </>
-              )}
-            </Field>
+              <div>
+                {/* Upload Files Button */}
+                <Button
+                  appearance="outline"
+                  icon={<DocumentAdd24Regular />}
+                  onClick={() => setShowUploadDialog(true)}
+                >
+                  Add Files
+                </Button>
 
-            <Field label="System prompt">
-              <Textarea
-                resize='vertical'
-                placeholder="Enter system prompt"
-                rows={10}
-                value={config.systemPrompt}
-                onChange={(_, data) => setConfig(prev => ({ ...prev, systemPrompt: data.value }))} />
-            </Field>
-            {/* add a note if systemPrompt is different from defaultSystemPrompt */}
-            {config.systemPrompt !== config.defaultSystemPrompt && (
-              <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
-                Note: You have modified the system prompt from the default. Delete it to reset.
-              </Text>
-            )}
-            {config.systemPrompt === config.defaultSystemPrompt && (
-              <Text size={200} style={{ color: tokens.colorStatusSuccessForeground1 }}>
-                Using latest version of prompt.
-              </Text>
-            )}
-          </div>
-        </Card>
+                <AddFilesWizard 
+                  open={showUploadDialog} 
+                  onOpenChange={setShowUploadDialog}
+                />
 
-        <Card>
-          <CardHeader
-            header={
-              <div className={styles.configHeader}>
-                <Settings24Regular />
-                <Text weight="semibold">Ledger proxy configuration</Text>
+                {/* Clear All Data Button */}
+                { hasData && <Dialog>
+                  <DialogTrigger disableButtonEnhancement>
+                    <Button
+                      appearance="outline"
+                      icon={<Delete24Regular />}
+                      disabled={clearAllDataMutation.isPending}
+                    >
+                      Clear All Data
+                    </Button>
+                  </DialogTrigger>
+                  <DialogSurface>
+                    <DialogTitle>Clear All Data</DialogTitle>
+                    <DialogContent>
+                      <DialogBody>
+                        <Body1>
+                          Are you sure you want to clear all data? This will permanently delete:
+                        </Body1>
+                        <ul>
+                          <li>{stats.fileCount} ledger file{stats.fileCount !== 1 ? 's' : ''}</li>
+                          <li>{stats.transactionCount} transaction{stats.transactionCount !== 1 ? 's' : ''}</li>
+                          <li>{stats.writeCount} write operation{stats.writeCount !== 1 ? 's' : ''}</li>
+                          <li>{stats.deleteCount} delete operation{stats.deleteCount !== 1 ? 's' : ''}</li>
+                        </ul>
+                        <Body1>This action cannot be undone.</Body1>
+                      </DialogBody>
+                      <DialogActions>
+                        <DialogTrigger disableButtonEnhancement>
+                          <Button appearance="secondary">Cancel</Button>
+                        </DialogTrigger>
+                        <Button
+                          appearance="primary"
+                          onClick={handleClearAllData}
+                          disabled={clearAllDataMutation.isPending}
+                        >
+                          {clearAllDataMutation.isPending ? 'Clearing...' : 'Clear All Data'}
+                        </Button>
+                      </DialogActions>
+                    </DialogContent>
+                  </DialogSurface>
+                </Dialog>
+                }
+
+                {/* Drop Database Button */}
+                <Dialog>
+                  <DialogTrigger disableButtonEnhancement>
+                    <Button
+                      appearance="outline"
+                      icon={<DatabaseArrowDownRegular />}
+                      disabled={dropDatabaseMutation.isPending}
+                    >
+                      Drop DB
+                    </Button>
+                  </DialogTrigger>
+                  <DialogSurface>
+                    <DialogTitle>Drop Database</DialogTitle>
+                    <DialogContent>
+                      <DialogBody>
+                        <Body1>
+                          Are you sure you want to drop the entire database? This will:
+                        </Body1>
+                        <ul>
+                          <li>Remove all tables and data completely</li>
+                          <li>Reset the database schema to its initial state</li>
+                          <li>Free up all storage space used by the database</li>
+                        </ul>
+                        <Body1>
+                          This is more thorough than "Clear All Data" and will completely reset the database structure.
+                          This action cannot be undone.
+                        </Body1>
+                      </DialogBody>
+                      <DialogActions>
+                        <DialogTrigger disableButtonEnhancement>
+                          <Button appearance="secondary">Cancel</Button>
+                        </DialogTrigger>
+                        <Button
+                          appearance="primary"
+                          onClick={handleDropDatabase}
+                          disabled={dropDatabaseMutation.isPending}
+                        >
+                          {dropDatabaseMutation.isPending ? 'Dropping...' : 'Drop Database'}
+                        </Button>
+                      </DialogActions>
+                    </DialogContent>
+                  </DialogSurface>
+                </Dialog>
               </div>
-            }
-          />
-          <div className={styles.configContent}>
-            <Text size={200}>
-              Configure ledger proxy due to the use of self signed TLS certs, to be able to connect from the browser.
-            </Text>
+            </div>
+          </Card>
 
-            <Field label="Proxy URL for ledger file downloads">
-              <Input
-                type="url"
-                placeholder="https://sageendpoint.com/mstproxy/"
-                value={config.mstProxyUrl}
-                onChange={(_, data) => setConfig(prev => ({ ...prev, mstProxyUrl: data.value }))} />
-            </Field>
 
-            {/* add a note if mstProxyUrl is not set */}
-            {!config.mstProxyUrl && (
-              <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
-                Note: Missing proxy URL may lead to issues downloading ledger files.
+          { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Card>
+            <CardHeader
+              header={
+                <div className={styles.configHeader}>
+                  <Settings24Regular />
+                  <Text weight="semibold">Agent configuration</Text>
+                </div>
+              }
+            />
+            <div className={styles.configContent}>
+              <Text size={200}>
+                Configuration for the AI chat. Set the base URL for the OpenAI API and tweak the system prompt.
               </Text>
-            )}
-          </div>
-        </Card>
+
+              <Field label="Base URL for chat integration">
+                <Input
+                  type="url"
+                  placeholder="https://sageendpoint.com/"
+                  value={config.baseUrl}
+                  onChange={(_, data) => setConfig(prev => ({ ...prev, baseUrl: data.value }))} />
+                
+                {/* Tools status and list */}
+                {config.baseUrl && (
+                  <>
+                    {isLoadingTools && (
+                      <div className={styles.statusMessage}>
+                        <Spinner size="tiny" />
+                        <Caption1>Loading available tools...</Caption1>
+                      </div>
+                    )}
+                    
+                    {toolsError && (
+                      <div className={styles.statusMessage}>
+                        <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
+                        <Caption1 style={{ color: tokens.colorPaletteRedForeground1 }}>
+                          Failed to fetch tools: {toolsError.message}
+                        </Caption1>
+                      </div>
+                    )}
+                    
+                    {toolsData?.tools && toolsData.tools.length > 0 && (
+                      <div className={styles.toolsList}>
+                        <Caption1>
+                          <span>Available tools ({toolsData.tools.length}):</span>{' '}
+                          {toolsData.tools.map((tool, index) => (
+                            <span key={index} className={styles.toolItem}>
+                              {tool.name}
+                            </span>
+                          ))}
+                        </Caption1>
+                      </div>
+                    )}
+                    
+                    {toolsData?.tools && toolsData.tools.length === 0 && (
+                      <div className={styles.statusMessage}>
+                        <Caption1>No tools available, check if server is running or can access MCP tools</Caption1>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Field>
+
+              <Field label="System prompt">
+                <Textarea
+                  resize='vertical'
+                  placeholder="Enter system prompt"
+                  rows={10}
+                  value={config.systemPrompt}
+                  onChange={(_, data) => setConfig(prev => ({ ...prev, systemPrompt: data.value }))} />
+              </Field>
+              {/* add a note if systemPrompt is different from defaultSystemPrompt */}
+              {config.systemPrompt !== config.defaultSystemPrompt && (
+                <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
+                  Note: You have modified the system prompt from the default. Delete it to reset.
+                </Text>
+              )}
+              {config.systemPrompt === config.defaultSystemPrompt && (
+                <Text size={200} style={{ color: tokens.colorStatusSuccessForeground1 }}>
+                  Using latest version of prompt.
+                </Text>
+              )}
+            </div>
+          </Card> }
+
+          <Card>
+            <CardHeader
+              header={
+                <div className={styles.configHeader}>
+                  <Settings24Regular />
+                  <Text weight="semibold">Ledger proxy configuration</Text>
+                </div>
+              }
+            />
+            <div className={styles.configContent}>
+              <Text size={200}>
+                Configure ledger proxy due to the use of self signed TLS certs, to be able to connect from the browser.
+              </Text>
+
+              <Field label="Proxy URL for ledger file downloads">
+                <Input
+                  type="url"
+                  placeholder="https://sageendpoint.com/mstproxy/"
+                  value={config.mstProxyUrl}
+                  onChange={(_, data) => setConfig(prev => ({ ...prev, mstProxyUrl: data.value }))} />
+              </Field>
+
+              {/* add a note if mstProxyUrl is not set */}
+              {!config.mstProxyUrl && (
+                <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
+                  Note: Missing proxy URL may lead to issues downloading ledger files.
+                </Text>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

@@ -60,7 +60,7 @@ function App() {
             <GridLayout.Main>
               <Routes>
                 <Route path="/" element={<StartPage />} />
-                <Route 
+                { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Route 
                   path="/chat" 
                   element={
                     <AIPage 
@@ -69,7 +69,7 @@ function App() {
                       clearChatFunction={clearChatFunction}
                     />
                   } 
-                />
+                /> }
                 <Route path="/files" element={<CCFVisualizerApp />} />
                 <Route path="/tables" element={<TablesPage />} />
                 <Route path="/tables/:tableName" element={<TablesPage />} />
