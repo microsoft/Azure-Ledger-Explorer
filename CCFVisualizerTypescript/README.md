@@ -65,7 +65,7 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 **Deploy with Sage features disabled (sets VITE_DISABLE_SAGE=true during build):**
 ```powershell
 # Disable Sage in a production build
-./deploy-to-azure.ps1 -BuildFirst -DisableSage
+./deploy-to-azure.ps1 -BuildFirst -DisableSage -ResourceGroupName "ccfexplorer-demo-rg"
 
 # Disable Sage in a preview build
 ./deploy-to-azure.ps1 -BuildFirst -DeployToPreview -DisableSage
