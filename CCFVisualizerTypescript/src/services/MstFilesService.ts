@@ -31,9 +31,8 @@ interface IMstClient {
 // MstClient implementation using fetch to access NGINX-indexed ledger files
 class MstClient implements IMstClient {
   private ledgerFilesUrl: string;
-  private proxyUrl: string | null;
 
-  constructor(domain: string, proxyUrl?: string) {
+  constructor(domain: string) {
     // Prefix domain with 'ledger-files-' and construct base URL
     // parse domain to avoid double protocol
     if (domain.startsWith('http://')) {
@@ -52,7 +51,6 @@ class MstClient implements IMstClient {
       throw new Error(`Invalid domain provided: ${domain}`);
     }
     this.ledgerFilesUrl = `https://ledger-files-${domain}/ledger/`;
-    this.proxyUrl = proxyUrl || null;
   }
 
   async *listAllLedgerFiles(): AsyncGenerator<FileInfo> {
@@ -61,10 +59,8 @@ class MstClient implements IMstClient {
 
   private async *listFilesRecursively(path: string): AsyncGenerator<FileInfo> {
     try {
-      const targetUrl = `${this.ledgerFilesUrl}${path.startsWith('/') ? path.slice(1) : path}`;
-      const fetchUrl = this.buildFetchUrl(targetUrl);
-      
-      const response = await fetch(fetchUrl, {
+      const targetUrl = `${this.ledgerFilesUrl}${path.startsWith('/') ? path.slice(1) : path}`;      
+      const response = await fetch(targetUrl, {
         headers: {
           'Accept': 'application/json',
         },
@@ -109,10 +105,8 @@ class MstClient implements IMstClient {
 
   async downloadFile(filename: string): Promise<DownloadResponse> {
     try {
-      const targetUrl = `${this.ledgerFilesUrl}${filename}`;
-      const fetchUrl = this.buildFetchUrl(targetUrl);
-      
-      const response = await fetch(fetchUrl);
+      const targetUrl = `${this.ledgerFilesUrl}${filename}`;      
+      const response = await fetch(targetUrl);
 
       if (!response.ok) {
         throw new Error(`Failed to download file ${filename}: ${response.status} ${response.statusText}`);
@@ -126,30 +120,18 @@ class MstClient implements IMstClient {
       throw new Error(`Failed to download file ${filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
-
-  private buildFetchUrl(targetUrl: string): string {
-    if (this.proxyUrl) {
-      // Send the target URL as a query parameter to the proxy
-      const proxyFetchUrl = new URL(this.proxyUrl);
-      proxyFetchUrl.searchParams.set('url', targetUrl);
-      return proxyFetchUrl.toString();
-    } else {
-      // Direct access without proxy
-      return targetUrl;
-    }
-  }
 }
 
 export class MstFilesService {
   private mstClient: IMstClient | null = null;
 
-  async initialize(domain: string, proxyUrl?: string): Promise<void> {
+  async initialize(domain: string): Promise<void> {
     try {
-      this.mstClient = new MstClient(domain, proxyUrl);
+      this.mstClient = new MstClient(domain);
     } catch (error) {
       console.error('Initialization error:', error);
       throw new Error(
-        'Failed to initialize MST client. Please ensure your domain and proxy URL are correct.'
+        'Failed to initialize MST client. Please ensure your domain is correct.'
       );
     }
   }

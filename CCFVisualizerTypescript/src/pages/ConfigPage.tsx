@@ -111,7 +111,6 @@ interface AppConfig {
   baseUrl: string;
   systemPrompt: string;
   defaultSystemPrompt: string;
-  mstProxyUrl: string;
 }
 
 // Custom hook for managing configuration state
@@ -120,12 +119,10 @@ export const useConfig = () => {
     baseUrl: localStorage.getItem('chat_base_url') || '',
     systemPrompt: localStorage.getItem('chat_system_prompt') || defaultSystemPrompt,
     defaultSystemPrompt: defaultSystemPrompt,
-    mstProxyUrl: localStorage.getItem('mst_proxy_url') || '',
   });
 
   useEffect(() => {
     localStorage.setItem('chat_base_url', config.baseUrl);
-    localStorage.setItem('mst_proxy_url', config.mstProxyUrl);
     if (config.systemPrompt) {
       localStorage.setItem('chat_system_prompt', config.systemPrompt);
     } else {
@@ -375,37 +372,6 @@ export const ConfigPage: React.FC = () => {
               )}
             </div>
           </Card> }
-
-          <Card>
-            <CardHeader
-              header={
-                <div className={styles.configHeader}>
-                  <Settings24Regular />
-                  <Text weight="semibold">Ledger proxy configuration</Text>
-                </div>
-              }
-            />
-            <div className={styles.configContent}>
-              <Text size={200}>
-                Configure ledger proxy due to the use of self signed TLS certs, to be able to connect from the browser.
-              </Text>
-
-              <Field label="Proxy URL for ledger file downloads">
-                <Input
-                  type="url"
-                  placeholder="https://sageendpoint.com/mstproxy/"
-                  value={config.mstProxyUrl}
-                  onChange={(_, data) => setConfig(prev => ({ ...prev, mstProxyUrl: data.value }))} />
-              </Field>
-
-              {/* add a note if mstProxyUrl is not set */}
-              {!config.mstProxyUrl && (
-                <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
-                  Note: Missing proxy URL may lead to issues downloading ledger files.
-                </Text>
-              )}
-            </div>
-          </Card>
         </div>
       </div>
     </div>

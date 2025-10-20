@@ -26,7 +26,6 @@ import {
     CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useClearAllData } from '../hooks/use-ccf-data';
-import { useConfig } from '../pages/ConfigPage';
 
 
 const useStyles = makeStyles({
@@ -99,7 +98,6 @@ const useStyles = makeStyles({
 export const useDownloadMstFiles = () => {
 
     const { handleFiles } = useFileDrop();
-    const { config } = useConfig();
 
     const downloadFiles = async (targetDomain?: string) => {
         const domainToUse = targetDomain;
@@ -107,7 +105,7 @@ export const useDownloadMstFiles = () => {
             throw new Error('Domain is required to download files');
         }
         const fileShareService = new MstFilesService();
-        await fileShareService.initialize(domainToUse, config.mstProxyUrl);
+        await fileShareService.initialize(domainToUse);
         const { files: downloadedFiles } = await fileShareService.downloadAllLedgerFiles();
         await handleFiles(downloadedFiles);
     };
@@ -129,7 +127,6 @@ export const MstLedgerImportView: React.FC = () => {
     const [selectedLedgerFile, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
     const fileShareService = React.useMemo(() => new MstFilesService(), []);
     const { handleFiles } = useFileDrop();
-    const { config } = useConfig();
 
     const verifyAccess = async () => {
         const domainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
@@ -149,7 +146,7 @@ export const MstLedgerImportView: React.FC = () => {
 
         try {
             await clearAllDataMutation.mutateAsync();
-            await fileShareService.initialize(ledgerDomain, config.mstProxyUrl);
+            await fileShareService.initialize(ledgerDomain);
             const ledgerFiles = await fileShareService.listLedgerFiles();
             setFiles(ledgerFiles);
             setVerificationError(null);
