@@ -84,10 +84,11 @@ export class CCFDatabase {
         flags INTEGER NOT NULL,
         size INTEGER NOT NULL,
         entry_type INTEGER NOT NULL,
+        tx_view INTEGER NOT NULL,
         tx_version INTEGER NOT NULL,
         max_conflict_version INTEGER,
         tx_digest BLOB,
-        transaction_id STRING,
+        transaction_id TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (file_id) REFERENCES ledger_files(id) ON DELETE CASCADE
       );
@@ -208,8 +209,8 @@ export class CCFDatabase {
         INSERT INTO transactions (
           file_id, version, flags, size,
           entry_type, tx_version, max_conflict_version,
-          tx_digest, transaction_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tx_digest, transaction_id, tx_view
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       const writeStmt = this.db.prepare(`
@@ -236,7 +237,8 @@ export class CCFDatabase {
           transaction.publicDomain.txVersion,
           transaction.publicDomain.maxConflictVersion,
           transaction.txDigest,
-          transaction.gcmHeader.view + '.' + transaction.gcmHeader.seqNo,
+          transaction.gcmHeader.view + '.' + transaction.publicDomain.txVersion,
+          transaction.gcmHeader.view,
         ]);
 
         const txId = this.db.exec('SELECT last_insert_rowid() as id')[0].values[0][0] as number;
@@ -301,8 +303,8 @@ export class CCFDatabase {
         INSERT INTO transactions (
           file_id, version, flags, size,
           entry_type, tx_version, max_conflict_version,
-          tx_digest, transaction_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          tx_digest, transaction_id, tx_view
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       txStmt.run([
@@ -314,7 +316,8 @@ export class CCFDatabase {
         transaction.publicDomain.txVersion,
         transaction.publicDomain.maxConflictVersion,
         transaction.txDigest,
-        transaction.gcmHeader.view + '.' + transaction.gcmHeader.seqNo,
+        transaction.gcmHeader.view + '.' + transaction.publicDomain.txVersion,
+        transaction.gcmHeader.view,
       ]);
       txStmt.free();
 
@@ -419,8 +422,11 @@ export class CCFDatabase {
 
     const result = this.db.exec(`
       SELECT 
-  id, version, flags, size,
-  entry_type, tx_version, max_conflict_version, transaction_id as tx_id
+        id, version, flags, 
+        size, entry_type, tx_version, 
+        max_conflict_version, 
+        transaction_id as tx_id, 
+        tx_view
       FROM transactions
       WHERE file_id = ?
       ORDER BY id
@@ -438,6 +444,7 @@ export class CCFDatabase {
       txVersion: row[5] as number,
       maxConflictVersion: row[6] as number,
       txId: row[7] as string,
+      txView: row[8] as number,
     }));
   }
 
@@ -462,8 +469,8 @@ export class CCFDatabase {
 
     let sql = `
       SELECT DISTINCT
-  t.id, t.file_id, f.filename, t.version, t.flags, t.size,
-  t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id,
+        t.id, t.file_id, f.filename, t.version, t.flags, t.size,
+        t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
         (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
         (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
         (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
@@ -507,9 +514,10 @@ export class CCFDatabase {
       txVersion: row[7] as number,
       maxConflictVersion: row[8] as number,
       txId: row[9] as string,
-      writeCount: row[10] as number,
-      deleteCount: row[11] as number,
-      mapName: row[12] as string || undefined,
+      txView: row[10] as number,
+      writeCount: row[11] as number,
+      deleteCount: row[12] as number,
+      mapName: row[13] as string || undefined,
     }));
   }
 
@@ -604,10 +612,10 @@ export class CCFDatabase {
 
     const result = this.db.exec(`
       SELECT t.id, t.file_id, lf.filename, t.version, t.flags,
-        t.size, t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id,
-             (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
-             (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
-             lf.file_size
+        t.size, t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
+        (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
+        (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
+        lf.file_size
       FROM transactions t
       LEFT JOIN ledger_files lf ON t.file_id = lf.id
       WHERE t.id = ?
@@ -628,9 +636,10 @@ export class CCFDatabase {
       txVersion: row[7] as number,
       maxConflictVersion: row[8] as number,
       txId: row[9] as string,
-      writeCount: row[10] as number,
-      deleteCount: row[11] as number,
-      fileSize: row[12] as number,
+      txView: row[10] as number,
+      writeCount: row[11] as number,
+      deleteCount: row[12] as number,
+      fileSize: row[13] as number,
     };
   }
 
@@ -934,8 +943,8 @@ export class CCFDatabase {
 
     let sql = `
       SELECT DISTINCT
-  t.id, t.file_id, f.filename, t.version, t.flags, t.size,
-  t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id,
+        t.id, t.file_id, f.filename, t.version, t.flags, t.size,
+        t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
         (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
         (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
         (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
@@ -982,9 +991,10 @@ export class CCFDatabase {
       txVersion: row[7] as number,
       maxConflictVersion: row[8] as number,
       txId: row[9] as string,
-      writeCount: row[10] as number,
-      deleteCount: row[11] as number,
-      mapName: row[12] as string,
+      txView: row[10] as number,
+      writeCount: row[11] as number,
+      deleteCount: row[12] as number,
+      mapName: row[13] as string,
     }));
   }
 

@@ -50,6 +50,7 @@ export interface DatabaseTransaction {
   size: number;
   entryType: number;
   txVersion: number;
+  txView: number;
   maxConflictVersion: number;
   txId: string;
   writeCount: number;

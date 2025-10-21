@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     tokens,
     makeStyles,
@@ -26,6 +26,10 @@ import {
     DialogActions,
     Field,
     Textarea,
+    Accordion,
+    AccordionItem,
+    AccordionHeader,
+    AccordionPanel,
 } from '@fluentui/react-components';
 import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular } from '@fluentui/react-icons';
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase } from '../hooks/use-ccf-data';
@@ -219,8 +223,15 @@ const TablesPage: React.FC = () => {
     const navigate = useNavigate();
     const { tableName } = useParams<{ tableName?: string }>();
 
-    const [searchQuery, setSearchQuery] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
+    // Read existing search param before state initialization
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialSearch = searchParams.get('q') || '';
+    const [searchQuery, setSearchQuery] = useState(initialSearch);
+    const initialPage = (() => {
+        const p = parseInt(searchParams.get('page') || '1', 10);
+        return isNaN(p) || p < 1 ? 1 : p;
+    })();
+    const [currentPage, setCurrentPage] = useState(initialPage);
     const [selectedKey, setSelectedKey] = useState<{ mapName: string; keyName: string } | null>(null);
     const [isSqlDialogOpen, setIsSqlDialogOpen] = useState(false);
     const [sqlQuery, setSqlQuery] = useState('');
@@ -257,9 +268,10 @@ const TablesPage: React.FC = () => {
     const hasPreviousPage = currentPage > 1;
 
     const handleTableSelect = useCallback((table: string) => {
-        navigate(`/tables/${encodeURIComponent(table)}`);
-        setCurrentPage(1);
+        // Reset to first page and clear search when switching table; reflect in URL
         setSearchQuery('');
+        setCurrentPage(1);
+        navigate(`/tables/${encodeURIComponent(table)}?page=1`);
     }, [navigate]);
 
     const handleKeySelect = useCallback((keyName: string) => {
@@ -274,20 +286,126 @@ const TablesPage: React.FC = () => {
 
     const handleSearchChange = useCallback((query: string) => {
         setSearchQuery(query);
-        setCurrentPage(1); // Reset to first page when searching
-    }, []);
+        // Reset to first page when searching
+        const params: Record<string, string> = { page: '1' };
+        if (query.trim().length > 0) params.q = query;
+        setCurrentPage(1);
+        if (tableName) {
+            const searchString = new URLSearchParams(params).toString();
+            navigate(`/tables/${encodeURIComponent(tableName)}?${searchString}`);
+        } else {
+            setSearchParams(params);
+        }
+    }, [navigate, tableName, setSearchParams]);
 
     const handlePreviousPage = useCallback(() => {
         if (hasPreviousPage) {
-            setCurrentPage(currentPage - 1);
+            const newPage = currentPage - 1;
+            setCurrentPage(newPage);
+            const params: Record<string, string> = { page: String(newPage) };
+            if (searchQuery.trim().length > 0) params.q = searchQuery;
+            if (tableName) {
+                const qs = new URLSearchParams(params).toString();
+                navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
+            } else {
+                setSearchParams(params);
+            }
         }
-    }, [currentPage, hasPreviousPage]);
+    }, [currentPage, hasPreviousPage, navigate, tableName, setSearchParams, searchQuery]);
 
     const handleNextPage = useCallback(() => {
         if (hasNextPage) {
-            setCurrentPage(currentPage + 1);
+            const newPage = currentPage + 1;
+            setCurrentPage(newPage);
+            const params: Record<string, string> = { page: String(newPage) };
+            if (searchQuery.trim().length > 0) params.q = searchQuery;
+            if (tableName) {
+                const qs = new URLSearchParams(params).toString();
+                navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
+            } else {
+                setSearchParams(params);
+            }
         }
-    }, [currentPage, hasNextPage]);
+    }, [currentPage, hasNextPage, navigate, tableName, setSearchParams, searchQuery]);
+
+    // Sync when URL page param changes externally (e.g. browser navigation)
+    useEffect(() => {
+        const urlPageRaw = searchParams.get('page');
+        const urlQuery = searchParams.get('q') || '';
+        if (urlQuery !== searchQuery) {
+            setSearchQuery(urlQuery);
+        }
+        if (urlPageRaw) {
+            const urlPage = parseInt(urlPageRaw, 10);
+            if (!isNaN(urlPage) && urlPage > 0 && urlPage !== currentPage) {
+                setCurrentPage(urlPage);
+            }
+        }
+    }, [searchParams, currentPage, searchQuery]);
+
+    // Clamp current page if total pages shrinks due to search query
+    useEffect(() => {
+        if (currentPage > totalPages && totalPages > 0) {
+            const params: Record<string, string> = { page: String(totalPages) };
+            if (searchQuery.trim().length > 0) params.q = searchQuery;
+            setCurrentPage(totalPages);
+            if (tableName) {
+                const qs = new URLSearchParams(params).toString();
+                navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
+            } else {
+                setSearchParams(params);
+            }
+        }
+    }, [currentPage, totalPages, navigate, tableName, setSearchParams, searchQuery]);
+
+    const goToPage = useCallback((page: number) => {
+        if (page < 1 || page > totalPages) return;
+        setCurrentPage(page);
+        const params: Record<string, string> = { page: String(page) };
+        if (searchQuery.trim().length > 0) params.q = searchQuery;
+        if (tableName) {
+            const qs = new URLSearchParams(params).toString();
+            navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
+        } else {
+            setSearchParams(params);
+        }
+    }, [navigate, tableName, totalPages, setSearchParams, searchQuery]);
+
+    const paginationPageButtons = useMemo(() => {
+        // Generate page numbers with ellipsis when many pages
+        const pages: (number | 'ellipsis')[] = [];
+        const maxButtons = 7; // including first/last and ellipsis markers
+        if (totalPages <= maxButtons) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i);
+        } else {
+            const showRange = 2; // pages adjacent to current
+            const first = 1;
+            const last = totalPages;
+            pages.push(first);
+            let start = Math.max(currentPage - showRange, 2);
+            let end = Math.min(currentPage + showRange, totalPages - 1);
+            if (start > 2) pages.push('ellipsis');
+            for (let p = start; p <= end; p++) pages.push(p);
+            if (end < totalPages - 1) pages.push('ellipsis');
+            pages.push(last);
+        }
+        return pages;
+    }, [totalPages, currentPage]);
+
+    // Group tables by prefix for sidebar
+    const { governanceTables, internalTables, otherTables } = useMemo(() => {
+        const govPrefix = 'public:ccf.gov';
+        const internalPrefix = 'public:ccf.internal';
+        const governance: string[] = [];
+        const internal: string[] = [];
+        const others: string[] = [];
+        (tables || []).forEach(t => {
+            if (t.startsWith(govPrefix)) governance.push(t);
+            else if (t.startsWith(internalPrefix)) internal.push(t);
+            else others.push(t);
+        });
+        return { governanceTables: governance, internalTables: internal, otherTables: others };
+    }, [tables]);
 
     const formatValue = (value: Uint8Array | null): string => {
         if (!value) return '';
@@ -366,10 +484,11 @@ const TablesPage: React.FC = () => {
             }
 
             if (tableName && tableName.length > 0) {
-                return `SELECT * FROM "${tableName}" LIMIT 100;`;
+                return `SELECT * FROM kv_writes where map_name="${tableName}" ORDER BY created_at ASC LIMIT 5;`;
             }
 
-            return `SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;`;
+            // Updated default query to use sqlite_schema and exclude internal sqlite_ tables
+            return `SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%';`;
         });
     }, [tableName]);
 
@@ -495,9 +614,7 @@ const TablesPage: React.FC = () => {
     };
 
     const renderSqlRunnerDialog = () => {
-        const placeholder = tableName && tableName.length > 0
-            ? `SELECT * FROM "${tableName}" LIMIT 10;`
-            : `SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name;`;
+        const placeholder = `SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%';`;
 
         return (
             <Dialog open={isSqlDialogOpen} onOpenChange={handleSqlDialogOpenChange}>
@@ -629,18 +746,62 @@ const TablesPage: React.FC = () => {
                             </MessageBar>
                         ) : tables && tables.length > 0 ? (
                             <div className={classes.tablesList}>
-                                {tables.map((table) => (
-                                    <div
-                                        key={table}
-                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''
-                                            }`}
-                                        onClick={() => handleTableSelect(table)}
-                                    >
-                                        <Text size={300} weight={table === tableName ? 'semibold' : 'regular'}>
-                                            {table}
-                                        </Text>
-                                    </div>
-                                ))}
+                                <Accordion multiple collapsible defaultOpenItems={['public']}> 
+                                    {governanceTables.length > 0 && (
+                                        <AccordionItem value="governance">
+                                            <AccordionHeader>Governance</AccordionHeader>
+                                            <AccordionPanel>
+                                                {governanceTables.map(table => (
+                                                    <div
+                                                        key={table}
+                                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
+                                                        onClick={() => handleTableSelect(table)}
+                                                    >
+                                                        <Text size={300} weight={table === tableName ? 'semibold' : 'regular'}>
+                                                            {table}
+                                                        </Text>
+                                                    </div>
+                                                ))}
+                                            </AccordionPanel>
+                                        </AccordionItem>
+                                    )}
+                                    {internalTables.length > 0 && (
+                                        <AccordionItem value="internal">
+                                            <AccordionHeader>Internal</AccordionHeader>
+                                            <AccordionPanel>
+                                                {internalTables.map(table => (
+                                                    <div
+                                                        key={table}
+                                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
+                                                        onClick={() => handleTableSelect(table)}
+                                                    >
+                                                        <Text size={300} weight={table === tableName ? 'semibold' : 'regular'}>
+                                                            {table}
+                                                        </Text>
+                                                    </div>
+                                                ))}
+                                            </AccordionPanel>
+                                        </AccordionItem>
+                                    )}
+                                    {otherTables.length > 0 && (
+                                        <AccordionItem value="public">
+                                            <AccordionHeader>Public</AccordionHeader>
+                                            <AccordionPanel>
+                                                {otherTables.map(table => (
+                                                    <div
+                                                        key={table}
+                                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
+                                                        onClick={() => handleTableSelect(table)}
+                                                    >
+                                                        <Text size={300} weight={table === tableName ? 'semibold' : 'regular'}>
+                                                            {table}
+                                                        </Text>
+                                                    </div>
+                                                ))}
+                                            </AccordionPanel>
+                                        </AccordionItem>
+                                    )}
+                                </Accordion>
                             </div>
                         ) : (
                             <div className={classes.emptyState}>
@@ -659,9 +820,6 @@ const TablesPage: React.FC = () => {
                                 <Text size={600} weight="semibold">
                                     <KeyRegular style={{ marginRight: '8px' }} />
                                     {tableName}
-                                </Text>
-                                <Text size={300} style={{ marginTop: '4px' }}>
-                                    Latest state of all keys in this table
                                 </Text>
                             </div>
 
@@ -780,6 +938,19 @@ const TablesPage: React.FC = () => {
                                         >
                                             Previous
                                         </Button>
+                                        {paginationPageButtons.map((p, idx) => p === 'ellipsis' ? (
+                                            <Text key={`ellipsis-${idx}`} size={300} style={{ padding: '0 4px' }}>...</Text>
+                                        ) : (
+                                            <Button
+                                                key={p}
+                                                appearance={p === currentPage ? 'primary' : 'subtle'}
+                                                onClick={() => goToPage(p)}
+                                                disabled={p === currentPage}
+                                                style={{ minWidth: '40px' }}
+                                            >
+                                                {p}
+                                            </Button>
+                                        ))}
                                         <Button
                                             appearance="subtle"
                                             icon={<ChevronRight24Regular />}
