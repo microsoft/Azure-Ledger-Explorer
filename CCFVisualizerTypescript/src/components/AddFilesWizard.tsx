@@ -7,10 +7,7 @@ import {
   DialogContent,
   Button,
   TabList,
-  Tab,
-  Text,
-  Caption1,
-  Divider,
+  Tab
 } from '@fluentui/react-components';
 import {
   CloudRegular,
@@ -18,9 +15,14 @@ import {
   FolderRegular,
   Dismiss24Regular,
 } from '@fluentui/react-icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { FileUploadArea } from './FileUploadArea';
 import { LedgerBackupView } from './LedgerBackupView';
 import { MstLedgerImportView } from './MstLedgerImportView';
+import azureLedgerHelp from '../assets/help/azure-confidential-ledger.md?raw';
+import mstHelp from '../assets/help/microsoft-signing-transparency.md?raw';
+import localFilesHelp from '../assets/help/local-files.md?raw';
 
 
 const useStyles = makeStyles({
@@ -51,7 +53,6 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     padding: '24px',
-    borderRight: '1px solid var(--colorNeutralStroke2)',
   },
   rightPanel: {
     flex: '1',
@@ -59,6 +60,7 @@ const useStyles = makeStyles({
     backgroundColor: 'var(--colorNeutralBackground2)',
     display: 'flex',
     flexDirection: 'column',
+    backgroundClip: 'padding-box',
   },
   tabList: {
     marginBottom: '24px',
@@ -71,53 +73,7 @@ const useStyles = makeStyles({
     height: '100%',
     overflow: 'auto',
   },
-  helpTitle: {
-    marginBottom: '16px',
-    color: 'var(--colorNeutralForeground1)',
-    fontWeight: '600',
-  },
   helpContent: {
-    color: 'var(--colorNeutralForeground2)',
-    lineHeight: '1.5',
-    '& h3': {
-      color: 'var(--colorNeutralForeground1)',
-      marginTop: '20px',
-      marginBottom: '8px',
-      fontSize: '14px',
-      fontWeight: '600',
-    },
-    '& p': {
-      marginBottom: '12px',
-    },
-    '& ul': {
-      marginBottom: '12px',
-      paddingLeft: '20px',
-    },
-    '& li': {
-      marginBottom: '4px',
-    },
-    '& code': {
-      backgroundColor: 'var(--colorNeutralBackground3)',
-      padding: '2px 4px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontFamily: 'monospace',
-    },
-  },
-  markdownList: {
-    marginBottom: '12px',
-    paddingLeft: '20px',
-  },
-  markdownListItem: {
-    marginBottom: '4px',
-  },
-  markdownHeading: {
-    marginBottom: '8px',
-    color: 'var(--colorNeutralForeground1)',
-  },
-  markdownParagraph: {
-    marginBottom: '12px',
-    lineHeight: '1.5',
     color: 'var(--colorNeutralForeground2)',
   },
   emptyTabContent: {
@@ -140,114 +96,21 @@ export interface AddFilesWizardProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type AllowedOptions = 'azure' | 'mst' | 'local';
+
 export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChange }) => {
   const styles = useStyles();
-  const [selectedTab, setSelectedTab] = useState<string>('local');
-  const renderMarkdownContent = (content: string) => {
-    return content.split('\n\n').map((paragraph, index) => {
-      if (paragraph.startsWith('### ')) {
-        return (
-          <Text key={index} as="h3" size={400} weight="semibold" className={styles.markdownHeading}>
-            {paragraph.replace('### ', '')}
-          </Text>
-        );
-      }
-      
-      if (paragraph.includes('- ') || paragraph.includes('1. ')) {
-        const items = paragraph.split('\n').filter(line => line.trim().startsWith('- ') || /^\d+\./.test(line.trim()));
-        return (
-          <ul key={index} className={styles.markdownList}>
-            {items.map((item, itemIndex) => (
-              <li key={itemIndex} className={styles.markdownListItem}>
-                <Caption1>{item.replace(/^- |^\d+\. /, '')}</Caption1>
-              </li>
-            ))}
-          </ul>
-        );
-      }
-      
-      return (
-        <Caption1 key={index} className={styles.markdownParagraph}>
-          {paragraph.replace(/`([^`]+)`/g, (_, code) => code)}
-        </Caption1>
-      );
-    });
-  };
+  const [selectedTab, setSelectedTab] = useState<AllowedOptions>('local');
 
   const getHelpContent = () => {
     switch (selectedTab) {
       case 'azure':
-        return {
-          title: 'Azure Confidential Ledger',
-          content: `
-### About Azure Confidential Ledger
-
-Azure Confidential Ledger is a managed service that provides a tamper-proof ledger for storing sensitive data. It's built on top of the Confidential Consortium Framework (CCF).
-
-### Instructions
-
-Please follow the following:
-- Perform a backup of your ledger. [Learn More...](http://todo)
-- Log into your storage account and generate a SAS key. [Learn More...](http://todo)
-- Provide your SAS key to this tool
-          `.trim(),
-        };
-
+        return azureLedgerHelp;
       case 'mst':
-        return {
-          title: 'Microsoft\'s Signing Transparency',
-          content: `
-### About Microsoft\'s Signing Transparency
-
-Microsoft\'s Signing Transparency provides transparency and auditability for software supply chain security, maintaining tamper-evident logs of software artifacts.
-          `.trim(),
-        };
+        return mstHelp;
       case 'local':
       default:
-        return {
-          title: 'Local Files',
-          content: `
-### Uploading Local Files
-
-Upload CCF ledger files from your local system for analysis and exploration.
-
-### Supported File Types
-
-- **Only .committed files** - Files must have the .committed extension
-- **Sequential naming required** - Files must be named: ledger_<start>-<end>.committed
-- **Examples**: ledger_1-18.committed, ledger_19-25.committed, ledger_26-40.committed
-
-### File Sequence Requirements
-
-1. **Must start at 1**: The first file must be ledger_1-X.committed
-2. **Must be contiguous**: No gaps between file ranges
-3. **No overlaps**: File ranges cannot overlap
-4. **Sequential order**: Files will be processed in sequence order
-
-### How to Upload
-
-1. **Drag and Drop**: Simply drag .committed files from your file system into the upload area
-2. **Browse Files**: Click "Select .committed Files" to open a file browser
-3. **Multiple Files**: You can upload multiple sequential files at once
-
-### File Processing
-
-After upload, the application will:
-- Validate file sequence and naming
-- Parse the ledger structure in sequential order
-- Extract transactions and key-value pairs
-- Index data for fast searching
-- Store everything locally in your browser
-
-### Validation
-
-The system will check for:
-- Correct .committed file extension
-- Proper naming format (ledger_X-Y.committed)
-- Sequential and contiguous ranges
-- No duplicate or overlapping files
-          `.trim(),
-        };
+        return localFilesHelp;
     }
   };
 
@@ -278,13 +141,14 @@ The system will check for:
         }>
           Add Ledger Files
         </DialogTitle>
-        
+
         <DialogContent className={styles.wizardContent}>
           {/* Left Panel - Wizard Content */}
           <div className={styles.leftPanel}>
             <TabList
               selectedValue={selectedTab}
-              onTabSelect={(_, data) => setSelectedTab(data.value as string)}
+              onTabSelect={(_, data) => setSelectedTab(data.value as AllowedOptions)}
+              
               className={styles.tabList}
             >
               <Tab value="azure" icon={<CloudRegular />}>
@@ -306,12 +170,10 @@ The system will check for:
           {/* Right Panel - Help Content */}
           <div className={styles.rightPanel}>
             <div className={styles.helpSection}>
-              <Text className={styles.helpTitle} size={500}>
-                {helpContent.title}
-              </Text>
-              <Divider style={{ marginBottom: '16px' }} />
               <div className={styles.helpContent}>
-                {renderMarkdownContent(helpContent.content)}
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {helpContent}
+                </ReactMarkdown>
               </div>
             </div>
           </div>
