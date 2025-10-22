@@ -5,6 +5,7 @@ import {
   Button,
   TabList,
   Tab,
+  tokens,
 } from '@fluentui/react-components';
 import {
   WeatherMoon24Regular,
@@ -24,8 +25,10 @@ import ccfLogo from '../assets/ccf.svg';
 
 const useStyles = makeStyles({
   header: {
-    padding: '16px 24px',
-    borderBottom: '1px solid var(--colorNeutralStroke2)',
+    backgroundColor: tokens.colorNeutralBackground3,
+    color: tokens.colorNeutralForeground2BrandHover,
+    padding: '8px 24px',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -50,11 +53,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '24px',
   },
-  navigationTabs: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
+
 });
 
 interface MenuBarProps {
@@ -101,8 +100,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       {/* Navigation and Header Actions */}
       <div className={styles.navigation}>
         {/* Navigation Tabs */}
-        <div className={styles.navigationTabs}>
-          <TabList onTabSelect={(_, data) => handleTabChange(data.value as string)}>
+          <TabList onTabSelect={(_, data) => handleTabChange(data.value as string)} >
             { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Tab value="chat" icon={<Bot24Regular />}>
               Chat
             </Tab> }
@@ -127,7 +125,6 @@ export const MenuBar: React.FC<MenuBarProps> = ({
               Configuration
             </Tab>
           </TabList>
-        </div>
 
         {/* Header Actions */}
         <div className={styles.headerActions}>

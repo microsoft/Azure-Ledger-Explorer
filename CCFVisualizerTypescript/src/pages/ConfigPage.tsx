@@ -11,7 +11,6 @@ import {
   Body1,
   makeStyles,
   tokens,
-  shorthands,
   Dialog,
   DialogTrigger,
   DialogSurface,
@@ -49,7 +48,7 @@ const useStyles = makeStyles({
   },
   cardsContainer: {
     display: 'flex',
-    ...shorthands.gap('24px'),
+    gap: '24px',
     padding: '24px',
     width: '100%',
     flexDirection: 'column',
@@ -60,7 +59,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     height: '100%',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
   },
   errorContainer: {
     display: 'flex',
@@ -68,7 +67,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     height: '100%',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
     color: tokens.colorPaletteRedForeground1,
   },
   content: {
@@ -78,13 +77,13 @@ const useStyles = makeStyles({
   configHeader: {
     display: 'flex',
     alignItems: 'center',
-    ...shorthands.gap('8px'),
+    gap: '8px',
   },
   configContent: {
-    ...shorthands.padding('16px'),
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
   },
   toolsList: {
     marginTop: '8px',

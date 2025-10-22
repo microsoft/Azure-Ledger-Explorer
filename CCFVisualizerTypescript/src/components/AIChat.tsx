@@ -7,7 +7,6 @@ import {
   MessageBar,
   makeStyles,
   tokens,
-  shorthands,
   Menu,
   MenuTrigger,
   MenuPopover,
@@ -135,17 +134,17 @@ const useStyles = makeStyles({
   messagesArea: {
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
     minHeight: '0', // Changed from 100vh to prevent initial page scroll
   },
   messageContainer: {
     display: 'flex',
-    ...shorthands.gap('12px'),
+    gap: '12px',
     alignItems: 'flex-start',
   },
   userMessageContainer: {
     display: 'flex',
-    ...shorthands.gap('12px'),
+    gap: '12px',
     alignItems: 'flex-start',
     justifyContent: 'flex-end',
   },
@@ -158,8 +157,8 @@ const useStyles = makeStyles({
     minWidth: 0,
   },
   messageBubble: {
-    ...shorthands.padding('12px'),
-    ...shorthands.borderRadius('8px'),
+    padding: '12px',
+    borderRadius: '8px',
   },
   userBubble: {
     backgroundColor: tokens.colorNeutralBackground4,
@@ -245,7 +244,7 @@ const useStyles = makeStyles({
     },
   },
   annotationsSection: {
-    ...shorthands.margin('12px', '0', '0', '0'),
+    margin: '12px 0 0 0',
   },
   annotationsHeader: {
     fontSize: '16px',
@@ -255,7 +254,7 @@ const useStyles = makeStyles({
   annotationsList: {
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('8px'),
+    gap: '8px',
     padding: '0',
   },
   annotationItem: {
@@ -264,7 +263,7 @@ const useStyles = makeStyles({
     listStyleType: 'none',
   },
   sqlSection: {
-    ...shorthands.margin('12px', '0', '0', '0'),
+    margin: '12px 0 0 0',
   },
   sqlHeader: {
     fontSize: '14px',
@@ -278,40 +277,40 @@ const useStyles = makeStyles({
   },
   sqlQuery: {
     backgroundColor: tokens.colorNeutralBackground3,
-    ...shorthands.padding('8px'),
-    ...shorthands.borderRadius('4px'),
+    padding: '8px',
+    borderRadius: '4px',
     fontSize: '12px',
-    ...shorthands.overflow('auto'),
-    ...shorthands.margin('4px', '0'),
-    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    overflow: 'auto',
+    margin: '4px 0',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
   },
   sqlResult: {
     backgroundColor: tokens.colorPaletteGreenBackground1,
-    ...shorthands.padding('8px'),
-    ...shorthands.borderRadius('4px'),
+    padding: '8px',
+    borderRadius: '4px',
     fontSize: '12px',
-    ...shorthands.overflow('auto'),
-    ...shorthands.margin('4px', '0'),
-    ...shorthands.border('1px', 'solid', tokens.colorPaletteGreenBorder1),
+    overflow: 'auto',
+    margin: '4px 0',
+    border: `1px solid ${tokens.colorPaletteGreenBorder1}`,
     fontFamily: '"Consolas", "Monaco", "Courier New", monospace',
   },
   errorSection: {
-    ...shorthands.margin('8px', '0', '0', '0'),
+    margin: '8px 0 0 0',
   },
   messageTimestamp: {
     fontSize: '11px',
     color: tokens.colorNeutralForeground3,
-    ...shorthands.margin('4px', '0', '0', '0'),
+    margin: '4px 0 0 0',
   },
   loadingContainer: {
     display: 'flex',
     alignItems: 'center',
-    ...shorthands.gap('8px'),
+    gap: '8px',
     color: tokens.colorNeutralForeground3,
   },
   errorContainer: {
-    ...shorthands.padding('8px', '16px', '0', '16px'),
+    padding: '8px 16px 0 16px',
     position: 'absolute',
     bottom: '100%',
     left: 0,
@@ -325,9 +324,9 @@ const useStyles = makeStyles({
     zIndex: 1000,
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.padding('10px', '16px'),
+    padding: '10px 16px',
     backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.borderTop('0px', 'solid', tokens.colorNeutralStroke2),
+    borderTop: `0px solid ${tokens.colorNeutralStroke2}`,
   },
   inputAreaAnimating: {
     transition: 'left 0.25s ease, width 0.25s ease',
@@ -338,7 +337,7 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    ...shorthands.gap('12px'),
+    gap: '12px',
     width: '100%',
     maxWidth: '830px',
     justifyContent: 'center',
@@ -347,18 +346,18 @@ const useStyles = makeStyles({
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('4px'),
-    ...shorthands.padding('10px', '10px', '5px', '10px'),
+    gap: '4px',
+    padding: '10px 10px 5px 10px',
     backgroundColor: tokens.colorNeutralBackground1,
-    ...shorthands.borderRadius('28px'),
-    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    borderRadius: '28px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     '&:focus-within': {
-      ...shorthands.border('1px', 'solid', tokens.colorBrandStroke1),
+      border: `1px solid ${tokens.colorBrandStroke1}`,
     },
   },
   inputTextareaContainer: {
     width: '100%',
-    ...shorthands.padding('8px', '20px', '8px', '8px'),
+    padding: '8px 20px 8px 8px',
     minHeight: '24px',
   },
   buttonsRow: {
@@ -366,14 +365,14 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    ...shorthands.padding('0px'),
+    padding: '0px',
   },
   plusButton: {
     minWidth: '32px',
     height: '32px',
-    ...shorthands.borderRadius('50%'),
+    borderRadius: '50%',
     backgroundColor: 'transparent',
-    ...shorthands.border('none'),
+    border: 'none',
     color: tokens.colorNeutralForeground2,
     '&:hover': {
       backgroundColor: tokens.colorNeutralBackground2,
@@ -385,12 +384,12 @@ const useStyles = makeStyles({
     width: '100%',
     minHeight: '24px',
     maxHeight: '72px', // 3 lines at 24px line height
-    ...shorthands.border('none'),
+    border: 'none',
     backgroundColor: 'transparent',
     resize: 'none',
     fontSize: '16px',
     lineHeight: '24px',
-    ...shorthands.padding('0'),
+    padding: '0',
     fontFamily: 'inherit',
     wordWrap: 'break-word',
     whiteSpace: 'pre-wrap',
@@ -407,9 +406,9 @@ const useStyles = makeStyles({
   sendButton: {
     minWidth: '32px',
     height: '32px',
-    ...shorthands.borderRadius('50%'),
+    borderRadius: '50%',
     backgroundColor: tokens.colorBrandBackground,
-  ...shorthands.border('none'),
+  border: 'none',
     color: tokens.colorNeutralForegroundInverted,
     '&:disabled': {
       backgroundColor: tokens.colorNeutralBackground4,
@@ -422,21 +421,21 @@ const useStyles = makeStyles({
   stopButton: {
     minWidth: '32px',
     height: '32px',
-    ...shorthands.borderRadius('50%'),
+    borderRadius: '50%',
     backgroundColor: tokens.colorPaletteBlueBorderActive,
-    ...shorthands.border('none'),
+    border: 'none',
     color: tokens.colorNeutralForegroundInverted,
   },
   newConversationButton: {
     minWidth: '32px',
     height: '32px',
-    ...shorthands.borderRadius('50%'),
+    borderRadius: '50%',
     backgroundColor: tokens.colorNeutralBackground2,
-    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     color: tokens.colorNeutralForeground1,
     '&:hover': {
       backgroundColor: tokens.colorNeutralBackground2Hover,
-      ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1Hover),
+      border: `1px solid ${tokens.colorNeutralStroke1Hover}`,
     },
   },
   helpText: {
@@ -444,19 +443,19 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   cleanedResult: {
-    ...shorthands.margin('8px', '0'),
-    ...shorthands.padding('12px'),
+    margin: '8px 0',
+    padding: '12px',
     backgroundColor: tokens.colorNeutralBackground2,
-    ...shorthands.borderRadius('8px'),
-    ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
+    borderRadius: '8px',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   rawDataDetails: {
-    ...shorthands.margin('8px', '0'),
+    margin: '8px 0',
     '& summary': {
       cursor: 'pointer',
       fontSize: '12px',
       color: tokens.colorNeutralForeground3,
-      ...shorthands.padding('4px', '0'),
+      padding: '4px 0',
       '&:hover': {
         color: tokens.colorNeutralForeground2,
       },
@@ -489,7 +488,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     if (loadedMessages && loadedMessages.length) return loadedMessages;
     try {
       const raw = localStorage.getItem(MESSAGES_KEY);
-      return raw ? JSON.parse(raw).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })) : [];
+      return raw ? JSON.parse(raw).map((m: ChatMessage) => ({ ...m, timestamp: new Date(m.timestamp) })) : [];
     } catch { return []; }
   });
   const [currentMessage, setCurrentMessage] = useState('');
@@ -695,7 +694,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       throw new Error('Base URL is required to send the request');
     }
 
-    let input = `## User asks:\n${newMessage}`;
+    const input = `## User asks:\n${newMessage}`;
 
     const previousResponseId = messages.length > 0 ? messages[messages.length - 1].responseId : null;
 
@@ -766,7 +765,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     const sseDataPrefix = 'data: ';
     let fullResponseText = '';
     let responseId: string;
-    let annotations: Record<string, ChatAnnotation> = {};
+    const annotations: Record<string, ChatAnnotation> = {};
     try {
       while (true) {
         // Check if we should abort
@@ -809,7 +808,7 @@ export const AIChat: React.FC<AIChatProps> = ({
               } else if (data.type === 'response.output_text.annotation.added') {
                 // print annotation/reference/footnote in text
                 if (data.annotation_index >= 0) {
-                  let annotationref = data.annotation_index + 1;
+                  const annotationref = data.annotation_index + 1;
                   textDelta += ` [${annotationref}]`;
 
                   if (!annotations[data.annotation.file_id]) {

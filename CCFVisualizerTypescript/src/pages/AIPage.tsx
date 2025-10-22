@@ -4,7 +4,7 @@ import type { ChatMessage } from '../components/AIChat';
 import { ConversationHistory, saveConversationToHistory } from '../components/ConversationHistory';
 import type { SavedConversation } from '../types/conversation-types';
 import { useDatabase } from '../hooks/use-ccf-data';
-import { Spinner, Text, makeStyles, tokens, shorthands } from '@fluentui/react-components';
+import { Spinner, Text, makeStyles, tokens } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
   container: {
@@ -19,7 +19,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     height: '100%',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
   },
   errorContainer: {
     display: 'flex',
@@ -27,7 +27,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     height: '100%',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
     color: tokens.colorPaletteRedForeground1,
   },
 });

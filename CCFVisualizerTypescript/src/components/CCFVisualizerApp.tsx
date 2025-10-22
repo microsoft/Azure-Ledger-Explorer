@@ -12,6 +12,7 @@ import {
   TreeItemLayout,
   Badge,
   Button,
+  tokens,
 } from '@fluentui/react-components';
 import {
   Document24Regular,
@@ -46,14 +47,14 @@ const useStyles = makeStyles({
     flex: 1,
     display: 'flex',
     overflow: 'hidden',
-    backgroundColor: 'var(--colorNeutralBackground1)',
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   sidebar: {
     width: 'var(--sidebar-width, 250px)',
     minWidth: '150px',
     maxWidth: '500px',
-    borderRight: '1px solid var(--colorNeutralStroke2)',
-    backgroundColor: 'var(--colorNeutralBackground2)',
+    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -70,19 +71,19 @@ const useStyles = makeStyles({
     borderRight: '1px solid transparent',
     zIndex: 10,
     '&:hover': {
-      borderRight: '1px solid var(--colorBrandBackground)',
+      borderRight: `1px solid ${tokens.colorBrandBackground}`,
     },
   },
   resizeHandleActive: {
-    borderRight: '1px solid var(--colorBrandBackground)',
+    borderRight: `1px solid ${tokens.colorBrandBackground}`,
   },
   resizing: {
     cursor: 'col-resize',
   },
   sidebarHeader: {
     padding: '16px',
-    borderBottom: '1px solid var(--colorNeutralStroke2)',
-    backgroundColor: 'var(--colorNeutralBackground1)',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   sidebarContent: {
     flex: 1,
@@ -97,7 +98,7 @@ const useStyles = makeStyles({
   },
   canvasHeader: {
     padding: '16px 24px',
-    borderBottom: '1px solid var(--colorNeutralStroke2)',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -113,16 +114,16 @@ const useStyles = makeStyles({
     overflowY: 'scroll',
     margin: '16px 24px',
     borderRadius: '8px',
-    border: '1px solid var(--colorNeutralStroke2)',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
   emptyState: {
     padding: '48px',
     textAlign: 'center',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
   statusBar: {
     padding: '8px 24px',
-    borderTop: '1px solid var(--colorNeutralStroke2)',    
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,    
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
@@ -186,8 +187,8 @@ const useStyles = makeStyles({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '8px 16px',
-    borderTop: '1px solid var(--colorNeutralStroke2)',
-    backgroundColor: 'var(--colorNeutralBackground2)',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
   },
   paginationControls: {
     display: 'flex',
@@ -196,12 +197,12 @@ const useStyles = makeStyles({
   },
   paginationInfo: {
     fontSize: '13px',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
   visualizationContainer: {
     padding: '16px 24px',
-    borderBottom: '1px solid var(--colorNeutralStroke2)',
-    backgroundColor: 'var(--colorNeutralBackground1)',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground1,
   },
 });
 
@@ -431,7 +432,7 @@ export const CCFVisualizerApp: React.FC = () => {
                     itemType="leaf"
                     className={styles.treeItem}
                     style={{ 
-                      backgroundColor: selectedFileId === file.id ? 'var(--colorNeutralBackground3)' : 'transparent'
+                      backgroundColor: selectedFileId === file.id ? tokens.colorNeutralBackground3 : 'transparent'
                     }}
                   >
                     <TreeItemLayout

@@ -18,6 +18,7 @@ import {
   Spinner,
   Card,
   CardHeader,
+  tokens,
 } from '@fluentui/react-components';
 import {
   StorageRegular,
@@ -28,7 +29,7 @@ import { useFileDrop , useClearAllData } from '../hooks/use-ccf-data';
 
 const useStyles = makeStyles({
         fileSequenceInfo: {
-    backgroundColor: 'var(--colorNeutralBackground3)',
+    backgroundColor: tokens.colorNeutralBackground3,
     padding: '12px',
     borderRadius: '6px',
     marginBottom: '16px',
@@ -36,7 +37,7 @@ const useStyles = makeStyles({
   sequenceText: {
     fontFamily: 'monospace',
     fontSize: '12px',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
     recentFiles: {
     display: 'flex',
@@ -59,7 +60,7 @@ const useStyles = makeStyles({
   },
     fileIcon: {
     fontSize: '32px',
-    color: 'var(--colorBrandBackground)',
+    color: tokens.colorBrandBackground,
   },
   fileInfo: {
     flex: 1,
@@ -69,7 +70,7 @@ const useStyles = makeStyles({
   },
   fileName: {
     fontWeight: '600',
-    color: 'var(--colorNeutralForeground1)',
+    color: tokens.colorNeutralForeground1,
   },
   emptyState: {
     textAlign: 'center',
@@ -84,7 +85,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     textAlign: 'center',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   comingSoonIcon: {
     fontSize: '48px',

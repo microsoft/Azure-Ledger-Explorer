@@ -11,6 +11,7 @@ import {
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
+  tokens,
 } from '@fluentui/react-components';
 import {
   CloudArrowUp24Regular,
@@ -39,31 +40,31 @@ const useStyles = makeStyles({
     overflow: 'auto',
   },
   dropZone: {
-    border: '2px dashed var(--colorNeutralStroke2)',
+    border: `2px dashed ${tokens.colorNeutralStroke2}`,
     borderRadius: '8px',
     padding: '48px 24px',
     textAlign: 'center',
-    backgroundColor: 'var(--colorNeutralBackground2)',
+    backgroundColor: tokens.colorNeutralBackground2,
     cursor: 'pointer',
     transition: 'all 0.2s ease',
     '&:hover': {
-      backgroundColor: 'var(--colorNeutralBackground1)',
+      backgroundColor: tokens.colorNeutralBackground1,
     },
   },
   dropZoneActive: {
-    backgroundColor: 'var(--colorBrandBackground2)',
+    backgroundColor: tokens.colorBrandBackground2,
   },
   dropZoneIcon: {
     fontSize: '48px',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
     marginBottom: '16px',
   },
   dropZoneText: {
     marginBottom: '8px',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
   dropZoneSubtext: {
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
     marginBottom: '16px',
   },
   hiddenInput: {
@@ -90,7 +91,7 @@ const useStyles = makeStyles({
   },
   fileIcon: {
     fontSize: '32px',
-    color: 'var(--colorBrandBackground)',
+    color: tokens.colorBrandBackground,
   },
   fileInfo: {
     flex: 1,
@@ -100,10 +101,10 @@ const useStyles = makeStyles({
   },
   fileName: {
     fontWeight: '600',
-    color: 'var(--colorNeutralForeground1)',
+    color: tokens.colorNeutralForeground1,
   },
   fileDetails: {
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   uploadingOverlay: {
     position: 'absolute',
@@ -111,7 +112,7 @@ const useStyles = makeStyles({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'var(--colorNeutralBackground1Pressed)',
+    backgroundColor: tokens.colorNeutralBackground1Pressed,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -124,7 +125,7 @@ const useStyles = makeStyles({
     gap: '12px',
   },
   errorCard: {
-    border: '1px solid var(--colorPaletteRedBorder2)',
+    border: `1px solid ${tokens.colorPaletteRedBorder2}`,
   },
   emptyState: {
     textAlign: 'center',
@@ -134,10 +135,10 @@ const useStyles = makeStyles({
     position: 'relative',
   },
   errorText: {
-    color: 'var(--colorPaletteRedForeground1)',
+    color: tokens.colorPaletteRedForeground1,
   },
   emptySubtext: {
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   validationError: {
     marginBottom: '16px',
@@ -146,7 +147,7 @@ const useStyles = makeStyles({
     marginBottom: '16px',
   },
   fileSequenceInfo: {
-    backgroundColor: 'var(--colorNeutralBackground3)',
+    backgroundColor: tokens.colorNeutralBackground3,
     padding: '12px',
     borderRadius: '6px',
     marginBottom: '16px',
@@ -154,7 +155,7 @@ const useStyles = makeStyles({
   sequenceText: {
     fontFamily: 'monospace',
     fontSize: '12px',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
 });
 

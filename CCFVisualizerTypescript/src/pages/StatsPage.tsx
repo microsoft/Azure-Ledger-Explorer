@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   tokens,
   makeStyles,
-  shorthands,
   Text,
   Card,
   CardHeader,
@@ -39,8 +38,8 @@ const useStyles = makeStyles({
     overflow: 'hidden',
   },
   header: {
-    ...shorthands.padding('16px', '24px'),
-    ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
+    padding: '16px 24px',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     backgroundColor: tokens.colorNeutralBackground1,
   },
   breadcrumb: {
@@ -49,12 +48,12 @@ const useStyles = makeStyles({
   content: {
     flex: 1,
     overflow: 'auto',
-    ...shorthands.padding('24px'),
+    padding: '24px',
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    ...shorthands.gap('16px'),
+    gap: '16px',
     marginBottom: '24px',
   },
   statCard: {
@@ -64,7 +63,7 @@ const useStyles = makeStyles({
   statCardHeader: {
     display: 'flex',
     alignItems: 'center',
-    ...shorthands.gap('12px'),
+    gap: '12px',
   },
   statIcon: {
     fontSize: '24px',
@@ -92,7 +91,7 @@ const useStyles = makeStyles({
     marginBottom: '16px',
     display: 'flex',
     alignItems: 'center',
-    ...shorthands.gap('8px'),
+    gap: '8px',
   },
   sectionIcon: {
     fontSize: '20px',
@@ -101,7 +100,7 @@ const useStyles = makeStyles({
   detailsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    ...shorthands.gap('16px'),
+    gap: '16px',
     marginBottom: '24px',
   },
   detailCard: {
@@ -140,13 +139,13 @@ const useStyles = makeStyles({
   },
   actionButtons: {
     display: 'flex',
-    ...shorthands.gap('12px'),
+    gap: '12px',
     marginTop: '24px',
   },
   highlight: {
     backgroundColor: tokens.colorBrandBackground2,
-    ...shorthands.padding('2px', '6px'),
-    ...shorthands.borderRadius('4px'),
+    padding: '2px 6px',
+    borderRadius: '4px',
     fontSize: '12px',
     fontWeight: '600',
   },

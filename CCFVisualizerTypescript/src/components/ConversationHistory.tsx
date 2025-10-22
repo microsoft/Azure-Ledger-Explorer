@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { makeStyles, shorthands, tokens, Button, Text, Spinner, MessageBar } from '@fluentui/react-components';
+import { makeStyles, tokens, Button, Text, Spinner, MessageBar } from '@fluentui/react-components';
 import { DeleteRegular, ChevronLeftRegular, ChevronRightRegular, ChatRegular } from '@fluentui/react-icons';
 import type { ConversationHistoryProps, SavedConversation } from '../types/conversation-types';
 import type { ChatMessage } from './AIChat';
@@ -24,7 +24,7 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...shorthands.padding('12px', '12px'),
+    padding: '12px 12px',
   },
   title: {
     fontWeight: tokens.fontWeightSemibold,
@@ -40,8 +40,8 @@ const useStyles = makeStyles({
     cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.padding('10px', '12px'),
-    ...shorthands.gap('4px'),
+    padding: '10px 12px',
+    gap: '4px',
     borderBottom: `1px solid ${tokens.colorNeutralStroke3}`,
     backgroundColor: 'transparent',
     '&:hover': {
@@ -90,8 +90,8 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     textAlign: 'center',
-    ...shorthands.padding('32px', '12px'),
-    ...shorthands.gap('8px'),
+    padding: '32px 12px',
+    gap: '8px',
     color: tokens.colorNeutralForeground3,
   },
 });

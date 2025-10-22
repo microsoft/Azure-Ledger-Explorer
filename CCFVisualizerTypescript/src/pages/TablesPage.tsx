@@ -3,7 +3,6 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
     tokens,
     makeStyles,
-    shorthands,
     Text,
     Button,
     Table,
@@ -43,8 +42,8 @@ const useStyles = makeStyles({
         overflow: 'hidden',
     },
     header: {
-        ...shorthands.padding('16px', '24px'),
-        ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
+        padding: '16px 24px',
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
         backgroundColor: tokens.colorNeutralBackground1,
     },
     breadcrumb: {
@@ -57,29 +56,29 @@ const useStyles = makeStyles({
     },
     sidebar: {
         width: '300px',
-        ...shorthands.borderRight('1px', 'solid', tokens.colorNeutralStroke2),
+        borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
         backgroundColor: tokens.colorNeutralBackground1,
         overflow: 'auto',
     },
     sidebarHeader: {
-        ...shorthands.padding('16px'),
-        ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
+        padding: '16px',
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
         backgroundColor: tokens.colorNeutralBackground2,
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center'
     },
     sidebarContent: {
-        ...shorthands.padding('8px'),
+        padding: '8px',
     },
     tablesList: {
         display: 'flex',
         flexDirection: 'column',
-        ...shorthands.gap('4px'),
+        gap: '4px',
     },
     tableItem: {
-        ...shorthands.padding('8px', '12px'),
-        ...shorthands.borderRadius('4px'),
+        padding: '8px 12px',
+        borderRadius: '4px',
         cursor: 'pointer',
         transition: 'background-color 0.2s',
         '&:hover': {
@@ -97,22 +96,22 @@ const useStyles = makeStyles({
         overflow: 'hidden',
     },
     mainHeader: {
-        ...shorthands.padding('16px', '24px'),
-        ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
+        padding: '16px 24px',
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
         backgroundColor: tokens.colorNeutralBackground1,
     },
     searchContainer: {
-        ...shorthands.padding('16px', '24px'),
-        ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
+        padding: '16px 24px',
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
     },
     tableContainer: {
         flex: 1,
         overflow: 'auto',
-        ...shorthands.padding('16px', '24px'),
+        padding: '16px 24px',
     },
     paginationContainer: {
-        ...shorthands.padding('8px', '16px'),
-        ...shorthands.borderTop('1px', 'solid', tokens.colorNeutralStroke2),
+        padding: '8px 16px',
+        borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -159,7 +158,7 @@ const useStyles = makeStyles({
     },
     keyTransactionsContent: {
         backgroundColor: tokens.colorNeutralBackground1,
-        ...shorthands.borderRadius('8px'),
+        borderRadius: '8px',
         width: '800px',
         maxHeight: '600px',
         overflow: 'hidden',
@@ -167,8 +166,8 @@ const useStyles = makeStyles({
         flexDirection: 'column',
     },
     keyTransactionsHeader: {
-        ...shorthands.padding('16px', '24px'),
-        ...shorthands.borderBottom('1px', 'solid', tokens.colorNeutralStroke2),
+        padding: '16px 24px',
+        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -176,11 +175,11 @@ const useStyles = makeStyles({
     keyTransactionsBody: {
         flex: 1,
         overflow: 'auto',
-        ...shorthands.padding('16px', '24px'),
+        padding: '16px 24px',
     },
     actionButtons: {
         display: 'flex',
-        ...shorthands.gap('8px'),
+        gap: '8px',
     },
     sqlDialogSurface: {
         width: '800px',
@@ -189,7 +188,7 @@ const useStyles = makeStyles({
     sqlDialogBody: {
         display: 'flex',
         flexDirection: 'column',
-        ...shorthands.gap('12px'),
+        gap: '12px',
     },
     sqlTextarea: {
         fontFamily: 'monospace',
@@ -197,15 +196,15 @@ const useStyles = makeStyles({
     sqlExecutionStatus: {
         display: 'flex',
         alignItems: 'center',
-        ...shorthands.gap('8px'),
+        gap: '8px',
         color: tokens.colorNeutralForeground2,
     },
     sqlResultContainer: {
         maxHeight: '320px',
         overflow: 'auto',
-        ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke2),
-        ...shorthands.borderRadius('6px'),
-        ...shorthands.padding('12px'),
+        border: `1px solid ${tokens.colorNeutralStroke2}`,
+        borderRadius: '6px',
+        padding: '12px',
         backgroundColor: tokens.colorNeutralBackground2,
     },
     sqlResultCell: {
@@ -382,8 +381,8 @@ const TablesPage: React.FC = () => {
             const first = 1;
             const last = totalPages;
             pages.push(first);
-            let start = Math.max(currentPage - showRange, 2);
-            let end = Math.min(currentPage + showRange, totalPages - 1);
+            const start = Math.max(currentPage - showRange, 2);
+            const end = Math.min(currentPage + showRange, totalPages - 1);
             if (start > 2) pages.push('ellipsis');
             for (let p = start; p <= end; p++) pages.push(p);
             if (end < totalPages - 1) pages.push('ellipsis');

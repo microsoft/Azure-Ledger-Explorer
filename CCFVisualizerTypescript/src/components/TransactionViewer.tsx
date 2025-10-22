@@ -22,6 +22,7 @@ import {
   DialogActions,
   Tab,
   TabList,
+  tokens,
 } from '@fluentui/react-components';
 import type { TabValue } from '@fluentui/react-components';
 import {
@@ -107,14 +108,14 @@ const useStyles = makeStyles({
   },
   metaLabel: {
     fontWeight: '600',
-    color: 'var(--colorNeutralForeground1)',
+    color: tokens.colorNeutralForeground1,
   },
   metaValue: {
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
     fontFamily: 'monospace',
   },
   kvTable: {
-    border: '1px solid var(--colorNeutralStroke2)',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: '8px',
     overflow: 'hidden',
   },
@@ -136,7 +137,7 @@ const useStyles = makeStyles({
   emptyState: {
     textAlign: 'center',
     padding: '48px 24px',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   dialogContent: {
     maxHeight: '70vh',
@@ -230,12 +231,12 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
                       gap: '8px', 
                       marginBottom: '12px',
                       padding: '8px 12px',
-                      backgroundColor: 'var(--colorNeutralBackground2)',
+                      backgroundColor: tokens.colorNeutralBackground2,
                       borderRadius: '4px',
-                      border: '1px solid var(--colorNeutralStroke2)'
+                      border: `1px solid ${tokens.colorNeutralStroke2}`
                     }}>
-                      <Database24Regular style={{ color: 'var(--colorNeutralForeground2)' }} />
-                      <Text weight="semibold" style={{ color: 'var(--colorNeutralForeground1)' }}>
+                      <Database24Regular style={{ color: tokens.colorNeutralForeground2 }} />
+                      <Text weight="semibold" style={{ color: tokens.colorNeutralForeground1 }}>
                         {tableName}
                       </Text>
                       <Badge size="small" color="brand">
@@ -253,7 +254,7 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
                         <Text 
                           style={{ 
                             fontSize: '12px', 
-                            color: 'var(--colorNeutralForeground3)',
+                            color: tokens.colorNeutralForeground3,
                             marginTop: '8px',
                             marginLeft: '8px',
                             fontFamily: 'monospace'
@@ -284,12 +285,12 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
                       gap: '8px', 
                       marginBottom: '12px',
                       padding: '8px 12px',
-                      backgroundColor: 'var(--colorNeutralBackground2)',
+                      backgroundColor: tokens.colorNeutralBackground2,
                       borderRadius: '4px',
-                      border: '1px solid var(--colorNeutralStroke2)'
+                      border: `1px solid ${tokens.colorNeutralStroke2}`
                     }}>
-                      <Database24Regular style={{ color: 'var(--colorNeutralForeground2)' }} />
-                      <Text weight="semibold" style={{ color: 'var(--colorNeutralForeground1)' }}>
+                      <Database24Regular style={{ color: tokens.colorNeutralForeground2 }} />
+                      <Text weight="semibold" style={{ color: tokens.colorNeutralForeground1 }}>
                         {tableName}
                       </Text>
                       <Badge size="small" color="danger">
@@ -552,12 +553,12 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
                               gap: '8px', 
                               marginBottom: '12px',
                               padding: '8px 12px',
-                              backgroundColor: 'var(--colorNeutralBackground2)',
+                              backgroundColor: tokens.colorNeutralBackground2,
                               borderRadius: '4px',
-                              border: '1px solid var(--colorNeutralStroke2)'
+                              border: `1px solid ${tokens.colorNeutralStroke2}`
                             }}>
-                              <Database24Regular style={{ color: 'var(--colorNeutralForeground2)' }} />
-                              <Text weight="semibold" style={{ color: 'var(--colorNeutralForeground1)' }}>
+                              <Database24Regular style={{ color: tokens.colorNeutralForeground2 }} />
+                              <Text weight="semibold" style={{ color: tokens.colorNeutralForeground1 }}>
                                 {tableName}
                               </Text>
                               <Badge size="small" color="brand">
@@ -575,7 +576,7 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
                                 <Text 
                                   style={{ 
                                     fontSize: '12px', 
-                                    color: 'var(--colorNeutralForeground3)',
+                                    color: tokens.colorNeutralForeground3,
                                     marginTop: '8px',
                                     marginLeft: '8px',
                                     fontFamily: 'monospace'
@@ -606,12 +607,12 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
                               gap: '8px', 
                               marginBottom: '12px',
                               padding: '8px 12px',
-                              backgroundColor: 'var(--colorNeutralBackground2)',
+                              backgroundColor: tokens.colorNeutralBackground2,
                               borderRadius: '4px',
-                              border: '1px solid var(--colorNeutralStroke2)'
+                              border: `1px solid ${tokens.colorNeutralStroke2}`
                             }}>
-                              <Database24Regular style={{ color: 'var(--colorNeutralForeground2)' }} />
-                              <Text weight="semibold" style={{ color: 'var(--colorNeutralForeground1)' }}>
+                              <Database24Regular style={{ color: tokens.colorNeutralForeground2 }} />
+                              <Text weight="semibold" style={{ color: tokens.colorNeutralForeground1 }}>
                                 {tableName}
                               </Text>
                               <Badge size="small" color="danger">

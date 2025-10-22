@@ -2,7 +2,6 @@ import React from 'react';
 import {
   makeStyles,
   tokens,
-  shorthands,
   Card,
   CardHeader,
   Caption1,
@@ -31,18 +30,18 @@ const useStyles = makeStyles({
   header: {
     display: 'flex',
     alignItems: 'center',
-    ...shorthands.gap('8px'),
+    gap: '8px',
   },
   content: {
-    ...shorthands.padding('16px'),
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('16px'),
+    gap: '16px',
   },
   progressContainer: {
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('8px'),
+    gap: '8px',
   },
   progressBar: {
     width: '100%',
@@ -55,12 +54,12 @@ const useStyles = makeStyles({
   metrics: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    ...shorthands.gap('12px'),
+    gap: '12px',
   },
   metric: {
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('4px'),
+    gap: '4px',
   },
   metricLabel: {
     fontSize: '12px',
@@ -75,7 +74,7 @@ const useStyles = makeStyles({
   recommendations: {
     display: 'flex',
     flexDirection: 'column',
-    ...shorthands.gap('8px'),
+    gap: '8px',
   },
   recommendationItem: {
     fontSize: '12px',
