@@ -16,10 +16,10 @@ const DecodeCborTables = [
 
 export class CCFDatabase {
   private client: DatabaseWorkerClient | null = null;
+  private config: DatabaseConfig;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  constructor(_config: DatabaseConfig) {
-    // Config is stored for future use if needed
+  constructor(config: DatabaseConfig) {
+    this.config = config;
   }
 
   async initialize(): Promise<void> {
@@ -62,30 +62,10 @@ export class CCFDatabase {
 
   async insertLedgerFile(filename: string, fileSize: number): Promise<number> {
     if (!this.client) throw new Error('Database not initialized');
-    
-    // Check if file already exists
-    const existing = await this.exec(
-      'SELECT id FROM ledger_files WHERE filename = ?',
-      [filename]
-    );
-    
-    if (existing.length > 0) {
-      // Update existing file
-      const fileId = existing[0].id as number;
-      await this.exec(`
-        UPDATE ledger_files 
-        SET file_size = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `, [fileSize, fileId]);
-      return fileId;
-    }
-    
-    // Insert new file
     await this.exec(`
-      INSERT INTO ledger_files (filename, file_size, updated_at)
+      INSERT OR REPLACE INTO ledger_files (filename, file_size, updated_at)
       VALUES (?, ?, CURRENT_TIMESTAMP)
     `, [filename, fileSize]);
-    
     const result = await this.exec('SELECT last_insert_rowid() as id');
     return result[0].id as number;
   }
@@ -98,11 +78,6 @@ export class CCFDatabase {
   async insertTransactionBatch(fileId: number, transactions: Transaction[]): Promise<number[]> {
     if (!this.client) throw new Error('Database not initialized');
     if (transactions.length === 0) return [];
-    
-    // Validate fileId
-    if (fileId === null || fileId === undefined || fileId <= 0) {
-      throw new Error(`Invalid fileId: ${fileId}. Must insert ledger file first.`);
-    }
 
     const txIds: number[] = [];
 

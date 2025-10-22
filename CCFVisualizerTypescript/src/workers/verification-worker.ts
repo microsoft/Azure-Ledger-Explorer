@@ -1,15 +1,15 @@
 // Simplified Verification Web Worker - Database-based approach with browser storage for progress
 
 import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '../utils/merkle-tree';
+import { CCFDatabase } from '../database/ccf-database';
 import type { 
   WorkerInMessage, 
   WorkerOutMessage,
   VerificationConfig
 } from '../types/verification-types';
 
-// Database connection in worker context
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let db: any = null;
+// Database instance in worker context
+let database: CCFDatabase | null = null;
 
 class VerificationWorker {
   private isRunning = false;
@@ -244,9 +244,9 @@ class VerificationWorker {
       this.postMessage({ type: 'error', data: { message: errorMessage } });
     } finally {
       this.isRunning = false;
-      if (db) {
-        db.close();
-        db = null;
+      if (database) {
+        await database.close();
+        database = null;
       }
     }
   }
@@ -306,29 +306,12 @@ class VerificationWorker {
 
   // Initialize database connection in worker context
   private async initializeDatabase(): Promise<void> {
-    // Import sql.js dynamically in worker
-    const initSqlJs = (await import('sql.js')).default;
-    const SQL = await initSqlJs({
-      locateFile: (file: string) => `https://sql.js.org/dist/${file}`
-    });
-
-    // Open the existing database from OPFS
-    const opfsRoot = await navigator.storage.getDirectory();
-    let dbData: Uint8Array;
-
-    try {
-      const dbFile = await opfsRoot.getFileHandle('ccf-ledger.db');
-      const file = await dbFile.getFile();
-      const arrayBuffer = await file.arrayBuffer();
-      dbData = new Uint8Array(arrayBuffer);
-    } catch {
-      throw new Error('Database not found. Please load ledger data first.');
-    }
-
-    db = new SQL.Database(dbData);
+    // Create a new database instance with default OPFS filename
+    database = new CCFDatabase({ filename: 'ccf-ledger.sqlite3', useOpfs: true });
+    await database.initialize();
   }
 
-  // Get transactions with their related data for verification (optimized single query)
+  // Get transactions with their related data for verification
   private async getTransactionsWithRelated(start: number, limit: number): Promise<Array<{
     txId: number;
     txHash: Uint8Array;
@@ -337,64 +320,15 @@ class VerificationWorker {
       value: string;
     }>;
   }>> {
-    if (!db) throw new Error('Database not initialized');
+    if (!database) throw new Error('Database not initialized');
 
-    // Single optimized query with LEFT JOIN to get all data at once
-    const result = db.exec(`
-      SELECT 
-        t.id as tx_id,
-        t.tx_digest,
-        kw.map_name,
-        kw.value_text
-      FROM transactions t
-      LEFT JOIN kv_writes kw ON t.id = kw.transaction_id AND kw.value_text IS NOT NULL
-      WHERE t.id >= ? AND t.id < ?
-      ORDER BY t.id, kw.map_name
-    `, [start + 1, start + limit + 1]); // +1 because transaction IDs are 1-based
-
-    if (result.length === 0) return [];
-
-    // Group the results by transaction
-    const transactionMap = new Map<number, {
-      txId: number;
-      txHash: Uint8Array;
-      tables: Array<{ storeName: string; value: string }>;
-    }>();
-
-    for (const row of result[0].values) {
-      const txId = row[0] as number;
-      const txDigest = new Uint8Array(row[1] as ArrayBuffer);
-      const mapName = row[2] as string | null;
-      const valueText = row[3] as string | null;
-
-      if (!transactionMap.has(txId)) {
-        transactionMap.set(txId, {
-          txId,
-          txHash: txDigest,
-          tables: []
-        });
-      }
-
-      // Only add table entries that have data
-      if (mapName && valueText) {
-        transactionMap.get(txId)!.tables.push({
-          storeName: mapName,
-          value: valueText
-        });
-      }
-    }
-
-    return Array.from(transactionMap.values());
+    return await database.getTransactionsWithRelated(start, limit);
   }
 
   private async getTotalTransactionsCount(): Promise<number> {
-    if (!db) throw new Error('Database not initialized');
+    if (!database) throw new Error('Database not initialized');
 
-    const result = db.exec(`SELECT COUNT(*) as count FROM transactions`);
-
-    if (result.length === 0 || result[0].values.length === 0) return 0;
-
-    return result[0].values[0][0] as number;
+    return await database.getTotalTransactionsCount();
   }
 }
 

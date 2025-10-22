@@ -236,13 +236,23 @@ export const useUploadLedgerFile = () => {
         transactionCount++;
       }
 
-      await db.save();
+      // OPFS auto-saves, no need to call save()
       return { fileId, transactionCount };
     },
     onSuccess: () => {
       // Invalidate all queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.enhancedStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ccfTables });
+      // Invalidate all transaction queries (they start with 'transactions')
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && query.queryKey[0] === 'transactions'
+      });
+      // Invalidate all search queries
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && (query.queryKey[0] === 'search' || query.queryKey[0] === 'searchByKeyOrValue')
+      });
     },
     onError: (error) => {
       console.error('Failed to upload and parse ledger file:', error);
@@ -265,7 +275,11 @@ export const useDeleteLedgerFile = () => {
       // Invalidate all queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats });
-      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.enhancedStats });
+      queryClient.invalidateQueries({ queryKey: queryKeys.ccfTables });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && query.queryKey[0] === 'transactions'
+      });
     },
     onError: (error) => {
       console.error('Failed to delete ledger file:', error);

@@ -26,8 +26,7 @@
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.27.0",
-    "remark-gfm": "^4.0.1",
-    "sql.js": "^1.13.0"
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
