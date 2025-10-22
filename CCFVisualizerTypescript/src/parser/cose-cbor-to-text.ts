@@ -4,7 +4,7 @@ import { Buffer } from "buffer";
 export function cborArrayToText(cbor: Uint8Array): any {
     const decoded: any = decode(cbor);
     
-    let output: Record<any, any> = {};
+    const output: Record<any, any> = {};
     let parts: any = [];
     if (decoded.tag === 18) {
         parts = decoded.contents;

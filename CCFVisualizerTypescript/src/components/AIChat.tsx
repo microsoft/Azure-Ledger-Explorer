@@ -488,7 +488,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     if (loadedMessages && loadedMessages.length) return loadedMessages;
     try {
       const raw = localStorage.getItem(MESSAGES_KEY);
-      return raw ? JSON.parse(raw).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })) : [];
+      return raw ? JSON.parse(raw).map((m: ChatMessage) => ({ ...m, timestamp: new Date(m.timestamp) })) : [];
     } catch { return []; }
   });
   const [currentMessage, setCurrentMessage] = useState('');
@@ -694,7 +694,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       throw new Error('Base URL is required to send the request');
     }
 
-    let input = `## User asks:\n${newMessage}`;
+    const input = `## User asks:\n${newMessage}`;
 
     const previousResponseId = messages.length > 0 ? messages[messages.length - 1].responseId : null;
 
@@ -765,7 +765,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     const sseDataPrefix = 'data: ';
     let fullResponseText = '';
     let responseId: string;
-    let annotations: Record<string, ChatAnnotation> = {};
+    const annotations: Record<string, ChatAnnotation> = {};
     try {
       while (true) {
         // Check if we should abort
@@ -808,7 +808,7 @@ export const AIChat: React.FC<AIChatProps> = ({
               } else if (data.type === 'response.output_text.annotation.added') {
                 // print annotation/reference/footnote in text
                 if (data.annotation_index >= 0) {
-                  let annotationref = data.annotation_index + 1;
+                  const annotationref = data.annotation_index + 1;
                   textDelta += ` [${annotationref}]`;
 
                   if (!annotations[data.annotation.file_id]) {

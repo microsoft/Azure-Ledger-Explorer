@@ -47,7 +47,7 @@ class MstClient implements IMstClient {
     // try parsing domain to ensure it's valid
     try {
       new URL(`https://${domain}`);
-    } catch (error) {
+    } catch {
       throw new Error(`Invalid domain provided: ${domain}`);
     }
     this.ledgerFilesUrl = `https://ledger-files-${domain}/ledger/`;

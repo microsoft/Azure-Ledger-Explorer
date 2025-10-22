@@ -381,8 +381,8 @@ const TablesPage: React.FC = () => {
             const first = 1;
             const last = totalPages;
             pages.push(first);
-            let start = Math.max(currentPage - showRange, 2);
-            let end = Math.min(currentPage + showRange, totalPages - 1);
+            const start = Math.max(currentPage - showRange, 2);
+            const end = Math.min(currentPage + showRange, totalPages - 1);
             if (start > 2) pages.push('ellipsis');
             for (let p = start; p <= end; p++) pages.push(p);
             if (end < totalPages - 1) pages.push('ellipsis');

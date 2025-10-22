@@ -4,7 +4,7 @@ import type { ChatMessage } from '../components/AIChat';
 import { ConversationHistory, saveConversationToHistory } from '../components/ConversationHistory';
 import type { SavedConversation } from '../types/conversation-types';
 import { useDatabase } from '../hooks/use-ccf-data';
-import { Spinner, Text, makeStyles, tokens, shorthands } from '@fluentui/react-components';
+import { Spinner, Text, makeStyles, tokens } from '@fluentui/react-components';
 
 const useStyles = makeStyles({
   container: {

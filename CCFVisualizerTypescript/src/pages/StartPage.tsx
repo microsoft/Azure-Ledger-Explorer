@@ -6,7 +6,6 @@ import {
   Button, 
   makeStyles, 
   tokens,
-  shorthands 
 } from '@fluentui/react-components';
 import { 
   Bot24Filled, 
