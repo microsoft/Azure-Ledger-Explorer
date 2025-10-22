@@ -6,6 +6,7 @@ import {
   Card,
   CardHeader,
   Spinner,
+  tokens,
 } from '@fluentui/react-components';
 import {
   DocumentMultiple24Regular,
@@ -39,7 +40,7 @@ const useStyles = makeStyles({
   },
   statIcon: {
     fontSize: '32px',
-    color: 'var(--colorBrandBackground)',
+    color: tokens.colorBrandBackground,
   },
   statInfo: {
     display: 'flex',
@@ -49,10 +50,10 @@ const useStyles = makeStyles({
   statValue: {
     fontSize: '24px',
     fontWeight: '600',
-    color: 'var(--colorNeutralForeground1)',
+    color: tokens.colorNeutralForeground1,
   },
   statLabel: {
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   loadingState: {
     display: 'flex',
@@ -63,7 +64,7 @@ const useStyles = makeStyles({
   emptyState: {
     textAlign: 'center',
     padding: '48px 24px',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   additionalMetrics: {
     marginTop: '24px',

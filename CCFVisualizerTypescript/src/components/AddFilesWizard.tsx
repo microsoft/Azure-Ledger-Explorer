@@ -7,7 +7,8 @@ import {
   DialogContent,
   Button,
   TabList,
-  Tab
+  Tab,
+  tokens,
 } from '@fluentui/react-components';
 import {
   CloudRegular,
@@ -57,7 +58,7 @@ const useStyles = makeStyles({
   rightPanel: {
     flex: '1',
     padding: '24px',
-    backgroundColor: 'var(--colorNeutralBackground2)',
+    backgroundColor: tokens.colorNeutralBackground2,
     display: 'flex',
     flexDirection: 'column',
     backgroundClip: 'padding-box',
@@ -74,7 +75,7 @@ const useStyles = makeStyles({
     overflow: 'auto',
   },
   helpContent: {
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
   emptyTabContent: {
     display: 'flex',
@@ -82,7 +83,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
     justifyContent: 'center',
     textAlign: 'center',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   comingSoonIcon: {
     fontSize: '48px',

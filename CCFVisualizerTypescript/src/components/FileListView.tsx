@@ -8,6 +8,7 @@ import {
   CardHeader,
   Badge,
   Spinner,
+  tokens,
 } from '@fluentui/react-components';
 import {
   DocumentRegular,
@@ -49,7 +50,7 @@ const useStyles = makeStyles({
   },
   fileIcon: {
     fontSize: '32px',
-    color: 'var(--colorBrandBackground)',
+    color: tokens.colorBrandBackground,
     flexShrink: 0,
   },
   fileInfo: {
@@ -61,7 +62,7 @@ const useStyles = makeStyles({
   },
   fileName: {
     fontWeight: '600',
-    color: 'var(--colorNeutralForeground1)',
+    color: tokens.colorNeutralForeground1,
     wordBreak: 'break-all',
   },
   fileDetails: {
@@ -71,7 +72,7 @@ const useStyles = makeStyles({
     alignItems: 'center',
   },
   fileMeta: {
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   fileActions: {
     display: 'flex',
@@ -81,7 +82,7 @@ const useStyles = makeStyles({
   emptyState: {
     textAlign: 'center',
     padding: '48px 24px',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   loadingState: {
     display: 'flex',

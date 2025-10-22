@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableHeaderCell,
   TableRow,
+  tokens,
 } from '@fluentui/react-components';
 import {
   Search24Regular,
@@ -47,22 +48,22 @@ const useStyles = makeStyles({
     maxWidth: '400px',
   },
   resultsTable: {
-    border: '1px solid var(--colorNeutralStroke2)',
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: '8px',
     overflow: 'hidden',
   },
   keyName: {
     fontFamily: 'monospace',
     fontWeight: '600',
-    color: 'var(--colorNeutralForeground1)',
+    color: tokens.colorNeutralForeground1,
   },
   mapName: {
     fontFamily: 'monospace',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
   sequenceNumber: {
     fontFamily: 'monospace',
-    color: 'var(--colorNeutralForeground2)',
+    color: tokens.colorNeutralForeground2,
   },
   loadingState: {
     display: 'flex',
@@ -73,7 +74,7 @@ const useStyles = makeStyles({
   emptyState: {
     textAlign: 'center',
     padding: '48px 24px',
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
   emptyIcon: {
     fontSize: '48px',
@@ -83,7 +84,7 @@ const useStyles = makeStyles({
     marginTop: '8px',
   },
   resultCount: {
-    color: 'var(--colorNeutralForeground3)',
+    color: tokens.colorNeutralForeground3,
   },
 });
 
