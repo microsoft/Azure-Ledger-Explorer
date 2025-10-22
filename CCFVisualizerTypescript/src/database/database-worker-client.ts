@@ -111,6 +111,51 @@ export class DatabaseWorkerClient {
   }
 
   /**
+   * Execute multiple SQL statements in a transaction using optimized prepared statements
+   */
+  async execBatchOptimized(statements: Array<{ sql: string; bind?: unknown[] }>): Promise<void> {
+    await this.readyPromise;
+
+    const id = this.messageId++;
+    
+    return new Promise((resolve, reject) => {
+      this.pendingMessages.set(id, { 
+        resolve: resolve as (result: unknown) => void, 
+        reject 
+      });
+      
+      this.worker.postMessage({
+        type: 'execBatchOptimized',
+        id,
+        payload: { statements },
+      });
+    }) as Promise<void>;
+  }
+
+  /**
+   * Insert a ledger file directly in the worker using transferable ArrayBuffer
+   */
+  async insertLedgerFile(filename: string, fileSize: number, arrayBuffer: ArrayBuffer): Promise<{ fileId: number; transactionCount: number }> {
+    await this.readyPromise;
+
+    const id = this.messageId++;
+    
+    return new Promise((resolve, reject) => {
+      this.pendingMessages.set(id, { 
+        resolve: resolve as (result: unknown) => void, 
+        reject 
+      });
+      
+      // Use transferable object to transfer ArrayBuffer ownership to worker
+      this.worker.postMessage({
+        type: 'insertLedgerFile',
+        id,
+        payload: { filename, fileSize, arrayBuffer },
+      }, [arrayBuffer]); // Transfer ownership of arrayBuffer
+    }) as Promise<{ fileId: number; transactionCount: number }>;
+  }
+
+  /**
    * Close the database and terminate the worker
    */
   async close(): Promise<void> {

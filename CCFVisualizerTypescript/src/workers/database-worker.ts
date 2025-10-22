@@ -200,6 +200,143 @@ self.onmessage = async (event: MessageEvent) => {
         break;
       }
 
+      case 'insertLedgerFile': {
+        // Import LedgerChunkV2 dynamically in the worker
+        const { LedgerChunkV2 } = await import('../parser/ledger-chunk');
+        
+        const { filename, fileSize, arrayBuffer } = payload;
+        
+        log(`Processing ledger file: ${filename} (${fileSize} bytes)`);
+        
+        // Insert file record
+        const fileResult = execSQL(db, `
+          SELECT id FROM ledger_files WHERE filename = ?
+        `, [filename]);
+        
+        let fileId: number;
+        if (fileResult.length > 0) {
+          fileId = (fileResult[0] as Record<string, unknown>).id as number;
+          execSQL(db, `
+            UPDATE ledger_files 
+            SET file_size = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `, [fileSize, fileId]);
+        } else {
+          db.exec({
+            sql: `INSERT INTO ledger_files (filename, file_size, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+            bind: [filename, fileSize]
+          });
+          const idResult = execSQL(db, 'SELECT last_insert_rowid() as id');
+          fileId = (idResult[0] as Record<string, unknown>).id as number;
+        }
+        
+        log(`File ID: ${fileId}, parsing transactions...`);
+        
+        // Parse ledger file
+        const ledgerChunk = new LedgerChunkV2(filename, arrayBuffer);
+        let transactionCount = 0;
+        
+        // Prepare statements for reuse
+        const txStmt = db.prepare(`
+          INSERT INTO transactions (
+            file_id, version, flags, size,
+            entry_type, tx_version, max_conflict_version,
+            tx_digest, transaction_id, tx_view
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `);
+        
+        const writeStmt = db.prepare(`
+          INSERT INTO kv_writes (transaction_id, map_name, key_name, value_text, version)
+          VALUES (?, ?, ?, ?, ?)
+        `);
+        
+        const deleteStmt = db.prepare(`
+          INSERT INTO kv_deletes (transaction_id, map_name, key_name, version)
+          VALUES (?, ?, ?, ?)
+        `);
+        
+        // Import CBOR decoder
+        const { cborArrayToText } = await import('../parser/cose-cbor-to-text');
+        const DecodeCborTables = ["public:scitt.entry"];
+        
+        // Process all transactions in a single transaction
+        db.exec('BEGIN IMMEDIATE TRANSACTION');
+        
+        try {
+          for await (const transaction of ledgerChunk.readAllTransactions()) {
+            // Insert transaction
+            txStmt.bind([
+              fileId,
+              transaction.header.version,
+              transaction.header.flags,
+              transaction.header.size,
+              transaction.publicDomain.entryType,
+              transaction.publicDomain.txVersion,
+              transaction.publicDomain.maxConflictVersion,
+              transaction.txDigest,
+              transaction.gcmHeader.view + '.' + transaction.publicDomain.txVersion,
+              transaction.gcmHeader.view,
+            ]);
+            txStmt.stepReset();
+            
+            // Get transaction ID
+            const txIdResult = execSQL(db, 'SELECT last_insert_rowid() as id');
+            const txId = (txIdResult[0] as Record<string, unknown>).id as number;
+            
+            // Insert writes
+            for (const write of transaction.publicDomain.writes) {
+              let valueText = '';
+              if (write.value && write.value.length > 0) {
+                try {
+                  if (DecodeCborTables.includes(write.mapName || '')) {
+                    valueText = cborArrayToText(write.value);
+                  } else {
+                    valueText = new TextDecoder('utf-8', { fatal: false }).decode(write.value);
+                  }
+                } catch {
+                  valueText = '';
+                }
+              }
+              
+              writeStmt.bind([txId, write.mapName || '', write.key, valueText, write.version]);
+              writeStmt.stepReset();
+            }
+            
+            // Insert deletes
+            for (const del of transaction.publicDomain.deletes) {
+              deleteStmt.bind([txId, del.mapName || '', del.key, del.version]);
+              deleteStmt.stepReset();
+            }
+            
+            transactionCount++;
+            
+            // Log progress every 1000 transactions
+            if (transactionCount % 1000 === 0) {
+              log(`Processed ${transactionCount} transactions...`);
+            }
+          }
+          
+          db.exec('COMMIT');
+          
+          // Finalize statements
+          txStmt.finalize();
+          writeStmt.finalize();
+          deleteStmt.finalize();
+          
+          log(`Completed: ${transactionCount} transactions inserted`);
+          
+          result = { fileId, transactionCount };
+        } catch (err) {
+          db.exec('ROLLBACK');
+          txStmt.finalize();
+          writeStmt.finalize();
+          deleteStmt.finalize();
+          throw err;
+        }
+        
+        break;
+      }
+
       case 'execBatch': {
         // Execute multiple SQL statements in a transaction
         db.exec('BEGIN IMMEDIATE TRANSACTION');
@@ -210,6 +347,40 @@ self.onmessage = async (event: MessageEvent) => {
               sql: stmt.sql,
               bind: stmt.bind || [],
             });
+          }
+          
+          db.exec('COMMIT');
+          result = { success: true };
+        } catch (err) {
+          db.exec('ROLLBACK');
+          throw err;
+        }
+        break;
+      }
+
+      case 'execBatchOptimized': {
+        // Optimized batch execution using prepared statements
+        db.exec('BEGIN IMMEDIATE TRANSACTION');
+        
+        try {
+          const stmtMap = new Map();
+          
+          for (const item of payload.statements) {
+            // Reuse prepared statements for the same SQL
+            if (!stmtMap.has(item.sql)) {
+              stmtMap.set(item.sql, db.prepare(item.sql));
+            }
+            
+            const stmt = stmtMap.get(item.sql);
+            if (item.bind && item.bind.length > 0) {
+              stmt.bind(item.bind);
+            }
+            stmt.stepReset();
+          }
+          
+          // Finalize all prepared statements
+          for (const stmt of stmtMap.values()) {
+            stmt.finalize();
           }
           
           db.exec('COMMIT');

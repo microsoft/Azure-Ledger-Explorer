@@ -57,7 +57,12 @@ export class CCFDatabase {
 
   private async execBatch(statements: Array<{ sql: string; bind?: unknown[] }>): Promise<void> {
     if (!this.client) throw new Error('Database not initialized');
-    await this.client.execBatch(statements);
+    // Use optimized batch for large operations
+    if (statements.length > 50) {
+      await this.client.execBatchOptimized(statements);
+    } else {
+      await this.client.execBatch(statements);
+    }
   }
 
   async insertLedgerFile(filename: string, fileSize: number): Promise<number> {
@@ -90,6 +95,13 @@ export class CCFDatabase {
     return result[0].id as number;
   }
 
+  async insertLedgerFileWithData(filename: string, fileSize: number, arrayBuffer: ArrayBuffer): Promise<{ fileId: number; transactionCount: number }> {
+    if (!this.client) throw new Error('Database not initialized');
+    
+    // Use the worker's optimized insertLedgerFile that processes everything
+    return await this.client.insertLedgerFile(filename, fileSize, arrayBuffer);
+  }
+
   async insertTransaction(fileId: number, transaction: Transaction): Promise<number> {
     const result = await this.insertTransactionBatch(fileId, [transaction]);
     return result[0];
@@ -104,14 +116,12 @@ export class CCFDatabase {
       throw new Error(`Invalid fileId: ${fileId}. Must insert ledger file first.`);
     }
 
-    const txIds: number[] = [];
+    // Prepare all statements for insertion in a single batch
+    const allStatements: Array<{ sql: string; bind?: unknown[] }> = [];
 
-    // Process each transaction individually to get proper IDs
+    // First, insert all transactions
     for (const transaction of transactions) {
-      const statements: Array<{ sql: string; bind?: unknown[] }> = [];
-
-      // Insert transaction
-      statements.push({
+      allStatements.push({
         sql: `
           INSERT INTO transactions (
             file_id, version, flags, size,
@@ -132,18 +142,29 @@ export class CCFDatabase {
           transaction.gcmHeader.view,
         ],
       });
+    }
 
-      await this.execBatch(statements);
+    // Execute all transaction inserts in a single batch
+    await this.execBatch(allStatements);
 
-      // Get the inserted transaction ID
-      const result = await this.exec('SELECT last_insert_rowid() as id');
-      const txId = result[0].id as number;
-      txIds.push(txId);
+    // Get the range of inserted IDs
+    const result = await this.exec(`
+      SELECT id FROM transactions 
+      WHERE file_id = ? 
+      ORDER BY id DESC 
+      LIMIT ?
+    `, [fileId, transactions.length]);
+    
+    const txIds = result.map(r => r.id as number).reverse();
 
-      // Now insert writes and deletes for this transaction
-      const writeDeleteStatements: Array<{ sql: string; bind?: unknown[] }> = [];
+    // Now insert all writes and deletes
+    const writeDeleteStatements: Array<{ sql: string; bind?: unknown[] }> = [];
+    
+    for (let i = 0; i < transactions.length; i++) {
+      const transaction = transactions[i];
+      const txId = txIds[i];
 
-      // Insert writes
+      // Insert writes for this transaction
       for (const write of transaction.publicDomain.writes) {
         const valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
         writeDeleteStatements.push({
@@ -155,7 +176,7 @@ export class CCFDatabase {
         });
       }
 
-      // Insert deletes
+      // Insert deletes for this transaction
       for (const del of transaction.publicDomain.deletes) {
         writeDeleteStatements.push({
           sql: `
@@ -165,10 +186,11 @@ export class CCFDatabase {
           bind: [txId, del.mapName || '', del.key, del.version],
         });
       }
+    }
 
-      if (writeDeleteStatements.length > 0) {
-        await this.execBatch(writeDeleteStatements);
-      }
+    // Execute all write/delete inserts in a single batch
+    if (writeDeleteStatements.length > 0) {
+      await this.execBatch(writeDeleteStatements);
     }
 
     return txIds;
