@@ -433,6 +433,30 @@ export class CCFDatabase {
     };
   }
 
+  async getTransactionByDigest(digestBytes: Uint8Array): Promise<{
+    transactionId: number;
+    txDigest: Uint8Array;
+  } | null> {
+    if (!this.client) throw new Error('Database not initialized');
+
+    const result = await this.exec(`
+      SELECT sequence_no, tx_digest 
+      FROM transactions 
+      WHERE tx_digest = ?
+      LIMIT 1
+    `, [digestBytes]);
+
+    if (result.length === 0) {
+      return null;
+    }
+
+    const row = result[0];
+    return {
+      transactionId: row.sequence_no as number,
+      txDigest: new Uint8Array(row.tx_digest as ArrayBuffer)
+    };
+  }
+
   async searchByKey(keyName: string, limit = 50): Promise<Array<{
     transactionId: number;
     mapName: string;

@@ -83,27 +83,8 @@ export class WriteReceiptLedgerService {
     txDigest: Uint8Array;
   } | null> {
     try {
-      // We need to access the database directly since executeQuery doesn't support parameters
-      if (!this.db['db']) {
-        throw new Error('Database not initialized');
-      }
-
-      const result = this.db['db'].exec(`
-        SELECT id, tx_digest 
-        FROM transactions 
-        WHERE tx_digest = ?
-        LIMIT 1
-      `, [digestBytes]);
-
-      if (result.length === 0 || result[0].values.length === 0) {
-        return null;
-      }
-
-      const row = result[0].values[0];
-      return {
-        transactionId: row[0] as number,
-        txDigest: new Uint8Array(row[1] as ArrayBuffer)
-      };
+      // Use the new public API method
+      return await this.db.getTransactionByDigest(digestBytes);
     } catch (error) {
       console.error('Error finding transaction by digest:', error);
       return null;
