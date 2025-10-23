@@ -57,9 +57,9 @@ const createTables = (db: SQLiteDB) => {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
 
-    // Transactions table
+    // Transactions table - using sequence_no as PRIMARY KEY (unique from ledger)
     `CREATE TABLE IF NOT EXISTS transactions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sequence_no INTEGER PRIMARY KEY,
       file_id INTEGER NOT NULL,
       version INTEGER NOT NULL,
       flags INTEGER NOT NULL,
@@ -77,32 +77,32 @@ const createTables = (db: SQLiteDB) => {
     // Key-value pairs table for writes
     `CREATE TABLE IF NOT EXISTS kv_writes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      transaction_id INTEGER NOT NULL,
+      sequence_no INTEGER NOT NULL,
       map_name TEXT NOT NULL,
       key_name TEXT NOT NULL,
       value_text TEXT,
       version INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+      FOREIGN KEY (sequence_no) REFERENCES transactions(sequence_no) ON DELETE CASCADE
     )`,
 
     // Key-value pairs table for deletes
     `CREATE TABLE IF NOT EXISTS kv_deletes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      transaction_id INTEGER NOT NULL,
+      sequence_no INTEGER NOT NULL,
       map_name TEXT NOT NULL,
       key_name TEXT NOT NULL,
       version INTEGER NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+      FOREIGN KEY (sequence_no) REFERENCES transactions(sequence_no) ON DELETE CASCADE
     )`,
 
     // Indexes for better query performance
     `CREATE INDEX IF NOT EXISTS idx_transactions_file_id ON transactions(file_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_kv_writes_transaction_id ON kv_writes(transaction_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_kv_writes_sequence_no ON kv_writes(sequence_no)`,
     `CREATE INDEX IF NOT EXISTS idx_kv_writes_map_key ON kv_writes(map_name, key_name)`,
     `CREATE INDEX IF NOT EXISTS idx_kv_writes_value_text ON kv_writes(value_text)`,
-    `CREATE INDEX IF NOT EXISTS idx_kv_deletes_transaction_id ON kv_deletes(transaction_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_kv_deletes_sequence_no ON kv_deletes(sequence_no)`,
     `CREATE INDEX IF NOT EXISTS idx_kv_deletes_map_key ON kv_deletes(map_name, key_name)`
   ];
 
@@ -239,19 +239,19 @@ self.onmessage = async (event: MessageEvent) => {
         // Prepare statements for reuse
         const txStmt = db.prepare(`
           INSERT INTO transactions (
-            file_id, version, flags, size,
+            sequence_no, file_id, version, flags, size,
             entry_type, tx_version, max_conflict_version,
             tx_digest, transaction_id, tx_view
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
         
         const writeStmt = db.prepare(`
-          INSERT INTO kv_writes (transaction_id, map_name, key_name, value_text, version)
+          INSERT INTO kv_writes (sequence_no, map_name, key_name, value_text, version)
           VALUES (?, ?, ?, ?, ?)
         `);
         
         const deleteStmt = db.prepare(`
-          INSERT INTO kv_deletes (transaction_id, map_name, key_name, version)
+          INSERT INTO kv_deletes (sequence_no, map_name, key_name, version)
           VALUES (?, ?, ?, ?)
         `);
         
@@ -264,8 +264,12 @@ self.onmessage = async (event: MessageEvent) => {
         
         try {
           for await (const transaction of ledgerChunk.readAllTransactions()) {
-            // Insert transaction
+            // Use sequence number from the ledger as the primary key
+            const seqNo = transaction.gcmHeader.seqNo;
+            
+            // Insert transaction with sequence number as primary key
             txStmt.bind([
+              seqNo,
               fileId,
               transaction.header.version,
               transaction.header.flags,
@@ -279,11 +283,7 @@ self.onmessage = async (event: MessageEvent) => {
             ]);
             txStmt.stepReset();
             
-            // Get transaction ID
-            const txIdResult = execSQL(db, 'SELECT last_insert_rowid() as id');
-            const txId = (txIdResult[0] as Record<string, unknown>).id as number;
-            
-            // Insert writes
+            // Insert writes using sequence number as foreign key
             for (const write of transaction.publicDomain.writes) {
               let valueText = '';
               if (write.value && write.value.length > 0) {
@@ -298,13 +298,13 @@ self.onmessage = async (event: MessageEvent) => {
                 }
               }
               
-              writeStmt.bind([txId, write.mapName || '', write.key, valueText, write.version]);
+              writeStmt.bind([seqNo, write.mapName || '', write.key, valueText, write.version]);
               writeStmt.stepReset();
             }
             
-            // Insert deletes
+            // Insert deletes using sequence number as foreign key
             for (const del of transaction.publicDomain.deletes) {
-              deleteStmt.bind([txId, del.mapName || '', del.key, del.version]);
+              deleteStmt.bind([seqNo, del.mapName || '', del.key, del.version]);
               deleteStmt.stepReset();
             }
             
@@ -396,6 +396,65 @@ self.onmessage = async (event: MessageEvent) => {
         db.close();
         result = { success: true };
         break;
+
+      case 'deleteDatabase': {
+        // Delete the OPFS database file completely
+        try {
+          // First close the current database connection
+          if (db) {
+            db.close();
+          }
+
+          // Re-initialize sqlite3 to get access to OPFS utilities
+          const sqlite3 = await sqlite3InitModule({ 
+            print: log, 
+            printErr: error 
+          });
+
+          // Check if OPFS is available and delete the database file
+          if ('opfs' in sqlite3) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const opfsUtil = (sqlite3 as any).opfs;
+            const dbPath = '/ccf-ledger.sqlite3';
+            
+            try {
+              await opfsUtil.unlink(dbPath);
+              log('OPFS database file deleted successfully');
+            } catch (unlinkErr) {
+              // File might not exist, which is okay
+              log('Could not delete OPFS file (may not exist):', unlinkErr);
+            }
+
+            // Recreate the database
+            db = new sqlite3.oo1.OpfsDb(dbPath);
+            log('New OPFS database created at', db.filename);
+          } else {
+            // For non-OPFS (transient) databases, just recreate
+            db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+            log('New transient database created');
+          }
+
+          // Drop any existing tables first (belt and suspenders approach)
+          try {
+            db.exec('DROP TABLE IF EXISTS kv_deletes');
+            db.exec('DROP TABLE IF EXISTS kv_writes');
+            db.exec('DROP TABLE IF EXISTS transactions');
+            db.exec('DROP TABLE IF EXISTS ledger_files');
+            log('Dropped any existing tables');
+          } catch (dropErr) {
+            log('No existing tables to drop (this is fine):', dropErr);
+          }
+
+          // Create tables in the new database
+          createTables(db);
+          
+          result = { success: true };
+        } catch (deleteErr) {
+          error('Failed to delete database:', deleteErr);
+          throw deleteErr;
+        }
+        break;
+      }
 
       default:
         throw new Error(`Unknown message type: ${type}`);

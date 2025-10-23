@@ -259,12 +259,14 @@ export const ConfigPage: React.FC = () => {
                           Are you sure you want to drop the entire database? This will:
                         </Body1>
                         <ul>
-                          <li>Remove all tables and data completely</li>
-                          <li>Reset the database schema to its initial state</li>
+                          <li>Completely delete the OPFS database file from disk</li>
+                          <li>Remove all tables, indexes, and data</li>
+                          <li>Create a fresh database with a clean schema</li>
                           <li>Free up all storage space used by the database</li>
                         </ul>
                         <Body1>
-                          This is more thorough than "Clear All Data" and will completely reset the database structure.
+                          <strong>This is the "nuclear option"</strong> - it completely wipes the database file and recreates it from scratch.
+                          Use this if the database is corrupted or you want a completely fresh start.
                           This action cannot be undone.
                         </Body1>
                       </DialogBody>

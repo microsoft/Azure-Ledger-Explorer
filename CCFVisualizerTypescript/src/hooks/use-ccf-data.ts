@@ -279,8 +279,9 @@ export const useClearAllData = () => {
       verificationService.clearSavedProgress();
     },
     onSuccess: () => {
-      // Invalidate all queries to refresh the UI
-      queryClient.invalidateQueries();
+      // Reset all queries to clear cached data and force re-fetch
+      // This ensures the UI immediately shows empty state
+      queryClient.resetQueries();
     },
     onError: (error) => {
       console.error('Failed to clear all data:', error);
@@ -290,6 +291,7 @@ export const useClearAllData = () => {
 
 /**
  * Hook to drop the entire database (complete reset)
+ * Uses the nuclear option to delete the OPFS database file completely
  */
 export const useDropDatabase = () => {
   const queryClient = useQueryClient();
@@ -297,14 +299,16 @@ export const useDropDatabase = () => {
   return useMutation({
     mutationFn: async () => {
       const db = await getDatabase();
-      await db.dropDatabase();
+      // Nuclear option: completely delete and recreate the OPFS database file
+      await db.deleteAndRecreateDatabase();
       
       // Clear verification progress since database is reset
       verificationService.clearSavedProgress();
     },
     onSuccess: () => {
-      // Invalidate all queries to refresh the UI
-      queryClient.invalidateQueries();
+      // Reset all queries to clear cached data and force re-fetch
+      // This ensures the UI immediately shows empty state
+      queryClient.resetQueries();
     },
     onError: (error) => {
       console.error('Failed to drop database:', error);

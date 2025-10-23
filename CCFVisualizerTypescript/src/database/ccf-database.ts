@@ -124,12 +124,13 @@ export class CCFDatabase {
       allStatements.push({
         sql: `
           INSERT INTO transactions (
-            file_id, version, flags, size,
+            sequence_no, file_id, version, flags, size,
             entry_type, tx_version, max_conflict_version,
             tx_digest, transaction_id, tx_view
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         bind: [
+          transaction.gcmHeader.seqNo,
           fileId,
           transaction.header.version,
           transaction.header.flags,
@@ -147,32 +148,25 @@ export class CCFDatabase {
     // Execute all transaction inserts in a single batch
     await this.execBatch(allStatements);
 
-    // Get the range of inserted IDs
-    const result = await this.exec(`
-      SELECT id FROM transactions 
-      WHERE file_id = ? 
-      ORDER BY id DESC 
-      LIMIT ?
-    `, [fileId, transactions.length]);
-    
-    const txIds = result.map(r => r.id as number).reverse();
+    // Get the sequence numbers we just inserted
+    const seqNos = transactions.map(t => t.gcmHeader.seqNo);
 
     // Now insert all writes and deletes
     const writeDeleteStatements: Array<{ sql: string; bind?: unknown[] }> = [];
     
     for (let i = 0; i < transactions.length; i++) {
       const transaction = transactions[i];
-      const txId = txIds[i];
+      const seqNo = seqNos[i];
 
       // Insert writes for this transaction
       for (const write of transaction.publicDomain.writes) {
         const valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
         writeDeleteStatements.push({
           sql: `
-            INSERT INTO kv_writes (transaction_id, map_name, key_name, value_text, version)
+            INSERT INTO kv_writes (sequence_no, map_name, key_name, value_text, version)
             VALUES (?, ?, ?, ?, ?)
           `,
-          bind: [txId, write.mapName || '', write.key, valueText, write.version],
+          bind: [seqNo, write.mapName || '', write.key, valueText, write.version],
         });
       }
 
@@ -180,10 +174,10 @@ export class CCFDatabase {
       for (const del of transaction.publicDomain.deletes) {
         writeDeleteStatements.push({
           sql: `
-            INSERT INTO kv_deletes (transaction_id, map_name, key_name, version)
+            INSERT INTO kv_deletes (sequence_no, map_name, key_name, version)
             VALUES (?, ?, ?, ?)
           `,
-          bind: [txId, del.mapName || '', del.key, del.version],
+          bind: [seqNo, del.mapName || '', del.key, del.version],
         });
       }
     }
@@ -193,7 +187,7 @@ export class CCFDatabase {
       await this.execBatch(writeDeleteStatements);
     }
 
-    return txIds;
+    return seqNos;
   }
 
   async getLedgerFiles(): Promise<Array<{
@@ -246,19 +240,19 @@ export class CCFDatabase {
 
     const result = await this.exec(`
       SELECT 
-        id, version, flags, 
+        sequence_no, version, flags, 
         size, entry_type, tx_version, 
         max_conflict_version, 
         transaction_id as tx_id, 
         tx_view
       FROM transactions
       WHERE file_id = ?
-      ORDER BY id
+      ORDER BY sequence_no
       LIMIT ? OFFSET ?
     `, [fileId, limit, offset]);
 
     return result.map((row) => ({
-      id: row.id as number,
+      id: row.sequence_no as number,
       version: row.version as number,
       flags: row.flags as number,
       size: row.size as number,
@@ -288,11 +282,11 @@ export class CCFDatabase {
 
     let sql = `
       SELECT DISTINCT
-        t.id, t.file_id, f.filename, t.version, t.flags, t.size,
+        t.sequence_no as id, t.file_id, f.filename, t.version, t.flags, t.size,
         t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
-        (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
-        (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
-        (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
+        (SELECT COUNT(*) FROM kv_writes WHERE sequence_no = t.sequence_no) as write_count,
+        (SELECT COUNT(*) FROM kv_deletes WHERE sequence_no = t.sequence_no) as delete_count,
+        (SELECT map_name FROM kv_writes WHERE sequence_no = t.sequence_no LIMIT 1) as map_name
       FROM transactions t
       JOIN ledger_files f ON t.file_id = f.id
       WHERE t.file_id = ?
@@ -303,18 +297,18 @@ export class CCFDatabase {
     if (searchQuery && searchQuery.trim()) {
       sql += ` AND (
         f.filename LIKE ? OR
-        CAST(t.id AS TEXT) LIKE ? OR
+        CAST(t.sequence_no AS TEXT) LIKE ? OR
         CAST(t.version AS TEXT) LIKE ? OR
         EXISTS (
           SELECT 1 FROM kv_writes kw 
-          WHERE kw.transaction_id = t.id AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
+          WHERE kw.sequence_no = t.sequence_no AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
         )
       )`;
       const searchPattern = `%${searchQuery.trim()}%`;
       params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
 
-    sql += ` ORDER BY t.id LIMIT ? OFFSET ?`;
+    sql += ` ORDER BY t.sequence_no LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const result = await this.exec(sql, params);
@@ -352,11 +346,11 @@ export class CCFDatabase {
     if (searchQuery && searchQuery.trim()) {
       sql += ` AND (
         f.filename LIKE ? OR
-        CAST(t.id AS TEXT) LIKE ? OR
+        CAST(t.sequence_no AS TEXT) LIKE ? OR
         CAST(t.version AS TEXT) LIKE ? OR
         EXISTS (
           SELECT 1 FROM kv_writes kw 
-          WHERE kw.transaction_id = t.id AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
+          WHERE kw.sequence_no = t.sequence_no AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
         )
       )`;
       const searchPattern = `%${searchQuery.trim()}%`;
@@ -373,7 +367,7 @@ export class CCFDatabase {
     const result = await this.exec(`
       SELECT key_name, value_text, version, map_name
       FROM kv_writes
-      WHERE transaction_id = ?
+      WHERE sequence_no = ?
       ORDER BY map_name, key_name
     `, [transactionId]);
 
@@ -391,7 +385,7 @@ export class CCFDatabase {
     const result = await this.exec(`
       SELECT key_name, version, map_name
       FROM kv_deletes
-      WHERE transaction_id = ?
+      WHERE sequence_no = ?
       ORDER BY map_name, key_name
     `, [transactionId]);
 
@@ -407,14 +401,14 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
 
     const result = await this.exec(`
-      SELECT t.id, t.file_id, lf.filename, t.version, t.flags,
+      SELECT t.sequence_no as id, t.file_id, lf.filename, t.version, t.flags,
         t.size, t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
-        (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
-        (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
+        (SELECT COUNT(*) FROM kv_writes WHERE sequence_no = t.sequence_no) as write_count,
+        (SELECT COUNT(*) FROM kv_deletes WHERE sequence_no = t.sequence_no) as delete_count,
         lf.file_size
       FROM transactions t
       LEFT JOIN ledger_files lf ON t.file_id = lf.id
-      WHERE t.id = ?
+      WHERE t.sequence_no = ?
     `, [transactionId]);
 
     if (result.length === 0) return null;
@@ -450,17 +444,17 @@ export class CCFDatabase {
 
     const result = await this.exec(`
       SELECT 
-        t.id, w.map_name, w.key_name, 1 as has_value, w.version
+        t.sequence_no as id, w.map_name, w.key_name, 1 as has_value, w.version
       FROM transactions t
-      JOIN kv_writes w ON t.id = w.transaction_id
+      JOIN kv_writes w ON t.sequence_no = w.sequence_no
       WHERE w.key_name LIKE ?
       
       UNION ALL
       
       SELECT 
-        t.id, d.map_name, d.key_name, 0 as has_value, d.version
+        t.sequence_no as id, d.map_name, d.key_name, 0 as has_value, d.version
       FROM transactions t
-      JOIN kv_deletes d ON t.id = d.transaction_id
+      JOIN kv_deletes d ON t.sequence_no = d.sequence_no
       WHERE d.key_name LIKE ?
       
       ORDER BY id
@@ -491,25 +485,25 @@ export class CCFDatabase {
 
     const result = await this.exec(`
       SELECT 
-        t.id, w.map_name, w.key_name, 1 as has_value, w.version, 'key' as match_type, w.key_name as matched_text
+        t.sequence_no as id, w.map_name, w.key_name, 1 as has_value, w.version, 'key' as match_type, w.key_name as matched_text
       FROM transactions t
-      JOIN kv_writes w ON t.id = w.transaction_id
+      JOIN kv_writes w ON t.sequence_no = w.sequence_no
       WHERE w.key_name LIKE ?
       
       UNION ALL
       
       SELECT 
-        t.id, w.map_name, w.key_name, 1 as has_value, w.version, 'value' as match_type, w.value_text as matched_text
+        t.sequence_no as id, w.map_name, w.key_name, 1 as has_value, w.version, 'value' as match_type, w.value_text as matched_text
       FROM transactions t
-      JOIN kv_writes w ON t.id = w.transaction_id
+      JOIN kv_writes w ON t.sequence_no = w.sequence_no
       WHERE w.value_text IS NOT NULL AND w.value_text LIKE ? AND w.key_name NOT LIKE ?
       
       UNION ALL
       
       SELECT 
-        t.id, d.map_name, d.key_name, 0 as has_value, d.version, 'key' as match_type, d.key_name as matched_text
+        t.sequence_no as id, d.map_name, d.key_name, 0 as has_value, d.version, 'key' as match_type, d.key_name as matched_text
       FROM transactions t
-      JOIN kv_deletes d ON t.id = d.transaction_id
+      JOIN kv_deletes d ON t.sequence_no = d.sequence_no
       WHERE d.key_name LIKE ?
       
       ORDER BY id
@@ -680,11 +674,11 @@ export class CCFDatabase {
 
     let sql = `
       SELECT DISTINCT
-        t.id, t.file_id, f.filename, t.version, t.flags, t.size,
+        t.sequence_no as id, t.file_id, f.filename, t.version, t.flags, t.size,
         t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
-        (SELECT COUNT(*) FROM kv_writes WHERE transaction_id = t.id) as write_count,
-        (SELECT COUNT(*) FROM kv_deletes WHERE transaction_id = t.id) as delete_count,
-        (SELECT map_name FROM kv_writes WHERE transaction_id = t.id LIMIT 1) as map_name
+        (SELECT COUNT(*) FROM kv_writes WHERE sequence_no = t.sequence_no) as write_count,
+        (SELECT COUNT(*) FROM kv_deletes WHERE sequence_no = t.sequence_no) as delete_count,
+        (SELECT map_name FROM kv_writes WHERE sequence_no = t.sequence_no LIMIT 1) as map_name
       FROM transactions t
       JOIN ledger_files f ON t.file_id = f.id
     `;
@@ -696,10 +690,10 @@ export class CCFDatabase {
         WHERE (
           f.filename LIKE ? OR
           EXISTS (
-            SELECT 1 FROM kv_writes w WHERE w.transaction_id = t.id AND (w.key_name LIKE ? OR w.map_name LIKE ?)
+            SELECT 1 FROM kv_writes w WHERE w.sequence_no = t.sequence_no AND (w.key_name LIKE ? OR w.map_name LIKE ?)
           ) OR
           EXISTS (
-            SELECT 1 FROM kv_deletes d WHERE d.transaction_id = t.id AND (d.key_name LIKE ? OR d.map_name LIKE ?)
+            SELECT 1 FROM kv_deletes d WHERE d.sequence_no = t.sequence_no AND (d.key_name LIKE ? OR d.map_name LIKE ?)
           )
         )
       `;
@@ -708,7 +702,7 @@ export class CCFDatabase {
     }
 
     sql += `
-      ORDER BY t.file_id, t.id
+      ORDER BY t.file_id, t.sequence_no
       LIMIT ? OFFSET ?
     `;
     params.push(limit, offset);
@@ -737,7 +731,7 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
 
     let sql = `
-      SELECT COUNT(DISTINCT t.id) as total
+      SELECT COUNT(DISTINCT t.sequence_no) as total
       FROM transactions t
       JOIN ledger_files f ON t.file_id = f.id
     `;
@@ -749,10 +743,10 @@ export class CCFDatabase {
         WHERE (
           f.filename LIKE ? OR
           EXISTS (
-            SELECT 1 FROM kv_writes w WHERE w.transaction_id = t.id AND (w.key_name LIKE ? OR w.map_name LIKE ?)
+            SELECT 1 FROM kv_writes w WHERE w.sequence_no = t.sequence_no AND (w.key_name LIKE ? OR w.map_name LIKE ?)
           ) OR
           EXISTS (
-            SELECT 1 FROM kv_deletes d WHERE d.transaction_id = t.id AND (d.key_name LIKE ? OR d.map_name LIKE ?)
+            SELECT 1 FROM kv_deletes d WHERE d.sequence_no = t.sequence_no AND (d.key_name LIKE ? OR d.map_name LIKE ?)
           )
         )
       `;
@@ -794,14 +788,14 @@ export class CCFDatabase {
         kv.key_name,
         kv.value_text,
         kv.version,
-        kv.transaction_id,
+        kv.sequence_no,
         kv.is_deleted
       FROM (
         SELECT 
           key_name,
           value_text,
           version,
-          transaction_id,
+          sequence_no,
           0 as is_deleted
         FROM kv_writes
         WHERE map_name = ?
@@ -810,7 +804,7 @@ export class CCFDatabase {
           key_name,
           NULL as value_text,
           version,
-          transaction_id,
+          sequence_no,
           1 as is_deleted
         FROM kv_deletes
         WHERE map_name = ?
@@ -843,7 +837,7 @@ export class CCFDatabase {
       keyName: row.key_name as string,
       value: row.value_text ? new TextEncoder().encode(row.value_text as string) : null,
       version: row.version as number,
-      transactionId: row.transaction_id as number,
+      transactionId: row.sequence_no as number,
       isDeleted: (row.is_deleted as number) === 1,
     }));
   }
@@ -874,8 +868,8 @@ export class CCFDatabase {
           lv.key_name,
           COALESCE(w.value_text, NULL) as value_text,
           lv.max_version as version,
-          COALESCE(w.transaction_id, d.transaction_id) as transaction_id,
-          CASE WHEN d.transaction_id IS NOT NULL THEN 1 ELSE 0 END as is_deleted
+          COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
+          CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted
         FROM latest_versions lv
         LEFT JOIN kv_writes w ON lv.key_name = w.key_name 
           AND lv.max_version = w.version 
@@ -888,7 +882,7 @@ export class CCFDatabase {
         lo.key_name,
         lo.value_text,
         lo.version,
-        lo.transaction_id,
+        lo.sequence_no,
         lo.is_deleted
       FROM latest_operations lo
     `;
@@ -919,7 +913,7 @@ export class CCFDatabase {
       keyName: row.key_name as string,
       value: row.value_text ? new TextEncoder().encode(row.value_text as string) : null,
       version: row.version as number,
-      transactionId: row.transaction_id as number,
+      transactionId: row.sequence_no as number,
       isDeleted: (row.is_deleted as number) === 1,
     }));
   }
@@ -944,8 +938,8 @@ export class CCFDatabase {
           lv.key_name,
           COALESCE(w.value_text, NULL) as value_text,
           lv.max_version as version,
-          COALESCE(w.transaction_id, d.transaction_id) as transaction_id,
-          CASE WHEN d.transaction_id IS NOT NULL THEN 1 ELSE 0 END as is_deleted
+          COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
+          CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted
         FROM latest_versions lv
         LEFT JOIN kv_writes w ON lv.key_name = w.key_name 
           AND lv.max_version = w.version 
@@ -986,14 +980,14 @@ export class CCFDatabase {
 
     const result = await this.exec(`
       SELECT 
-        ops.transaction_id,
+        ops.sequence_no,
         ops.version,
         ops.operation_type,
         ops.value_text,
         f.filename
       FROM (
         SELECT 
-          transaction_id,
+          sequence_no,
           version,
           'write' as operation_type,
           value_text
@@ -1001,21 +995,21 @@ export class CCFDatabase {
         WHERE map_name = ? AND key_name = ?
         UNION ALL
         SELECT 
-          transaction_id,
+          sequence_no,
           version,
           'delete' as operation_type,
           NULL as value_text
         FROM kv_deletes
         WHERE map_name = ? AND key_name = ?
       ) AS ops
-      JOIN transactions t ON ops.transaction_id = t.id
+      JOIN transactions t ON ops.sequence_no = t.sequence_no
       JOIN ledger_files f ON t.file_id = f.id
       ORDER BY ops.version DESC
       LIMIT ? OFFSET ?
     `, [mapName, keyName, mapName, keyName, limit, offset]);
 
     return result.map((row) => ({
-      transactionId: row.transaction_id as number,
+      transactionId: row.sequence_no as number,
       version: row.version as number,
       operationType: row.operation_type as 'write' | 'delete',
       value: row.value_text ? new TextEncoder().encode(row.value_text as string) : null,
@@ -1032,13 +1026,26 @@ export class CCFDatabase {
       { sql: 'DROP TABLE IF EXISTS transactions' },
       { sql: 'DROP TABLE IF EXISTS ledger_files' },
       { sql: 'DROP INDEX IF EXISTS idx_transactions_file_id' },
-      { sql: 'DROP INDEX IF EXISTS idx_kv_writes_transaction_id' },
+      { sql: 'DROP INDEX IF EXISTS idx_kv_writes_sequence_no' },
       { sql: 'DROP INDEX IF EXISTS idx_kv_writes_map_key' },
       { sql: 'DROP INDEX IF EXISTS idx_kv_writes_value_text' },
-      { sql: 'DROP INDEX IF EXISTS idx_kv_deletes_transaction_id' },
+      { sql: 'DROP INDEX IF EXISTS idx_kv_deletes_sequence_no' },
       { sql: 'DROP INDEX IF EXISTS idx_kv_deletes_map_key' },
       { sql: 'DELETE FROM sqlite_sequence' },
     ]);
+  }
+
+  /**
+   * Nuclear option: Delete the entire OPFS database file and recreate it from scratch
+   * This will completely wipe all data and create a fresh database
+   * Use this only as a last resort when the database is corrupted
+   */
+  async deleteAndRecreateDatabase(): Promise<void> {
+    if (!this.client) throw new Error('Database not initialized');
+    
+    console.warn('[CCFDatabase] Deleting and recreating entire database - all data will be lost!');
+    await this.client.deleteDatabase();
+    console.log('[CCFDatabase] Database deleted and recreated successfully');
   }
 
   async checkIntegrity(): Promise<boolean> {
@@ -1135,7 +1142,7 @@ export class CCFDatabase {
       const writesResult = await this.exec(`
         SELECT map_name, value_text
         FROM kv_writes
-        WHERE transaction_id = ? AND value_text IS NOT NULL
+        WHERE sequence_no = ? AND value_text IS NOT NULL
       `, [txId]);
 
       const tables: Array<{ storeName: string; value: string }> = writesResult.map(row => ({

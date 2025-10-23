@@ -175,4 +175,24 @@ export class DatabaseWorkerClient {
 
     this.worker.terminate();
   }
+
+  /**
+   * Delete the entire OPFS database file and recreate a fresh database
+   * This is a nuclear option for recovering from corrupted databases
+   */
+  async deleteDatabase(): Promise<void> {
+    await this.readyPromise;
+
+    const id = this.messageId++;
+    
+    await new Promise((resolve, reject) => {
+      this.pendingMessages.set(id, { resolve, reject });
+      
+      this.worker.postMessage({
+        type: 'deleteDatabase',
+        id,
+        payload: {},
+      });
+    });
+  }
 }
