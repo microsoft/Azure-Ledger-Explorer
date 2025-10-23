@@ -1120,9 +1120,9 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
 
     const transactionResult = await this.exec(`
-      SELECT id, tx_digest
+      SELECT sequence_no, tx_digest
       FROM transactions
-      ORDER BY id
+      ORDER BY sequence_no
       LIMIT ? OFFSET ?
     `, [limit, start]);
 
@@ -1136,7 +1136,7 @@ export class CCFDatabase {
     }> = [];
 
     for (const tx of transactionResult) {
-      const txId = tx.id as number;
+      const txId = tx.sequence_no as number;
       const txHash = new Uint8Array(tx.tx_digest as ArrayBuffer);
 
       const writesResult = await this.exec(`
