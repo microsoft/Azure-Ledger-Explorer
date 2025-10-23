@@ -130,9 +130,70 @@ self.onmessage = async (event: MessageEvent) => {
         
         // Parse ledger file
         const ledgerChunk = new LedgerChunkV2(filename, arrayBuffer);
+        
+        // Import CBOR decoder
+        const { cborArrayToText } = await import('../parser/cose-cbor-to-text');
+        const DecodeCborTables = ["public:scitt.entry"];
+        
+        // Collect all data in memory first for bulk insert
+        const txBinds: unknown[][] = [];
+        const writeBinds: unknown[][] = [];
+        const deleteBinds: unknown[][] = [];
         let transactionCount = 0;
         
-        // Prepare statements for reuse
+        log('Parsing all transactions into memory...');
+        
+        for await (const transaction of ledgerChunk.readAllTransactions()) {
+          const seqNo = transaction.gcmHeader.seqNo;
+          
+          // Collect transaction data
+          txBinds.push([
+            seqNo,
+            fileId,
+            transaction.header.version,
+            transaction.header.flags,
+            transaction.header.size,
+            transaction.publicDomain.entryType,
+            transaction.publicDomain.txVersion,
+            transaction.publicDomain.maxConflictVersion,
+            transaction.txDigest,
+            transaction.gcmHeader.view + '.' + transaction.publicDomain.txVersion,
+            transaction.gcmHeader.view,
+          ]);
+          
+          // Collect writes data
+          for (const write of transaction.publicDomain.writes) {
+            let valueText = '';
+            if (write.value && write.value.length > 0) {
+              try {
+                if (DecodeCborTables.includes(write.mapName || '')) {
+                  valueText = cborArrayToText(write.value);
+                } else {
+                  valueText = new TextDecoder('utf-8', { fatal: false }).decode(write.value);
+                }
+              } catch {
+                valueText = '';
+              }
+            }
+            
+            writeBinds.push([seqNo, write.mapName || '', write.key, valueText, write.version]);
+          }
+          
+          // Collect deletes data
+          for (const del of transaction.publicDomain.deletes) {
+            deleteBinds.push([seqNo, del.mapName || '', del.key, del.version]);
+          }
+          
+          transactionCount++;
+          
+          if (transactionCount % 1000 === 0) {
+            log(`Parsed ${transactionCount} transactions...`);
+          }
+        }
+        
+        log(`Parsed ${transactionCount} transactions, now bulk inserting...`);
+        
+        // Prepare statements for bulk insert
         const txStmt = db.prepare(`
           INSERT INTO transactions (
             sequence_no, file_id, version, flags, size,
@@ -151,64 +212,33 @@ self.onmessage = async (event: MessageEvent) => {
           VALUES (?, ?, ?, ?)
         `);
         
-        // Import CBOR decoder
-        const { cborArrayToText } = await import('../parser/cose-cbor-to-text');
-        const DecodeCborTables = ["public:scitt.entry"];
-        
-        // Process all transactions in a single transaction
+        // Bulk insert in a single transaction
         db.exec('BEGIN IMMEDIATE TRANSACTION');
         
         try {
-          for await (const transaction of ledgerChunk.readAllTransactions()) {
-            // Use sequence number from the ledger as the primary key
-            const seqNo = transaction.gcmHeader.seqNo;
-            
-            // Insert transaction with sequence number as primary key
-            txStmt.bind([
-              seqNo,
-              fileId,
-              transaction.header.version,
-              transaction.header.flags,
-              transaction.header.size,
-              transaction.publicDomain.entryType,
-              transaction.publicDomain.txVersion,
-              transaction.publicDomain.maxConflictVersion,
-              transaction.txDigest,
-              transaction.gcmHeader.view + '.' + transaction.publicDomain.txVersion,
-              transaction.gcmHeader.view,
-            ]);
+          // Insert all transactions
+          log(`Inserting ${txBinds.length} transactions...`);
+          for (const bind of txBinds) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            txStmt.bind(bind as any);
             txStmt.stepReset();
-            
-            // Insert writes using sequence number as foreign key
-            for (const write of transaction.publicDomain.writes) {
-              let valueText = '';
-              if (write.value && write.value.length > 0) {
-                try {
-                  if (DecodeCborTables.includes(write.mapName || '')) {
-                    valueText = cborArrayToText(write.value);
-                  } else {
-                    valueText = new TextDecoder('utf-8', { fatal: false }).decode(write.value);
-                  }
-                } catch {
-                  valueText = '';
-                }
-              }
-              
-              writeStmt.bind([seqNo, write.mapName || '', write.key, valueText, write.version]);
-              writeStmt.stepReset();
-            }
-            
-            // Insert deletes using sequence number as foreign key
-            for (const del of transaction.publicDomain.deletes) {
-              deleteStmt.bind([seqNo, del.mapName || '', del.key, del.version]);
+          }
+          
+          // Insert all writes
+          log(`Inserting ${writeBinds.length} writes...`);
+          for (const bind of writeBinds) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            writeStmt.bind(bind as any);
+            writeStmt.stepReset();
+          }
+          
+          // Insert all deletes
+          if (deleteBinds.length > 0) {
+            log(`Inserting ${deleteBinds.length} deletes...`);
+            for (const bind of deleteBinds) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              deleteStmt.bind(bind as any);
               deleteStmt.stepReset();
-            }
-            
-            transactionCount++;
-            
-            // Log progress every 1000 transactions
-            if (transactionCount % 1000 === 0) {
-              log(`Processed ${transactionCount} transactions...`);
             }
           }
           
