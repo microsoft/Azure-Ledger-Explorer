@@ -94,7 +94,7 @@ export const SearchView: React.FC = () => {
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Debounce search query to avoid too many API calls
-  const debounceTimeout = React.useRef<number | undefined>(undefined);
+  const debounceTimeout = React.useRef<number | NodeJS.Timeout | undefined>(undefined);
   
   React.useEffect(() => {
     if (debounceTimeout.current) {
