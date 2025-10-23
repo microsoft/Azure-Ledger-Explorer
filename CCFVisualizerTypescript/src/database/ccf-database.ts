@@ -671,13 +671,37 @@ export class CCFDatabase {
   async clearAllData(): Promise<void> {
     if (!this.client) throw new Error('Database not initialized');
 
-    await this.execBatch([
-      { sql: 'DELETE FROM kv_deletes' },
-      { sql: 'DELETE FROM kv_writes' },
-      { sql: 'DELETE FROM transactions' },
-      { sql: 'DELETE FROM ledger_files' },
-      { sql: 'DELETE FROM sqlite_sequence WHERE name IN ("ledger_files", "transactions")' },
-    ]);
+    // Check which tables exist before attempting to delete
+    const tableExistsQueries = await this.exec(`
+      SELECT name FROM sqlite_master 
+      WHERE type='table' 
+      AND name IN ('kv_deletes', 'kv_writes', 'transactions', 'ledger_files', 'sqlite_sequence')
+    `);
+    
+    const existingTables = new Set(tableExistsQueries.map(row => row.name as string));
+    const deleteStatements: Array<{ sql: string; bind?: unknown[] }> = [];
+    
+    // Only delete from tables that exist
+    if (existingTables.has('kv_deletes')) {
+      deleteStatements.push({ sql: 'DELETE FROM kv_deletes' });
+    }
+    if (existingTables.has('kv_writes')) {
+      deleteStatements.push({ sql: 'DELETE FROM kv_writes' });
+    }
+    if (existingTables.has('transactions')) {
+      deleteStatements.push({ sql: 'DELETE FROM transactions' });
+    }
+    if (existingTables.has('ledger_files')) {
+      deleteStatements.push({ sql: 'DELETE FROM ledger_files' });
+    }
+    if (existingTables.has('sqlite_sequence')) {
+      deleteStatements.push({ sql: `DELETE FROM sqlite_sequence WHERE name IN ('ledger_files', 'transactions')` });
+    }
+    
+    // Only execute batch if there are statements to run
+    if (deleteStatements.length > 0) {
+      await this.execBatch(deleteStatements);
+    }
   }
 
   async getAllTransactions(limit = 1000, offset = 0, searchQuery?: string): Promise<Array<{
