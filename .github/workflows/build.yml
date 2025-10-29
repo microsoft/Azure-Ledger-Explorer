@@ -1,0 +1,15 @@
+name: Build
+on: [push]
+permissions:
+  contents: read
+jobs:
+  build-ts-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: npm ci && npm run build
+        name: Build app
+        working-directory: ./CCFVisualizerTypescript
