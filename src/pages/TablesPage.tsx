@@ -30,7 +30,7 @@ import {
     AccordionHeader,
     AccordionPanel,
 } from '@fluentui/react-components';
-import { useTableFeatures, useTableColumnSizing_unstable, type TableColumnDefinition, type TableColumnSizingOptions } from '@fluentui/react-table';
+import { useTableFeatures, useTableColumnSizing_unstable, type TableColumnDefinition, type TableColumnSizingOptions, type TableFeaturePlugin } from '@fluentui/react-table';
 import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular } from '@fluentui/react-icons';
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import type { DialogOpenChangeData } from '@fluentui/react-components';
@@ -413,7 +413,7 @@ const TablesPage: React.FC = () => {
             columns: columnDefinitions,
             getRowId,
         },
-        [columnSizingPlugin]
+        [columnSizingPlugin as TableFeaturePlugin]
     );
     const { columnSizing_unstable: columnSizing, tableRef: rawTableRef } = tableState;
     const tableProps = columnSizing.getTableProps();
