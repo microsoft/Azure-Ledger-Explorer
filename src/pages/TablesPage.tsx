@@ -281,6 +281,8 @@ const TablesPage: React.FC = () => {
     const [isExecutingSql, setIsExecutingSql] = useState(false);
     const itemsPerPage = 50;
     const offset = (currentPage - 1) * itemsPerPage;
+    const isScittEntryTable = tableName === 'public:scitt.entry';
+    const utf8Decoder = useMemo(() => new TextDecoder('utf-8', { fatal: false }), []);
 
     const buildQueryParams = useCallback((page: number, query: string, sort: TableLatestStateSortColumn, dir: TableLatestStateSortDirection) => {
         const params: Record<string, string> = { page: String(page), sort, dir };
@@ -500,6 +502,88 @@ const TablesPage: React.FC = () => {
             return hex.length > 100 ? hex.substring(0, 100) + '...' : hex;
         }
     };
+
+    const decodeValueToString = useCallback((value: Uint8Array | null): string | null => {
+        if (!value) return null;
+        try {
+            return utf8Decoder.decode(value);
+        } catch {
+            return null;
+        }
+    }, [utf8Decoder]);
+
+    const formatSignedAt = useCallback((timestamp: unknown): string | null => {
+        if (typeof timestamp === 'number') {
+            const milliseconds = timestamp > 1e12 ? timestamp : timestamp * 1000;
+            const date = new Date(milliseconds);
+            return Number.isNaN(date.getTime()) ? null : date.toISOString();
+        }
+
+        if (typeof timestamp === 'string') {
+            if (timestamp.trim().length === 0) return null;
+
+            const numericValue = Number(timestamp);
+            if (!Number.isNaN(numericValue)) {
+                return formatSignedAt(numericValue);
+            }
+
+            const parsedDate = new Date(timestamp);
+            return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
+        }
+
+        return null;
+    }, []);
+
+    const getScittClaims = useCallback((value: Uint8Array | null) => {
+        const decoded = decodeValueToString(value);
+        if (!decoded) {
+            return {
+                issuer: null,
+                subject: null,
+                signedAt: null,
+            } as const;
+        }
+
+        try {
+            const data = JSON.parse(decoded) as Record<string, unknown> | null;
+            if (!data || typeof data !== 'object') {
+                return {
+                    issuer: null,
+                    subject: null,
+                    signedAt: null,
+                } as const;
+            }
+
+            const protectedSection = data.protected as Record<string, unknown> | undefined;
+            const cwtClaims = protectedSection && typeof protectedSection === 'object'
+                ? (protectedSection['CWT Claims'] as Record<string, unknown> | undefined)
+                : undefined;
+
+            if (!cwtClaims || typeof cwtClaims !== 'object') {
+                return {
+                    issuer: null,
+                    subject: null,
+                    signedAt: null,
+                } as const;
+            }
+
+            const issuer = typeof cwtClaims.iss === 'string' ? cwtClaims.iss : null;
+            const subject = typeof cwtClaims.sub === 'string' ? cwtClaims.sub : null;
+            const signedAt = formatSignedAt(cwtClaims.iat ?? null);
+
+            return {
+                issuer,
+                subject,
+                signedAt,
+            } as const;
+        } catch {
+            return {
+                issuer: null,
+                subject: null,
+                signedAt: null,
+            } as const;
+        }
+    }, [decodeValueToString, formatSignedAt]);
 
     const formatSqlValue = (value: unknown): string => {
         if (value === null || value === undefined) {
@@ -970,71 +1054,109 @@ const TablesPage: React.FC = () => {
                                                         {renderSortIcon('value')}
                                                     </TableCellLayout>
                                                 </TableHeaderCell>
+                                                {isScittEntryTable && (
+                                                    <>
+                                                        <TableHeaderCell>Issuer</TableHeaderCell>
+                                                        <TableHeaderCell>Subject</TableHeaderCell>
+                                                        <TableHeaderCell>Signed At</TableHeaderCell>
+                                                    </>
+                                                )}
                                                 <TableHeaderCell>Actions</TableHeaderCell>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {keyValues.map((kv) => (
-                                                <TableRow key={`${kv.transactionId}-${kv.keyName}`}>
-                                                    <TableCell>
-                                                        <TableCellLayout>
-                                                            {kv.transactionId}
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TableCellLayout>
-                                                            <Text size={200} style={{ fontFamily: 'monospace' }}>
-                                                                {kv.transactionIdentifier ?? '—'}
-                                                            </Text>
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TableCellLayout truncate>
-                                                            <Text size={300} weight="semibold">
-                                                                {kv.keyName}
-                                                            </Text>
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TableCellLayout truncate>
-                                                            <Text size={200} style={{ fontFamily: 'monospace' }}>
-                                                                {kv.isDeleted ? (
-                                                                    <Text style={{ color: tokens.colorPaletteRedForeground2, fontStyle: 'italic' }}>
-                                                                        [DELETED]
-                                                                    </Text>
-                                                                ) : (
-                                                                    formatValue(kv.value)
-                                                                )}
-                                                            </Text>
-                                                        </TableCellLayout>
-                                                    </TableCell>
+                                            {keyValues.map((kv) => {
+                                                const scittClaims = isScittEntryTable && !kv.isDeleted
+                                                    ? getScittClaims(kv.value)
+                                                    : null;
 
-                                                    <TableCell>
-                                                        <TableCellLayout>
-                                                            <div className={classes.actionButtons}>
-                                                                <Tooltip content="View transaction history for this key" relationship="label">
-                                                                    <Button
-                                                                        appearance="outline"
-                                                                        size="small"
-                                                                        onClick={() => handleKeySelect(kv.keyName)}
-                                                                    >
-                                                                        <HistoryRegular /> <span>History</span>
-                                                                    </Button>
-                                                                </Tooltip>
-                                                                <Tooltip content="View transaction details" relationship="label">
-                                                                    <Button
-                                                                        appearance="outline"
-                                                                        size="small"
-                                                                        onClick={() => handleTransactionSelect(kv.transactionId)}
-                                                                    >
-                                                                        <span>Details</span> <ChevronRightRegular />
-                                                                    </Button>
-                                                                </Tooltip>
-                                                            </div>
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                                return (
+                                                    <TableRow key={`${kv.transactionId}-${kv.keyName}`}>
+                                                        <TableCell>
+                                                            <TableCellLayout>
+                                                                {kv.transactionId}
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <TableCellLayout>
+                                                                <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                    {kv.transactionIdentifier ?? '—'}
+                                                                </Text>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <TableCellLayout truncate>
+                                                                <Text size={300} weight="semibold">
+                                                                    {kv.keyName}
+                                                                </Text>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <TableCellLayout truncate>
+                                                                <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                    {kv.isDeleted ? (
+                                                                        <Text style={{ color: tokens.colorPaletteRedForeground2, fontStyle: 'italic' }}>
+                                                                            [DELETED]
+                                                                        </Text>
+                                                                    ) : (
+                                                                        formatValue(kv.value)
+                                                                    )}
+                                                                </Text>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        {isScittEntryTable && (
+                                                            <>
+                                                                <TableCell>
+                                                                    <TableCellLayout truncate>
+                                                                        <Text size={200}>
+                                                                            {scittClaims?.issuer ?? '—'}
+                                                                        </Text>
+                                                                    </TableCellLayout>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TableCellLayout truncate>
+                                                                        <Text size={200}>
+                                                                            {scittClaims?.subject ?? '—'}
+                                                                        </Text>
+                                                                    </TableCellLayout>
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <TableCellLayout>
+                                                                        <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                            {scittClaims?.signedAt ?? '—'}
+                                                                        </Text>
+                                                                    </TableCellLayout>
+                                                                </TableCell>
+                                                            </>
+                                                        )}
+
+                                                        <TableCell>
+                                                            <TableCellLayout>
+                                                                <div className={classes.actionButtons}>
+                                                                    <Tooltip content="View transaction history for this key" relationship="label">
+                                                                        <Button
+                                                                            appearance="outline"
+                                                                            size="small"
+                                                                            onClick={() => handleKeySelect(kv.keyName)}
+                                                                        >
+                                                                            <HistoryRegular /> <span>History</span>
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                    <Tooltip content="View transaction details" relationship="label">
+                                                                        <Button
+                                                                            appearance="outline"
+                                                                            size="small"
+                                                                            onClick={() => handleTransactionSelect(kv.transactionId)}
+                                                                        >
+                                                                            <span>Details</span> <ChevronRightRegular />
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                 ) : (
