@@ -137,6 +137,7 @@ export const ConfigPage: React.FC = () => {
   const { config, setConfig } = useConfig();
   const { data: allTransactionsCount } = useAllTransactionsCount();
   const [showUploadDialog, setShowUploadDialog] = React.useState(false);
+  const [dropDbDialogOpen, setDropDbDialogOpen] = React.useState(false);
   const { data: stats } = useStats();
   const clearAllDataMutation = useClearAllData();
   const dropDatabaseMutation = useDropDatabase();
@@ -157,6 +158,7 @@ export const ConfigPage: React.FC = () => {
   const handleDropDatabase = async () => {
     try {
       await dropDatabaseMutation.mutateAsync();
+      setDropDbDialogOpen(false);
     } catch (error) {
       console.error('Failed to drop database:', error);
     }
@@ -241,12 +243,16 @@ export const ConfigPage: React.FC = () => {
                 }
 
                 {/* Drop Database Button */}
-                <Dialog>
+                <Dialog 
+                  open={dropDbDialogOpen} 
+                  onOpenChange={(_, data) => setDropDbDialogOpen(data.open)}
+                >
                   <DialogTrigger disableButtonEnhancement>
                     <Button
                       appearance="outline"
                       icon={<DatabaseArrowDownRegular />}
                       disabled={dropDatabaseMutation.isPending}
+                      onClick={() => setDropDbDialogOpen(true)}
                     >
                       Drop DB
                     </Button>
