@@ -30,13 +30,18 @@ import {
     AccordionHeader,
     AccordionPanel,
 } from '@fluentui/react-components';
+import { useTableFeatures, useTableColumnSizing_unstable, type TableColumnDefinition, type TableColumnSizingOptions } from '@fluentui/react-table';
 import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular } from '@fluentui/react-icons';
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import type { DialogOpenChangeData } from '@fluentui/react-components';
+import type { CCFDatabase } from '../database';
 
 const SORTABLE_COLUMNS: TableLatestStateSortColumn[] = ['sequence', 'transactionId', 'keyName', 'value'];
 const DEFAULT_SORT_COLUMN: TableLatestStateSortColumn = 'sequence';
 const DEFAULT_SORT_DIRECTION: TableLatestStateSortDirection = 'asc';
+
+type ColumnId = 'sequence' | 'transactionId' | 'keyName' | 'value' | 'issuer' | 'subject' | 'signedAt' | 'actions';
+type TableLatestStateRow = Awaited<ReturnType<CCFDatabase['getTableLatestState']>>[number];
 
 const isValidSortColumn = (value: string | null): value is TableLatestStateSortColumn => {
     return !!value && SORTABLE_COLUMNS.includes(value as TableLatestStateSortColumn);
@@ -121,9 +126,15 @@ const useStyles = makeStyles({
         overflow: 'auto',
         padding: '16px 24px',
     },
+    headerCell: {
+        borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+        borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    },
     sortableHeaderCell: {
         cursor: 'pointer',
         userSelect: 'none',
+        borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+        borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
     },
     sortableHeaderContent: {
         display: 'flex',
@@ -283,6 +294,38 @@ const TablesPage: React.FC = () => {
     const offset = (currentPage - 1) * itemsPerPage;
     const isScittEntryTable = tableName === 'public:scitt.entry';
     const utf8Decoder = useMemo(() => new TextDecoder('utf-8', { fatal: false }), []);
+    const columnSizingOptions = useMemo<TableColumnSizingOptions>(() => ({
+        sequence: { defaultWidth: 120, minWidth: 80 },
+        transactionId: { defaultWidth: 200, minWidth: 150 },
+        keyName: { defaultWidth: 240, minWidth: 160 },
+        value: { defaultWidth: isScittEntryTable ? 280 : 360, minWidth: 220 },
+        issuer: { defaultWidth: 220, minWidth: 160 },
+        subject: { defaultWidth: 220, minWidth: 160 },
+        signedAt: { defaultWidth: 240, minWidth: 180 },
+        actions: { defaultWidth: 220, minWidth: 160 },
+    }), [isScittEntryTable]);
+    const columnDefinitions = useMemo<TableColumnDefinition<TableLatestStateRow>[]>(() => {
+        const buildColumn = (columnId: ColumnId): TableColumnDefinition<TableLatestStateRow> => ({
+            columnId,
+            renderCell: () => null,
+            renderHeaderCell: () => null,
+            compare: () => 0,
+        });
+
+        const columns: TableColumnDefinition<TableLatestStateRow>[] = [
+            buildColumn('sequence'),
+            buildColumn('transactionId'),
+            buildColumn('keyName'),
+            buildColumn('value'),
+        ];
+
+        if (isScittEntryTable) {
+            columns.push(buildColumn('issuer'), buildColumn('subject'), buildColumn('signedAt'));
+        }
+
+        columns.push(buildColumn('actions'));
+        return columns;
+    }, [isScittEntryTable]);
 
     const buildQueryParams = useCallback((page: number, query: string, sort: TableLatestStateSortColumn, dir: TableLatestStateSortDirection) => {
         const params: Record<string, string> = { page: String(page), sort, dir };
@@ -361,6 +404,47 @@ const TablesPage: React.FC = () => {
         0
     );
     const { data: database, isLoading: databaseLoading, error: databaseError } = useDatabase();
+    const tableItems = useMemo<TableLatestStateRow[]>(() => keyValues ?? [], [keyValues]);
+    const getRowId = useCallback((item: TableLatestStateRow) => `${item.transactionId}-${item.keyName}`, []);
+    const columnSizingPlugin = useTableColumnSizing_unstable<TableLatestStateRow>({ columnSizingOptions });
+    const tableState = useTableFeatures<TableLatestStateRow>(
+        {
+            items: tableItems,
+            columns: columnDefinitions,
+            getRowId,
+        },
+        [columnSizingPlugin]
+    );
+    const { columnSizing_unstable: columnSizing, tableRef: rawTableRef } = tableState;
+    const tableProps = columnSizing.getTableProps();
+    const headerSizing = {
+        sequence: columnSizing.getTableHeaderCellProps('sequence'),
+        transactionId: columnSizing.getTableHeaderCellProps('transactionId'),
+        keyName: columnSizing.getTableHeaderCellProps('keyName'),
+        value: columnSizing.getTableHeaderCellProps('value'),
+        actions: columnSizing.getTableHeaderCellProps('actions'),
+    } as const;
+    const cellSizing = {
+        sequence: columnSizing.getTableCellProps('sequence'),
+        transactionId: columnSizing.getTableCellProps('transactionId'),
+        keyName: columnSizing.getTableCellProps('keyName'),
+        value: columnSizing.getTableCellProps('value'),
+        actions: columnSizing.getTableCellProps('actions'),
+    } as const;
+    const scittHeaderSizing = isScittEntryTable
+        ? {
+            issuer: columnSizing.getTableHeaderCellProps('issuer'),
+            subject: columnSizing.getTableHeaderCellProps('subject'),
+            signedAt: columnSizing.getTableHeaderCellProps('signedAt'),
+        }
+        : null;
+    const scittCellSizing = isScittEntryTable
+        ? {
+            issuer: columnSizing.getTableCellProps('issuer'),
+            subject: columnSizing.getTableCellProps('subject'),
+            signedAt: columnSizing.getTableCellProps('signedAt'),
+        }
+        : null;
 
     // Pagination calculations
     const totalPages = Math.ceil((totalKeyCount || 0) / itemsPerPage);
@@ -1003,11 +1087,13 @@ const TablesPage: React.FC = () => {
                                         Error loading key values: {keyValuesError.message}
                                     </MessageBar>
                                 ) : keyValues && keyValues.length > 0 ? (
-                                    <Table>
+                                    <Table ref={rawTableRef as React.RefObject<HTMLDivElement>} {...tableProps}>
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHeaderCell
                                                     className={classes.sortableHeaderCell}
+                                                    style={headerSizing.sequence.style}
+                                                    aside={headerSizing.sequence.aside}
                                                     onClick={() => handleSortChange('sequence')}
                                                     tabIndex={0}
                                                     onKeyDown={(event) => handleHeaderKeyDown(event, 'sequence')}
@@ -1020,6 +1106,8 @@ const TablesPage: React.FC = () => {
                                                 </TableHeaderCell>
                                                 <TableHeaderCell
                                                     className={classes.sortableHeaderCell}
+                                                    style={headerSizing.transactionId.style}
+                                                    aside={headerSizing.transactionId.aside}
                                                     onClick={() => handleSortChange('transactionId')}
                                                     tabIndex={0}
                                                     onKeyDown={(event) => handleHeaderKeyDown(event, 'transactionId')}
@@ -1032,6 +1120,8 @@ const TablesPage: React.FC = () => {
                                                 </TableHeaderCell>
                                                 <TableHeaderCell
                                                     className={classes.sortableHeaderCell}
+                                                    style={headerSizing.keyName.style}
+                                                    aside={headerSizing.keyName.aside}
                                                     onClick={() => handleSortChange('keyName')}
                                                     tabIndex={0}
                                                     onKeyDown={(event) => handleHeaderKeyDown(event, 'keyName')}
@@ -1044,6 +1134,8 @@ const TablesPage: React.FC = () => {
                                                 </TableHeaderCell>
                                                 <TableHeaderCell
                                                     className={classes.sortableHeaderCell}
+                                                    style={headerSizing.value.style}
+                                                    aside={headerSizing.value.aside}
                                                     onClick={() => handleSortChange('value')}
                                                     tabIndex={0}
                                                     onKeyDown={(event) => handleHeaderKeyDown(event, 'value')}
@@ -1056,12 +1148,36 @@ const TablesPage: React.FC = () => {
                                                 </TableHeaderCell>
                                                 {isScittEntryTable && (
                                                     <>
-                                                        <TableHeaderCell>Issuer</TableHeaderCell>
-                                                        <TableHeaderCell>Subject</TableHeaderCell>
-                                                        <TableHeaderCell>Signed At</TableHeaderCell>
+                                                        <TableHeaderCell
+                                                            className={classes.headerCell}
+                                                            style={scittHeaderSizing?.issuer.style}
+                                                            aside={scittHeaderSizing?.issuer.aside}
+                                                        >
+                                                            Issuer
+                                                        </TableHeaderCell>
+                                                        <TableHeaderCell
+                                                            className={classes.headerCell}
+                                                            style={scittHeaderSizing?.subject.style}
+                                                            aside={scittHeaderSizing?.subject.aside}
+                                                        >
+                                                            Subject
+                                                        </TableHeaderCell>
+                                                        <TableHeaderCell
+                                                            className={classes.headerCell}
+                                                            style={scittHeaderSizing?.signedAt.style}
+                                                            aside={scittHeaderSizing?.signedAt.aside}
+                                                        >
+                                                            Signed At
+                                                        </TableHeaderCell>
                                                     </>
                                                 )}
-                                                <TableHeaderCell>Actions</TableHeaderCell>
+                                                <TableHeaderCell
+                                                    className={classes.headerCell}
+                                                    style={headerSizing.actions.style}
+                                                    aside={headerSizing.actions.aside}
+                                                >
+                                                    Actions
+                                                </TableHeaderCell>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -1072,26 +1188,26 @@ const TablesPage: React.FC = () => {
 
                                                 return (
                                                     <TableRow key={`${kv.transactionId}-${kv.keyName}`}>
-                                                        <TableCell>
+                                                        <TableCell style={cellSizing.sequence.style}>
                                                             <TableCellLayout>
                                                                 {kv.transactionId}
                                                             </TableCellLayout>
                                                         </TableCell>
-                                                        <TableCell>
+                                                        <TableCell style={cellSizing.transactionId.style}>
                                                             <TableCellLayout>
                                                                 <Text size={200} style={{ fontFamily: 'monospace' }}>
                                                                     {kv.transactionIdentifier ?? '—'}
                                                                 </Text>
                                                             </TableCellLayout>
                                                         </TableCell>
-                                                        <TableCell>
+                                                        <TableCell style={cellSizing.keyName.style}>
                                                             <TableCellLayout truncate>
                                                                 <Text size={300} weight="semibold">
                                                                     {kv.keyName}
                                                                 </Text>
                                                             </TableCellLayout>
                                                         </TableCell>
-                                                        <TableCell>
+                                                        <TableCell style={cellSizing.value.style}>
                                                             <TableCellLayout truncate>
                                                                 <Text size={200} style={{ fontFamily: 'monospace' }}>
                                                                     {kv.isDeleted ? (
@@ -1106,21 +1222,21 @@ const TablesPage: React.FC = () => {
                                                         </TableCell>
                                                         {isScittEntryTable && (
                                                             <>
-                                                                <TableCell>
+                                                                <TableCell style={scittCellSizing?.issuer.style}>
                                                                     <TableCellLayout truncate>
                                                                         <Text size={200}>
                                                                             {scittClaims?.issuer ?? '—'}
                                                                         </Text>
                                                                     </TableCellLayout>
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell style={scittCellSizing?.subject.style}>
                                                                     <TableCellLayout truncate>
                                                                         <Text size={200}>
                                                                             {scittClaims?.subject ?? '—'}
                                                                         </Text>
                                                                     </TableCellLayout>
                                                                 </TableCell>
-                                                                <TableCell>
+                                                                <TableCell style={scittCellSizing?.signedAt.style}>
                                                                     <TableCellLayout>
                                                                         <Text size={200} style={{ fontFamily: 'monospace' }}>
                                                                             {scittClaims?.signedAt ?? '—'}
@@ -1130,7 +1246,7 @@ const TablesPage: React.FC = () => {
                                                             </>
                                                         )}
 
-                                                        <TableCell>
+                                                        <TableCell style={cellSizing.actions.style}>
                                                             <TableCellLayout>
                                                                 <div className={classes.actionButtons}>
                                                                     <Tooltip content="View transaction history for this key" relationship="label">
