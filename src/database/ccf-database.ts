@@ -895,6 +895,7 @@ export class CCFDatabase {
     value: Uint8Array | null;
     version: number;
     transactionId: number;
+    transactionIdentifier: string | null;
     isDeleted: boolean;
   }>> {
     if (!this.client) throw new Error('Database not initialized');
@@ -917,7 +918,8 @@ export class CCFDatabase {
           COALESCE(w.value_text, NULL) as value_text,
           lv.max_version as version,
           COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
-          CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted
+          CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted,
+          t.transaction_id as transaction_id
         FROM latest_versions lv
         LEFT JOIN kv_writes w ON lv.key_name = w.key_name 
           AND lv.max_version = w.version 
@@ -925,13 +927,15 @@ export class CCFDatabase {
         LEFT JOIN kv_deletes d ON lv.key_name = d.key_name 
           AND lv.max_version = d.version 
           AND d.map_name = ?
+        LEFT JOIN transactions t ON t.sequence_no = COALESCE(w.sequence_no, d.sequence_no)
       )
       SELECT 
         lo.key_name,
         lo.value_text,
         lo.version,
         lo.sequence_no,
-        lo.is_deleted
+        lo.is_deleted,
+        lo.transaction_id
       FROM latest_operations lo
     `;
 
@@ -962,6 +966,7 @@ export class CCFDatabase {
       value: row.value_text ? new TextEncoder().encode(row.value_text as string) : null,
       version: row.version as number,
       transactionId: row.sequence_no as number,
+      transactionIdentifier: (row.transaction_id as string) || null,
       isDeleted: (row.is_deleted as number) === 1,
     }));
   }

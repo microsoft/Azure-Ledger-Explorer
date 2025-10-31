@@ -844,6 +844,7 @@ const TablesPage: React.FC = () => {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHeaderCell>Sequence</TableHeaderCell>
+                                                <TableHeaderCell>Transaction ID</TableHeaderCell>
                                                 <TableHeaderCell>Key</TableHeaderCell>
                                                 <TableHeaderCell>Value</TableHeaderCell>
                                                 <TableHeaderCell>Actions</TableHeaderCell>
@@ -855,6 +856,13 @@ const TablesPage: React.FC = () => {
                                                     <TableCell>
                                                         <TableCellLayout>
                                                             {kv.transactionId}
+                                                        </TableCellLayout>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <TableCellLayout>
+                                                            <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                {kv.transactionIdentifier ?? '—'}
+                                                            </Text>
                                                         </TableCellLayout>
                                                     </TableCell>
                                                     <TableCell>
