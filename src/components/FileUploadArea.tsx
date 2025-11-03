@@ -17,6 +17,9 @@ import {
   CloudArrowUp24Regular,
   DocumentAdd24Regular,
   CheckmarkCircle24Regular,
+  CheckmarkCircle20Filled,
+  DismissCircle20Filled,
+  Info20Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useLedgerFiles, useStorageCapacity } from '../hooks/use-ccf-data';
 import { 
@@ -157,6 +160,59 @@ const useStyles = makeStyles({
     fontSize: '12px',
     color: tokens.colorNeutralForeground2,
   },
+  fileSelectionFeedback: {
+    backgroundColor: tokens.colorNeutralBackground2,
+    border: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '16px',
+  },
+  feedbackHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '12px',
+    paddingBottom: '12px',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  feedbackStats: {
+    display: 'flex',
+    gap: '16px',
+    fontSize: '12px',
+  },
+  statItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  statIcon: {
+    fontSize: '16px',
+  },
+  newFileIcon: {
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  skippedFileIcon: {
+    color: tokens.colorNeutralForeground3,
+  },
+  fileList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    maxHeight: '200px',
+    overflow: 'auto',
+  },
+  fileItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px',
+    borderRadius: '4px',
+    backgroundColor: tokens.colorNeutralBackground1,
+    fontSize: '12px',
+  },
+  fileItemSkipped: {
+    opacity: 0.6,
+  },
 });
 
 export const FileUploadArea: React.FC = () => {
@@ -166,6 +222,12 @@ export const FileUploadArea: React.FC = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [selectedFilesInfo, setSelectedFilesInfo] = useState<{
+    newFiles: LedgerFileInfo[];
+    skippedFiles: LedgerFileInfo[];
+    totalSelected: number;
+  } | null>(null);
+  const [uploadCompleted, setUploadCompleted] = useState(false);
   
   const { handleDragOver, handleFiles, isUploading, uploadError } = useFileDrop();
   const { data: ledgerFiles, refetch: refetchFiles } = useLedgerFiles();
@@ -184,6 +246,9 @@ export const FileUploadArea: React.FC = () => {
   const validateAndHandleFiles = (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     
+    // Reset upload completed state when selecting new files
+    setUploadCompleted(false);
+    
     // Filter for .committed files only
     const committedFiles = fileArray.filter(file => file.name.endsWith('.committed'));
     
@@ -200,6 +265,7 @@ export const FileUploadArea: React.FC = () => {
         missingRanges: [],
       });
       setPendingFiles([]);
+      setSelectedFilesInfo(null);
       return;
     }
     
@@ -211,20 +277,44 @@ export const FileUploadArea: React.FC = () => {
       parseLedgerFilename(file.filename)
     ).filter(info => info.isValid) || [];
     
-    // Validate the sequence
-    const validation = validateLedgerSequence(committedFiles, existingFileInfos);
-    setValidationResult(validation);
+    // Parse selected files
+    const selectedFileInfos = committedFiles.map(file => parseLedgerFilename(file.name));
     
-    if (validation.isValid) {
-      // Check storage capacity before proceeding
-      // const totalSize = committedFiles.reduce((sum, file) => sum + file.size, 0);
-      // const estimatedDBSize = estimateDatabaseSize(committedFiles.length * 1000);
-      //const requiredStorage = totalSize + estimatedDBSize;
+    // Categorize files: new vs already imported
+    const existingFilenames = new Set(existingFileInfos.map(f => f.filename));
+    const newFiles = selectedFileInfos.filter(info => !existingFilenames.has(info.filename));
+    const skippedFiles = selectedFileInfos.filter(info => existingFilenames.has(info.filename));
+    
+    // Set file selection feedback
+    setSelectedFilesInfo({
+      newFiles,
+      skippedFiles,
+      totalSelected: committedFiles.length,
+    });
+    
+    // If we have new files to import or if all files are duplicates (skipped), don't show error
+    if (newFiles.length > 0 || skippedFiles.length === committedFiles.length) {
+      // Clear any validation errors since we're handling duplicates gracefully
+      setValidationResult(null);
       
-      // Note: In a real implementation, you'd want to wait for storageCapacity to load
-      // For now, we'll proceed optimistically and let the user see warnings in the UI
-      handleFiles(committedFiles);
-      setPendingFiles([]); // Clear pending files after successful upload
+      // Only process new files (skip duplicates)
+      const newFilesArray = committedFiles.filter(file => 
+        newFiles.some(info => info.filename === file.name)
+      );
+      
+      if (newFilesArray.length > 0) {
+        handleFiles(newFilesArray);
+      }
+      setPendingFiles([]); // Clear pending files after initiating upload
+    } else {
+      // Validate the sequence only if we have issues beyond duplicates
+      const validation = validateLedgerSequence(committedFiles, existingFileInfos);
+      setValidationResult(validation);
+      
+      if (validation.isValid) {
+        handleFiles(committedFiles);
+        setPendingFiles([]); // Clear pending files after successful upload
+      }
     }
   };
 
@@ -257,11 +347,19 @@ export const FileUploadArea: React.FC = () => {
   };
 
   React.useEffect(() => {
-    if (!isUploading) {
+    if (!isUploading && selectedFilesInfo && !uploadCompleted) {
+      // Mark upload as completed
+      setUploadCompleted(true);
       refetchFiles();
       setPendingFiles([]); // Clear pending files when upload completes
+      
+      // Don't auto-clear feedback - let it stay visible for user review
+      // Only clear if user starts a new upload
+    } else if (isUploading) {
+      // Reset uploadCompleted when starting new upload
+      setUploadCompleted(false);
     }
-  }, [isUploading, refetchFiles]);
+  }, [isUploading, refetchFiles, selectedFilesInfo, uploadCompleted]);
 
   return (
     <div className={styles.container}>
@@ -347,6 +445,62 @@ export const FileUploadArea: React.FC = () => {
             ))}
           </MessageBarBody>
         </MessageBar>
+      )}
+
+      {/* File Selection Feedback */}
+      {selectedFilesInfo && selectedFilesInfo.totalSelected > 0 && (
+        <div className={styles.fileSelectionFeedback}>
+          <div className={styles.feedbackHeader}>
+            <Text size={400} weight="semibold">
+              Selected Files ({selectedFilesInfo.totalSelected})
+            </Text>
+            <div className={styles.feedbackStats}>
+              {selectedFilesInfo.newFiles.length > 0 && (
+                <div className={styles.statItem}>
+                  <CheckmarkCircle20Filled className={`${styles.statIcon} ${styles.newFileIcon}`} />
+                  <Text size={200}>{selectedFilesInfo.newFiles.length} to import</Text>
+                </div>
+              )}
+              {selectedFilesInfo.skippedFiles.length > 0 && (
+                <div className={styles.statItem}>
+                  <Info20Regular className={`${styles.statIcon} ${styles.skippedFileIcon}`} />
+                  <Text size={200}>{selectedFilesInfo.skippedFiles.length} already imported</Text>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className={styles.fileList}>
+            {selectedFilesInfo.newFiles.map((file, index) => (
+              <div key={`new-${index}`} className={styles.fileItem}>
+                <CheckmarkCircle20Filled className={`${styles.statIcon} ${styles.newFileIcon}`} />
+                <Text size={200} style={{ flex: 1 }}>{file.filename}</Text>
+                <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>
+                  {file.startNo}-{file.endNo}
+                </Text>
+              </div>
+            ))}
+            {selectedFilesInfo.skippedFiles.map((file, index) => (
+              <div key={`skipped-${index}`} className={`${styles.fileItem} ${styles.fileItemSkipped}`}>
+                <DismissCircle20Filled className={`${styles.statIcon} ${styles.skippedFileIcon}`} />
+                <Text size={200} style={{ flex: 1 }}>{file.filename}</Text>
+                <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>
+                  Already imported
+                </Text>
+              </div>
+            ))}
+          </div>
+          
+          {/* Show success message after upload completes */}
+          {uploadCompleted && selectedFilesInfo.newFiles.length > 0 && (
+            <MessageBar intent="success" style={{ marginTop: '12px' }}>
+              <MessageBarBody>
+                <MessageBarTitle>Upload Complete!</MessageBarTitle>
+                Successfully imported {selectedFilesInfo.newFiles.length} file(s). 
+                You can close this dialog or upload more files.
+              </MessageBarBody>
+            </MessageBar>
+          )}
+        </div>
       )}
 
       {/* File Sequence Info */}
