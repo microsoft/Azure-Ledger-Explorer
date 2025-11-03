@@ -81,7 +81,7 @@ test.describe('Configuration Page - Domain Persistence', () => {
     await page.getByRole('button', { name: 'Add Files' }).click();
     
     // Click to select files
-    await page.getByRole('button', { name: 'Select .committed Files' }).click();
+    await page.getByRole('button', { name: 'Browse Files' }).click();
     
     // Upload a local file using same path pattern as files.spec.ts
     await page.getByLabel('Upload CCF ledger files').setInputFiles([
