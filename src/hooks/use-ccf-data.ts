@@ -9,13 +9,21 @@ import { verificationService } from '../services/verification-service';
 // Global database instance (singleton pattern)
 let dbInstance: CCFDatabase | null = null;
 
+export type TableLatestStateSortColumn = 'sequence' | 'transactionId' | 'keyName' | 'value';
+export type TableLatestStateSortDirection = 'asc' | 'desc';
+
 const getDatabase = async (): Promise<CCFDatabase> => {
   if (!dbInstance) {
     dbInstance = new CCFDatabase({
       filename: 'ccf-ledger.db',
       useOpfs: true,
     });
-    await dbInstance.initialize();
+    try {
+      await dbInstance.initialize();
+    } catch (error) {
+      alert('Could not open local database. Please reload the page or close other windows or tabs that also use this page. ' + error);
+      throw error;
+    }
   }
   return dbInstance;
 };
@@ -30,7 +38,14 @@ export const queryKeys = {
   enhancedStats: ['enhancedStats'] as const,
   ccfTables: ['ccfTables'] as const,
   tableKeyValues: (mapName: string, limit: number, offset: number, searchQuery?: string) => ['tableKeyValues', mapName, limit, offset, searchQuery] as const,
-  tableLatestState: (mapName: string, limit: number, offset: number, searchQuery?: string) => ['tableLatestState', mapName, limit, offset, searchQuery] as const,
+  tableLatestState: (
+    mapName: string,
+    limit: number,
+    offset: number,
+    searchQuery: string | undefined,
+    sortColumn: TableLatestStateSortColumn,
+    sortDirection: TableLatestStateSortDirection,
+  ) => ['tableLatestState', mapName, limit, offset, searchQuery, sortColumn, sortDirection] as const,
   tableLatestStateCount: (mapName: string, searchQuery?: string) => ['tableLatestStateCount', mapName, searchQuery] as const,
   keyTransactions: (mapName: string, keyName: string, limit: number, offset: number) => ['keyTransactions', mapName, keyName, limit, offset] as const,
   searchByKeyOrValue: (query: string, limit: number) => ['searchByKeyOrValue', query, limit] as const,
@@ -441,12 +456,19 @@ export const useTableKeyValues = (mapName: string, limit = 100, offset = 0, sear
 /**
  * Hook to get the latest state of all keys in a specific CCF table
  */
-export const useTableLatestState = (mapName: string, limit = 100, offset = 0, searchQuery?: string) => {
+export const useTableLatestState = (
+  mapName: string,
+  limit = 100,
+  offset = 0,
+  searchQuery?: string,
+  sortColumn: TableLatestStateSortColumn = 'sequence',
+  sortDirection: TableLatestStateSortDirection = 'asc',
+) => {
   return useQuery({
-    queryKey: queryKeys.tableLatestState(mapName, limit, offset, searchQuery),
+    queryKey: queryKeys.tableLatestState(mapName, limit, offset, searchQuery, sortColumn, sortDirection),
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getTableLatestState(mapName, limit, offset, searchQuery);
+      return db.getTableLatestState(mapName, limit, offset, searchQuery, sortColumn, sortDirection);
     },
     enabled: mapName.length > 0,
   });

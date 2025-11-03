@@ -30,9 +30,26 @@ import {
     AccordionHeader,
     AccordionPanel,
 } from '@fluentui/react-components';
-import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular } from '@fluentui/react-icons';
-import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase } from '../hooks/use-ccf-data';
+import { useTableFeatures, useTableColumnSizing_unstable, type TableColumnDefinition, type TableColumnSizingOptions, type TableFeaturePlugin } from '@fluentui/react-table';
+import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular } from '@fluentui/react-icons';
+import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import type { DialogOpenChangeData } from '@fluentui/react-components';
+import type { CCFDatabase } from '../database';
+
+const SORTABLE_COLUMNS: TableLatestStateSortColumn[] = ['sequence', 'transactionId', 'keyName', 'value'];
+const DEFAULT_SORT_COLUMN: TableLatestStateSortColumn = 'sequence';
+const DEFAULT_SORT_DIRECTION: TableLatestStateSortDirection = 'asc';
+
+type ColumnId = 'sequence' | 'transactionId' | 'keyName' | 'value' | 'issuer' | 'subject' | 'signedAt' | 'actions';
+type TableLatestStateRow = Awaited<ReturnType<CCFDatabase['getTableLatestState']>>[number];
+
+const isValidSortColumn = (value: string | null): value is TableLatestStateSortColumn => {
+    return !!value && SORTABLE_COLUMNS.includes(value as TableLatestStateSortColumn);
+};
+
+const isValidSortDirection = (value: string | null): value is TableLatestStateSortDirection => {
+    return value === 'asc' || value === 'desc';
+};
 
 const useStyles = makeStyles({
     container: {
@@ -108,6 +125,31 @@ const useStyles = makeStyles({
         flex: 1,
         overflow: 'auto',
         padding: '16px 24px',
+    },
+    headerCell: {
+        borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+        borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    },
+    sortableHeaderCell: {
+        cursor: 'pointer',
+        userSelect: 'none',
+        borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+        borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    },
+    sortableHeaderContent: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+    },
+    sortIcon: {
+        marginLeft: '4px',
+        fontSize: '12px',
+        width: '12px',
+        height: '12px',
+        color: tokens.colorNeutralForeground3,
+    },
+    sortIconActive: {
+        color: tokens.colorBrandForeground1,
     },
     paginationContainer: {
         padding: '8px 16px',
@@ -225,12 +267,22 @@ const TablesPage: React.FC = () => {
     // Read existing search param before state initialization
     const [searchParams, setSearchParams] = useSearchParams();
     const initialSearch = searchParams.get('q') || '';
+    const sortParam = searchParams.get('sort');
+    const dirParam = searchParams.get('dir');
+    const initialSortColumn = isValidSortColumn(sortParam)
+        ? (sortParam as TableLatestStateSortColumn)
+        : DEFAULT_SORT_COLUMN;
+    const initialSortDirection = isValidSortDirection(dirParam)
+        ? (dirParam as TableLatestStateSortDirection)
+        : DEFAULT_SORT_DIRECTION;
     const [searchQuery, setSearchQuery] = useState(initialSearch);
     const initialPage = (() => {
         const p = parseInt(searchParams.get('page') || '1', 10);
         return isNaN(p) || p < 1 ? 1 : p;
     })();
     const [currentPage, setCurrentPage] = useState(initialPage);
+    const [sortColumn, setSortColumn] = useState<TableLatestStateSortColumn>(initialSortColumn);
+    const [sortDirection, setSortDirection] = useState<TableLatestStateSortDirection>(initialSortDirection);
     const [selectedKey, setSelectedKey] = useState<{ mapName: string; keyName: string } | null>(null);
     const [isSqlDialogOpen, setIsSqlDialogOpen] = useState(false);
     const [sqlQuery, setSqlQuery] = useState('');
@@ -240,6 +292,96 @@ const TablesPage: React.FC = () => {
     const [isExecutingSql, setIsExecutingSql] = useState(false);
     const itemsPerPage = 50;
     const offset = (currentPage - 1) * itemsPerPage;
+    const isScittEntryTable = tableName === 'public:scitt.entry';
+    const utf8Decoder = useMemo(() => new TextDecoder('utf-8', { fatal: false }), []);
+    const columnSizingOptions = useMemo<TableColumnSizingOptions>(() => ({
+        sequence: { defaultWidth: 120, minWidth: 80 },
+        transactionId: { defaultWidth: 200, minWidth: 150 },
+        keyName: { defaultWidth: 240, minWidth: 160 },
+        value: { defaultWidth: isScittEntryTable ? 280 : 360, minWidth: 220 },
+        issuer: { defaultWidth: 220, minWidth: 160 },
+        subject: { defaultWidth: 220, minWidth: 160 },
+        signedAt: { defaultWidth: 240, minWidth: 180 },
+        actions: { defaultWidth: 220, minWidth: 160 },
+    }), [isScittEntryTable]);
+    const columnDefinitions = useMemo<TableColumnDefinition<TableLatestStateRow>[]>(() => {
+        const buildColumn = (columnId: ColumnId): TableColumnDefinition<TableLatestStateRow> => ({
+            columnId,
+            renderCell: () => null,
+            renderHeaderCell: () => null,
+            compare: () => 0,
+        });
+
+        const columns: TableColumnDefinition<TableLatestStateRow>[] = [
+            buildColumn('sequence'),
+            buildColumn('transactionId'),
+            buildColumn('keyName'),
+            buildColumn('value'),
+        ];
+
+        if (isScittEntryTable) {
+            columns.push(buildColumn('issuer'), buildColumn('subject'), buildColumn('signedAt'));
+        }
+
+        columns.push(buildColumn('actions'));
+        return columns;
+    }, [isScittEntryTable]);
+
+    const buildQueryParams = useCallback((page: number, query: string, sort: TableLatestStateSortColumn, dir: TableLatestStateSortDirection) => {
+        const params: Record<string, string> = { page: String(page), sort, dir };
+        const normalizedQuery = query.trim();
+        if (normalizedQuery.length > 0) {
+            params.q = normalizedQuery;
+        }
+        return params;
+    }, []);
+
+    const updateRouteParams = useCallback((page: number, query: string, sort: TableLatestStateSortColumn, dir: TableLatestStateSortDirection) => {
+        const params = buildQueryParams(page, query, sort, dir);
+        if (tableName) {
+            const qs = new URLSearchParams(params).toString();
+            navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
+        } else {
+            setSearchParams(params);
+        }
+    }, [buildQueryParams, navigate, setSearchParams, tableName]);
+
+    const renderSortIcon = (column: TableLatestStateSortColumn) => {
+        if (sortColumn !== column) {
+            return <ArrowSort24Regular className={classes.sortIcon} />;
+        }
+        return sortDirection === 'asc'
+            ? <ArrowSortUp24Regular className={`${classes.sortIcon} ${classes.sortIconActive}`} />
+            : <ArrowSortDown24Regular className={`${classes.sortIcon} ${classes.sortIconActive}`} />;
+    };
+
+    const getAriaSort = (column: TableLatestStateSortColumn): 'ascending' | 'descending' | 'none' => {
+        if (sortColumn !== column) {
+            return 'none';
+        }
+        return sortDirection === 'asc' ? 'ascending' : 'descending';
+    };
+
+    const handleSortChange = useCallback((column: TableLatestStateSortColumn) => {
+        const isSameColumn = column === sortColumn;
+        const nextColumn = column;
+        const nextDirection: TableLatestStateSortDirection = isSameColumn
+            ? (sortDirection === 'asc' ? 'desc' : 'asc')
+            : 'asc';
+
+        setSortColumn(nextColumn);
+        setSortDirection(nextDirection);
+        const nextPage = 1;
+        setCurrentPage(nextPage);
+        updateRouteParams(nextPage, searchQuery, nextColumn, nextDirection);
+    }, [sortColumn, sortDirection, updateRouteParams, searchQuery]);
+
+    const handleHeaderKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>, column: TableLatestStateSortColumn) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleSortChange(column);
+        }
+    }, [handleSortChange]);
 
     // Query hooks
     const { data: tables, isLoading: tablesLoading, error: tablesError } = useCCFTables();
@@ -247,7 +389,9 @@ const TablesPage: React.FC = () => {
         tableName || '',
         itemsPerPage,
         offset,
-        searchQuery // Pass search query to the hook
+        searchQuery,
+        sortColumn,
+        sortDirection
     );
     const { data: totalKeyCount } = useTableLatestStateCount(
         tableName || '',
@@ -260,6 +404,47 @@ const TablesPage: React.FC = () => {
         0
     );
     const { data: database, isLoading: databaseLoading, error: databaseError } = useDatabase();
+    const tableItems = useMemo<TableLatestStateRow[]>(() => keyValues ?? [], [keyValues]);
+    const getRowId = useCallback((item: TableLatestStateRow) => `${item.transactionId}-${item.keyName}`, []);
+    const columnSizingPlugin = useTableColumnSizing_unstable<TableLatestStateRow>({ columnSizingOptions });
+    const tableState = useTableFeatures<TableLatestStateRow>(
+        {
+            items: tableItems,
+            columns: columnDefinitions,
+            getRowId,
+        },
+        [columnSizingPlugin as TableFeaturePlugin]
+    );
+    const { columnSizing_unstable: columnSizing, tableRef: rawTableRef } = tableState;
+    const tableProps = columnSizing.getTableProps();
+    const headerSizing = {
+        sequence: columnSizing.getTableHeaderCellProps('sequence'),
+        transactionId: columnSizing.getTableHeaderCellProps('transactionId'),
+        keyName: columnSizing.getTableHeaderCellProps('keyName'),
+        value: columnSizing.getTableHeaderCellProps('value'),
+        actions: columnSizing.getTableHeaderCellProps('actions'),
+    } as const;
+    const cellSizing = {
+        sequence: columnSizing.getTableCellProps('sequence'),
+        transactionId: columnSizing.getTableCellProps('transactionId'),
+        keyName: columnSizing.getTableCellProps('keyName'),
+        value: columnSizing.getTableCellProps('value'),
+        actions: columnSizing.getTableCellProps('actions'),
+    } as const;
+    const scittHeaderSizing = isScittEntryTable
+        ? {
+            issuer: columnSizing.getTableHeaderCellProps('issuer'),
+            subject: columnSizing.getTableHeaderCellProps('subject'),
+            signedAt: columnSizing.getTableHeaderCellProps('signedAt'),
+        }
+        : null;
+    const scittCellSizing = isScittEntryTable
+        ? {
+            issuer: columnSizing.getTableCellProps('issuer'),
+            subject: columnSizing.getTableCellProps('subject'),
+            signedAt: columnSizing.getTableCellProps('signedAt'),
+        }
+        : null;
 
     // Pagination calculations
     const totalPages = Math.ceil((totalKeyCount || 0) / itemsPerPage);
@@ -267,11 +452,13 @@ const TablesPage: React.FC = () => {
     const hasPreviousPage = currentPage > 1;
 
     const handleTableSelect = useCallback((table: string) => {
-        // Reset to first page and clear search when switching table; reflect in URL
         setSearchQuery('');
-        setCurrentPage(1);
-        navigate(`/tables/${encodeURIComponent(table)}?page=1`);
-    }, [navigate]);
+        const nextPage = 1;
+        setCurrentPage(nextPage);
+        const params = buildQueryParams(nextPage, '', sortColumn, sortDirection);
+        const qs = new URLSearchParams(params).toString();
+        navigate(`/tables/${encodeURIComponent(table)}?${qs}`);
+    }, [buildQueryParams, navigate, sortColumn, sortDirection]);
 
     const handleKeySelect = useCallback((keyName: string) => {
         if (tableName) {
@@ -285,47 +472,26 @@ const TablesPage: React.FC = () => {
 
     const handleSearchChange = useCallback((query: string) => {
         setSearchQuery(query);
-        // Reset to first page when searching
-        const params: Record<string, string> = { page: '1' };
-        if (query.trim().length > 0) params.q = query;
-        setCurrentPage(1);
-        if (tableName) {
-            const searchString = new URLSearchParams(params).toString();
-            navigate(`/tables/${encodeURIComponent(tableName)}?${searchString}`);
-        } else {
-            setSearchParams(params);
-        }
-    }, [navigate, tableName, setSearchParams]);
+        const nextPage = 1;
+        setCurrentPage(nextPage);
+        updateRouteParams(nextPage, query, sortColumn, sortDirection);
+    }, [sortColumn, sortDirection, updateRouteParams]);
 
     const handlePreviousPage = useCallback(() => {
         if (hasPreviousPage) {
             const newPage = currentPage - 1;
             setCurrentPage(newPage);
-            const params: Record<string, string> = { page: String(newPage) };
-            if (searchQuery.trim().length > 0) params.q = searchQuery;
-            if (tableName) {
-                const qs = new URLSearchParams(params).toString();
-                navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
-            } else {
-                setSearchParams(params);
-            }
+            updateRouteParams(newPage, searchQuery, sortColumn, sortDirection);
         }
-    }, [currentPage, hasPreviousPage, navigate, tableName, setSearchParams, searchQuery]);
+    }, [currentPage, hasPreviousPage, updateRouteParams, searchQuery, sortColumn, sortDirection]);
 
     const handleNextPage = useCallback(() => {
         if (hasNextPage) {
             const newPage = currentPage + 1;
             setCurrentPage(newPage);
-            const params: Record<string, string> = { page: String(newPage) };
-            if (searchQuery.trim().length > 0) params.q = searchQuery;
-            if (tableName) {
-                const qs = new URLSearchParams(params).toString();
-                navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
-            } else {
-                setSearchParams(params);
-            }
+            updateRouteParams(newPage, searchQuery, sortColumn, sortDirection);
         }
-    }, [currentPage, hasNextPage, navigate, tableName, setSearchParams, searchQuery]);
+    }, [currentPage, hasNextPage, updateRouteParams, searchQuery, sortColumn, sortDirection]);
 
     // Sync when URL page param changes externally (e.g. browser navigation)
     useEffect(() => {
@@ -340,35 +506,34 @@ const TablesPage: React.FC = () => {
                 setCurrentPage(urlPage);
             }
         }
-    }, [searchParams, currentPage, searchQuery]);
+        const urlSort = searchParams.get('sort');
+        if (isValidSortColumn(urlSort) && urlSort !== sortColumn) {
+            setSortColumn(urlSort as TableLatestStateSortColumn);
+        } else if (!urlSort && sortColumn !== DEFAULT_SORT_COLUMN) {
+            setSortColumn(DEFAULT_SORT_COLUMN);
+        }
+        const urlDir = searchParams.get('dir');
+        if (isValidSortDirection(urlDir) && urlDir !== sortDirection) {
+            setSortDirection(urlDir as TableLatestStateSortDirection);
+        } else if (!urlDir && sortDirection !== DEFAULT_SORT_DIRECTION) {
+            setSortDirection(DEFAULT_SORT_DIRECTION);
+        }
+    }, [searchParams, currentPage, searchQuery, sortColumn, sortDirection]);
 
     // Clamp current page if total pages shrinks due to search query
     useEffect(() => {
         if (currentPage > totalPages && totalPages > 0) {
-            const params: Record<string, string> = { page: String(totalPages) };
-            if (searchQuery.trim().length > 0) params.q = searchQuery;
-            setCurrentPage(totalPages);
-            if (tableName) {
-                const qs = new URLSearchParams(params).toString();
-                navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
-            } else {
-                setSearchParams(params);
-            }
+            const newPage = totalPages;
+            setCurrentPage(newPage);
+            updateRouteParams(newPage, searchQuery, sortColumn, sortDirection);
         }
-    }, [currentPage, totalPages, navigate, tableName, setSearchParams, searchQuery]);
+    }, [currentPage, totalPages, updateRouteParams, searchQuery, sortColumn, sortDirection]);
 
     const goToPage = useCallback((page: number) => {
         if (page < 1 || page > totalPages) return;
         setCurrentPage(page);
-        const params: Record<string, string> = { page: String(page) };
-        if (searchQuery.trim().length > 0) params.q = searchQuery;
-        if (tableName) {
-            const qs = new URLSearchParams(params).toString();
-            navigate(`/tables/${encodeURIComponent(tableName)}?${qs}`);
-        } else {
-            setSearchParams(params);
-        }
-    }, [navigate, tableName, totalPages, setSearchParams, searchQuery]);
+        updateRouteParams(page, searchQuery, sortColumn, sortDirection);
+    }, [totalPages, updateRouteParams, searchQuery, sortColumn, sortDirection]);
 
     const paginationPageButtons = useMemo(() => {
         // Generate page numbers with ellipsis when many pages
@@ -421,6 +586,88 @@ const TablesPage: React.FC = () => {
             return hex.length > 100 ? hex.substring(0, 100) + '...' : hex;
         }
     };
+
+    const decodeValueToString = useCallback((value: Uint8Array | null): string | null => {
+        if (!value) return null;
+        try {
+            return utf8Decoder.decode(value);
+        } catch {
+            return null;
+        }
+    }, [utf8Decoder]);
+
+    const formatSignedAt = useCallback((timestamp: unknown): string | null => {
+        if (typeof timestamp === 'number') {
+            const milliseconds = timestamp > 1e12 ? timestamp : timestamp * 1000;
+            const date = new Date(milliseconds);
+            return Number.isNaN(date.getTime()) ? null : date.toISOString();
+        }
+
+        if (typeof timestamp === 'string') {
+            if (timestamp.trim().length === 0) return null;
+
+            const numericValue = Number(timestamp);
+            if (!Number.isNaN(numericValue)) {
+                return formatSignedAt(numericValue);
+            }
+
+            const parsedDate = new Date(timestamp);
+            return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.toISOString();
+        }
+
+        return null;
+    }, []);
+
+    const getScittClaims = useCallback((value: Uint8Array | null) => {
+        const decoded = decodeValueToString(value);
+        if (!decoded) {
+            return {
+                issuer: null,
+                subject: null,
+                signedAt: null,
+            } as const;
+        }
+
+        try {
+            const data = JSON.parse(decoded) as Record<string, unknown> | null;
+            if (!data || typeof data !== 'object') {
+                return {
+                    issuer: null,
+                    subject: null,
+                    signedAt: null,
+                } as const;
+            }
+
+            const protectedSection = data.protected as Record<string, unknown> | undefined;
+            const cwtClaims = protectedSection && typeof protectedSection === 'object'
+                ? (protectedSection['CWT Claims'] as Record<string, unknown> | undefined)
+                : undefined;
+
+            if (!cwtClaims || typeof cwtClaims !== 'object') {
+                return {
+                    issuer: null,
+                    subject: null,
+                    signedAt: null,
+                } as const;
+            }
+
+            const issuer = typeof cwtClaims.iss === 'string' ? cwtClaims.iss : null;
+            const subject = typeof cwtClaims.sub === 'string' ? cwtClaims.sub : null;
+            const signedAt = formatSignedAt(cwtClaims.iat ?? null);
+
+            return {
+                issuer,
+                subject,
+                signedAt,
+            } as const;
+        } catch {
+            return {
+                issuer: null,
+                subject: null,
+                signedAt: null,
+            } as const;
+        }
+    }, [decodeValueToString, formatSignedAt]);
 
     const formatSqlValue = (value: unknown): string => {
         if (value === null || value === undefined) {
@@ -840,70 +1087,192 @@ const TablesPage: React.FC = () => {
                                         Error loading key values: {keyValuesError.message}
                                     </MessageBar>
                                 ) : keyValues && keyValues.length > 0 ? (
-                                    <Table>
+                                    <Table ref={rawTableRef as React.RefObject<HTMLDivElement>} {...tableProps}>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHeaderCell>Sequence</TableHeaderCell>
-                                                <TableHeaderCell>Key</TableHeaderCell>
-                                                <TableHeaderCell>Value</TableHeaderCell>
-                                                <TableHeaderCell>Actions</TableHeaderCell>
+                                                <TableHeaderCell
+                                                    className={classes.sortableHeaderCell}
+                                                    style={headerSizing.sequence.style}
+                                                    aside={headerSizing.sequence.aside}
+                                                    onClick={() => handleSortChange('sequence')}
+                                                    tabIndex={0}
+                                                    onKeyDown={(event) => handleHeaderKeyDown(event, 'sequence')}
+                                                    aria-sort={getAriaSort('sequence')}
+                                                >
+                                                    <TableCellLayout className={classes.sortableHeaderContent}>
+                                                        <span>Sequence</span>
+                                                        {renderSortIcon('sequence')}
+                                                    </TableCellLayout>
+                                                </TableHeaderCell>
+                                                <TableHeaderCell
+                                                    className={classes.sortableHeaderCell}
+                                                    style={headerSizing.transactionId.style}
+                                                    aside={headerSizing.transactionId.aside}
+                                                    onClick={() => handleSortChange('transactionId')}
+                                                    tabIndex={0}
+                                                    onKeyDown={(event) => handleHeaderKeyDown(event, 'transactionId')}
+                                                    aria-sort={getAriaSort('transactionId')}
+                                                >
+                                                    <TableCellLayout className={classes.sortableHeaderContent}>
+                                                        <span>Transaction ID</span>
+                                                        {renderSortIcon('transactionId')}
+                                                    </TableCellLayout>
+                                                </TableHeaderCell>
+                                                <TableHeaderCell
+                                                    className={classes.sortableHeaderCell}
+                                                    style={headerSizing.keyName.style}
+                                                    aside={headerSizing.keyName.aside}
+                                                    onClick={() => handleSortChange('keyName')}
+                                                    tabIndex={0}
+                                                    onKeyDown={(event) => handleHeaderKeyDown(event, 'keyName')}
+                                                    aria-sort={getAriaSort('keyName')}
+                                                >
+                                                    <TableCellLayout className={classes.sortableHeaderContent}>
+                                                        <span>Key</span>
+                                                        {renderSortIcon('keyName')}
+                                                    </TableCellLayout>
+                                                </TableHeaderCell>
+                                                <TableHeaderCell
+                                                    className={classes.sortableHeaderCell}
+                                                    style={headerSizing.value.style}
+                                                    aside={headerSizing.value.aside}
+                                                    onClick={() => handleSortChange('value')}
+                                                    tabIndex={0}
+                                                    onKeyDown={(event) => handleHeaderKeyDown(event, 'value')}
+                                                    aria-sort={getAriaSort('value')}
+                                                >
+                                                    <TableCellLayout className={classes.sortableHeaderContent}>
+                                                        <span>Value</span>
+                                                        {renderSortIcon('value')}
+                                                    </TableCellLayout>
+                                                </TableHeaderCell>
+                                                {isScittEntryTable && (
+                                                    <>
+                                                        <TableHeaderCell
+                                                            className={classes.headerCell}
+                                                            style={scittHeaderSizing?.issuer.style}
+                                                            aside={scittHeaderSizing?.issuer.aside}
+                                                        >
+                                                            Issuer
+                                                        </TableHeaderCell>
+                                                        <TableHeaderCell
+                                                            className={classes.headerCell}
+                                                            style={scittHeaderSizing?.subject.style}
+                                                            aside={scittHeaderSizing?.subject.aside}
+                                                        >
+                                                            Subject
+                                                        </TableHeaderCell>
+                                                        <TableHeaderCell
+                                                            className={classes.headerCell}
+                                                            style={scittHeaderSizing?.signedAt.style}
+                                                            aside={scittHeaderSizing?.signedAt.aside}
+                                                        >
+                                                            Signed At
+                                                        </TableHeaderCell>
+                                                    </>
+                                                )}
+                                                <TableHeaderCell
+                                                    className={classes.headerCell}
+                                                    style={headerSizing.actions.style}
+                                                    aside={headerSizing.actions.aside}
+                                                >
+                                                    Actions
+                                                </TableHeaderCell>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {keyValues.map((kv, index) => (
-                                                <TableRow key={index}>
-                                                    <TableCell>
-                                                        <TableCellLayout>
-                                                            {kv.transactionId}
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TableCellLayout truncate>
-                                                            <Text size={300} weight="semibold">
-                                                                {kv.keyName}
-                                                            </Text>
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <TableCellLayout truncate>
-                                                            <Text size={200} style={{ fontFamily: 'monospace' }}>
-                                                                {kv.isDeleted ? (
-                                                                    <Text style={{ color: tokens.colorPaletteRedForeground2, fontStyle: 'italic' }}>
-                                                                        [DELETED]
-                                                                    </Text>
-                                                                ) : (
-                                                                    formatValue(kv.value)
-                                                                )}
-                                                            </Text>
-                                                        </TableCellLayout>
-                                                    </TableCell>
+                                            {keyValues.map((kv) => {
+                                                const scittClaims = isScittEntryTable && !kv.isDeleted
+                                                    ? getScittClaims(kv.value)
+                                                    : null;
 
-                                                    <TableCell>
-                                                        <TableCellLayout>
-                                                            <div className={classes.actionButtons}>
-                                                                <Tooltip content="View transaction history for this key" relationship="label">
-                                                                    <Button
-                                                                        appearance="outline"
-                                                                        size="small"
-                                                                        onClick={() => handleKeySelect(kv.keyName)}
-                                                                    >
-                                                                        <HistoryRegular /> <span>History</span>
-                                                                    </Button>
-                                                                </Tooltip>
-                                                                <Tooltip content="View transaction details" relationship="label">
-                                                                    <Button
-                                                                        appearance="outline"
-                                                                        size="small"
-                                                                        onClick={() => handleTransactionSelect(kv.transactionId)}
-                                                                    >
-                                                                        <span>Details</span> <ChevronRightRegular />
-                                                                    </Button>
-                                                                </Tooltip>
-                                                            </div>
-                                                        </TableCellLayout>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
+                                                return (
+                                                    <TableRow key={`${kv.transactionId}-${kv.keyName}`}>
+                                                        <TableCell style={cellSizing.sequence.style}>
+                                                            <TableCellLayout>
+                                                                {kv.transactionId}
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        <TableCell style={cellSizing.transactionId.style}>
+                                                            <TableCellLayout>
+                                                                <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                    {kv.transactionIdentifier ?? '—'}
+                                                                </Text>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        <TableCell style={cellSizing.keyName.style}>
+                                                            <TableCellLayout truncate>
+                                                                <Text size={300} weight="semibold">
+                                                                    {kv.keyName}
+                                                                </Text>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        <TableCell style={cellSizing.value.style}>
+                                                            <TableCellLayout truncate>
+                                                                <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                    {kv.isDeleted ? (
+                                                                        <Text style={{ color: tokens.colorPaletteRedForeground2, fontStyle: 'italic' }}>
+                                                                            [DELETED]
+                                                                        </Text>
+                                                                    ) : (
+                                                                        formatValue(kv.value)
+                                                                    )}
+                                                                </Text>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                        {isScittEntryTable && (
+                                                            <>
+                                                                <TableCell style={scittCellSizing?.issuer.style}>
+                                                                    <TableCellLayout truncate>
+                                                                        <Text size={200}>
+                                                                            {scittClaims?.issuer ?? '—'}
+                                                                        </Text>
+                                                                    </TableCellLayout>
+                                                                </TableCell>
+                                                                <TableCell style={scittCellSizing?.subject.style}>
+                                                                    <TableCellLayout truncate>
+                                                                        <Text size={200}>
+                                                                            {scittClaims?.subject ?? '—'}
+                                                                        </Text>
+                                                                    </TableCellLayout>
+                                                                </TableCell>
+                                                                <TableCell style={scittCellSizing?.signedAt.style}>
+                                                                    <TableCellLayout>
+                                                                        <Text size={200} style={{ fontFamily: 'monospace' }}>
+                                                                            {scittClaims?.signedAt ?? '—'}
+                                                                        </Text>
+                                                                    </TableCellLayout>
+                                                                </TableCell>
+                                                            </>
+                                                        )}
+
+                                                        <TableCell style={cellSizing.actions.style}>
+                                                            <TableCellLayout>
+                                                                <div className={classes.actionButtons}>
+                                                                    <Tooltip content="View transaction history for this key" relationship="label">
+                                                                        <Button
+                                                                            appearance="outline"
+                                                                            size="small"
+                                                                            onClick={() => handleKeySelect(kv.keyName)}
+                                                                        >
+                                                                            <HistoryRegular /> <span>History</span>
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                    <Tooltip content="View transaction details" relationship="label">
+                                                                        <Button
+                                                                            appearance="outline"
+                                                                            size="small"
+                                                                            onClick={() => handleTransactionSelect(kv.transactionId)}
+                                                                        >
+                                                                            <span>Details</span> <ChevronRightRegular />
+                                                                        </Button>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCellLayout>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
                                         </TableBody>
                                     </Table>
                                 ) : (

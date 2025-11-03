@@ -27,6 +27,7 @@ import {
     CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useClearAllData } from '../hooks/use-ccf-data';
+import { setLedgerDomain as storeLedgerDomain } from '../utils/ledger-domain-storage';
 
 
 const useStyles = makeStyles({
@@ -167,6 +168,11 @@ export const MstLedgerImportView: React.FC = () => {
         const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
         if (downloadedFiles.length > 0) {
             handleFiles(downloadedFiles);
+
+            if (ledgerDomain) {
+                storeLedgerDomain(ledgerDomain, 'MST');
+            }
+            
             setFiles([]);
             setDownloadedFiles(filesDownloaded);
         }
