@@ -21,7 +21,7 @@ import {
   DismissCircle20Filled,
   Info20Regular,
 } from '@fluentui/react-icons';
-import { useFileDrop, useLedgerFiles, useStorageCapacity } from '../hooks/use-ccf-data';
+import { useFileDrop, useLedgerFiles } from '../hooks/use-ccf-data';
 import { 
   validateLedgerSequence, 
   parseLedgerFilename, 
@@ -30,8 +30,6 @@ import {
   type LedgerFileInfo,
   type ValidationResult 
 } from '../utils/ledger-validation';
-import { StorageVisualizer } from './StorageVisualizer';
-import { estimateDatabaseSize } from '../utils/storage-quota';
 
 const useStyles = makeStyles({
   container: {
@@ -255,7 +253,6 @@ export const FileUploadArea: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [selectedFilesInfo, setSelectedFilesInfo] = useState<{
     newFiles: LedgerFileInfo[];
     skippedFiles: LedgerFileInfo[];
@@ -265,13 +262,6 @@ export const FileUploadArea: React.FC = () => {
   
   const { handleDragOver, handleFiles, isUploading, uploadError } = useFileDrop();
   const { data: ledgerFiles, refetch: refetchFiles } = useLedgerFiles();
-  
-  // Calculate estimated storage requirement for pending files
-  const totalFileSize = pendingFiles.reduce((sum, file) => sum + file.size, 0);
-  const estimatedDBSize = estimateDatabaseSize(pendingFiles.length * 1000); // Rough estimate
-  const requiredStorage = totalFileSize + estimatedDBSize;
-  
-  const { data: storageCapacity } = useStorageCapacity(requiredStorage);
 
   const handleClick = () => {
     fileInputRef.current?.click();
@@ -298,13 +288,9 @@ export const FileUploadArea: React.FC = () => {
         sortedFiles: [],
         missingRanges: [],
       });
-      setPendingFiles([]);
       setSelectedFilesInfo(null);
       return;
     }
-    
-    // Set pending files for storage calculation
-    setPendingFiles(committedFiles);
     
     // Get existing file info
     const existingFileInfos: LedgerFileInfo[] = ledgerFiles?.map(file => 
@@ -320,7 +306,6 @@ export const FileUploadArea: React.FC = () => {
       // Show validation error for invalid filenames
       const validation = validateLedgerSequence(committedFiles, existingFileInfos);
       setValidationResult(validation);
-      setPendingFiles([]);
       setSelectedFilesInfo(null);
       return;
     }
@@ -350,7 +335,6 @@ export const FileUploadArea: React.FC = () => {
       if (newFilesArray.length > 0) {
         handleFiles(newFilesArray);
       }
-      setPendingFiles([]); // Clear pending files after initiating upload
     } else {
       // Validate the sequence only if we have issues beyond duplicates
       const validation = validateLedgerSequence(committedFiles, existingFileInfos);
@@ -358,7 +342,6 @@ export const FileUploadArea: React.FC = () => {
       
       if (validation.isValid) {
         handleFiles(committedFiles);
-        setPendingFiles([]); // Clear pending files after successful upload
       }
     }
   };
@@ -396,7 +379,6 @@ export const FileUploadArea: React.FC = () => {
       // Mark upload as completed
       setUploadCompleted(true);
       refetchFiles();
-      setPendingFiles([]); // Clear pending files when upload completes
       
       // Don't auto-clear feedback - let it stay visible for user review
       // Only clear if user starts a new upload
@@ -408,31 +390,6 @@ export const FileUploadArea: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      {/* Storage Status */}
-      <StorageVisualizer 
-        title="Storage Status" 
-        showRefreshButton={true}
-        showRecommendations={true}
-        requiredSpace={requiredStorage}
-      />
-
-      {/* Storage Warning for pending files */}
-      {pendingFiles.length > 0 && storageCapacity && !storageCapacity.hasCapacity && (
-        <MessageBar intent="error">
-          <MessageBarBody>
-            <MessageBarTitle>Insufficient Storage Space</MessageBarTitle>
-            <div>
-              Required: {formatFileSize(storageCapacity.requiredBytes)} • 
-              Available: {formatFileSize(storageCapacity.availableBytes)} • 
-              Shortfall: {formatFileSize(storageCapacity.shortfallBytes || 0)}
-            </div>
-            <div style={{ marginTop: '8px' }}>
-              Please clear existing data or reduce file selection before proceeding.
-            </div>
-          </MessageBarBody>
-        </MessageBar>
-      )}
-
       {/* Drop Zone */}
       <div
         className={`${styles.dropZone} ${isDragActive ? styles.dropZoneActive : ''}`}
