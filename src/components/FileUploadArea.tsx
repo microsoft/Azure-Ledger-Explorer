@@ -40,32 +40,63 @@ const useStyles = makeStyles({
     overflow: 'auto',
   },
   dropZone: {
-    border: `2px dashed ${tokens.colorNeutralStroke2}`,
+    background: 'linear-gradient(135deg, rgba(0,120,212,0.05), rgba(0,120,212,0.02))',
+    border: '2px dashed rgba(0,120,212,0.3)',
     borderRadius: '8px',
-    padding: '48px 24px',
+    padding: '40px 32px',
     textAlign: 'center',
-    backgroundColor: tokens.colorNeutralBackground2,
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.03)',
+    backdropFilter: 'blur(20px)',
     '&:hover': {
-      backgroundColor: tokens.colorNeutralBackground1,
+      border: '2px dashed #0078D4',
+      boxShadow: '0 6px 24px rgba(0,0,0,0.06)',
     },
   },
   dropZoneActive: {
-    backgroundColor: tokens.colorBrandBackground2,
+    background: 'linear-gradient(135deg, rgba(0,120,212,0.15), rgba(0,120,212,0.08))',
+    border: '2px dashed #0078D4',
+    transform: 'scale(1.02)',
+    boxShadow: '0 8px 32px rgba(0,120,212,0.15)',
   },
   dropZoneIcon: {
     fontSize: '48px',
-    color: tokens.colorNeutralForeground3,
+    color: '#0078D4',
     marginBottom: '16px',
+    transition: 'all 0.3s ease',
+  },
+  dropZoneIconActive: {
+    opacity: '1',
+    transform: 'scale(1.1)',
+  },
+  dropZoneContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  fileFormatHint: {
+    marginTop: '12px',
+    padding: '8px 16px',
+    background: 'rgba(0,0,0,0.03)',
+    borderRadius: '6px',
+    color: tokens.colorNeutralForeground2,
+  },
+  dividerText: {
+    margin: '8px 0',
+    opacity: '0.6',
+    color: tokens.colorNeutralForeground3,
   },
   dropZoneText: {
-    marginBottom: '8px',
-    color: tokens.colorNeutralForeground2,
+    marginBottom: '12px',
+    color: tokens.colorNeutralForeground1,
   },
   dropZoneSubtext: {
     color: tokens.colorNeutralForeground3,
-    marginBottom: '16px',
+    marginBottom: '4px',
+    display: 'block',
+    fontSize: '12px',
   },
   hiddenInput: {
     display: 'none',
@@ -76,11 +107,14 @@ const useStyles = makeStyles({
     gap: '12px',
   },
   fileCard: {
+    background: 'white',
+    border: '1px solid rgba(0,0,0,0.06)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.3s ease',
     '&:hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: 'var(--shadow4)',
+      transform: 'translateY(-3px)',
+      boxShadow: '0 6px 20px rgba(0,0,0,0.1)',
     },
   },
   fileCardContent: {
@@ -311,18 +345,37 @@ export const FileUploadArea: React.FC = () => {
         />
 
         {!isUploading ? (
-          <>
-            <CloudArrowUp24Regular className={styles.dropZoneIcon} />
-            <Text className={styles.dropZoneText} size={500} weight="semibold">
-              {isDragActive ? 'Drop .committed files here' : 'Drag and drop CCF ledger .committed files'}
-            </Text>
-            <Caption1 className={styles.dropZoneSubtext}>
-              Files must be named: ledger_&lt;start&gt;-&lt;end&gt;.committed (e.g., ledger_1-18.committed)
-            </Caption1>
-            <Button appearance="primary" icon={<DocumentAdd24Regular />}>
-              Select .committed Files
-            </Button>
-          </>
+          <div style={{ textAlign: 'center' }}>
+            <CloudArrowUp24Regular 
+              className={`${styles.dropZoneIcon} ${isDragActive ? styles.dropZoneIconActive : ''}`}
+              style={{
+                opacity: isDragActive ? 1 : 0.7,
+                transform: isDragActive ? 'scale(1.1)' : 'scale(1)',
+              }}
+            />
+            <div className={styles.dropZoneContent}>
+              <Text size={500} weight="semibold" style={{ color: '#0078D4' }}>
+                {isDragActive ? 'Release to upload' : 'Drop files here'}
+              </Text>
+              <Text size={200} className={styles.dividerText}>
+                — or —
+              </Text>
+              <Button 
+                appearance="primary" 
+                size="large" 
+                icon={<DocumentAdd24Regular />}
+                style={{
+                  background: 'linear-gradient(135deg, #0078D4, #005a9e)',
+                  boxShadow: '0 4px 12px rgba(0,120,212,0.3)',
+                }}
+              >
+                Browse Files
+              </Button>
+              <Caption1 className={styles.fileFormatHint}>
+                .committed files only • Format: ledger_1-18.committed
+              </Caption1>
+            </div>
+          </div>
         ) : (
           <div className={styles.uploadingContent}>
             <Spinner size="large" />
