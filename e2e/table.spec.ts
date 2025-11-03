@@ -6,7 +6,7 @@ const testfilepath = import.meta.url.replace('file://', '');
 test.beforeEach(async ({ page }) => {
   await page.goto('/files');
   await page.getByRole('button', { name: 'Add Files' }).click();
-  await page.getByRole('button', { name: 'Select .committed Files' }).click();
+  await page.getByRole('button', { name: 'Browse Files' }).click();
   await page.getByLabel('Upload CCF ledger files').setInputFiles([
     path.join(testfilepath, '../test_files', 'ledger_1-14.committed'),
     path.join(testfilepath, '../test_files', 'ledger_15-3926.committed'),

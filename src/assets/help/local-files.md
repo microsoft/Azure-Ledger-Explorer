@@ -1,39 +1,25 @@
-### Uploading Local Files
+### Quick Start
 
-Upload CCF ledger files from your local system for analysis and exploration.
+Upload CCF ledger files (`.committed`) from your local system.
 
-### Supported File Types
+### Requirements
 
-- **Only .committed files** - Files must have the .committed extension
-- **Sequential naming required** - Files must be named: ledger_<start>-<end>.committed
-- **Examples**: ledger_1-18.committed, ledger_19-25.committed, ledger_26-40.committed
+- **File extension**: Only `.committed` files
+- **Naming format**: `ledger_<start>-<end>.committed`
+- **Sequence**: Must start at 1, no gaps or overlaps
 
-### File Sequence Requirements
+### Examples
 
-1. **Must start at 1**: The first file must be ledger_1-X.committed
-2. **Must be contiguous**: No gaps between file ranges
-3. **No overlaps**: File ranges cannot overlap
-4. **Sequential order**: Files will be processed in sequence order
+- `ledger_1-18.committed`
+- `ledger_19-25.committed`
+- `ledger_26-40.committed`
 
 ### How to Upload
 
-1. **Drag and Drop**: Simply drag .committed files from your file system into the upload area
-2. **Browse Files**: Click "Select .committed Files" to open a file browser
-3. **Multiple Files**: You can upload multiple sequential files at once
+1. **Drag & drop** files into the upload area
+2. **Click button** to browse and select files
+3. **Multiple files** can be uploaded at once
 
-### File Processing
+### Processing
 
-After upload, the application will:
-- Validate file sequence and naming
-- Parse the ledger structure in sequential order
-- Extract transactions and key-value pairs
-- Index data for fast searching
-- Store everything locally in your browser
-
-### Validation
-
-The system will check for:
-- Correct .committed file extension
-- Proper naming format (ledger_X-Y.committed)
-- Sequential and contiguous ranges
-- No duplicate or overlapping files
+Files are validated, parsed, and stored locally in your browser for fast searching.
