@@ -219,7 +219,6 @@ export const FileUploadArea: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [selectedFilesInfo, setSelectedFilesInfo] = useState<{
     newFiles: LedgerFileInfo[];
     skippedFiles: LedgerFileInfo[];
@@ -255,7 +254,6 @@ export const FileUploadArea: React.FC = () => {
         sortedFiles: [],
         missingRanges: [],
       });
-      setPendingFiles([]);
       setSelectedFilesInfo(null);
       return;
     }
@@ -274,7 +272,6 @@ export const FileUploadArea: React.FC = () => {
       // Show validation error for invalid filenames
       const validation = validateLedgerSequence(committedFiles, existingFileInfos);
       setValidationResult(validation);
-      setPendingFiles([]);
       setSelectedFilesInfo(null);
       return;
     }
@@ -304,7 +301,6 @@ export const FileUploadArea: React.FC = () => {
       if (newFilesArray.length > 0) {
         handleFiles(newFilesArray);
       }
-      setPendingFiles([]); // Clear pending files after initiating upload
     } else {
       // Validate the sequence only if we have issues beyond duplicates
       const validation = validateLedgerSequence(committedFiles, existingFileInfos);
@@ -312,7 +308,6 @@ export const FileUploadArea: React.FC = () => {
       
       if (validation.isValid) {
         handleFiles(committedFiles);
-        setPendingFiles([]); // Clear pending files after successful upload
       }
     }
   };
@@ -350,7 +345,6 @@ export const FileUploadArea: React.FC = () => {
       // Mark upload as completed
       setUploadCompleted(true);
       refetchFiles();
-      setPendingFiles([]); // Clear pending files when upload completes
       
       // Don't auto-clear feedback - let it stay visible for user review
       // Only clear if user starts a new upload
