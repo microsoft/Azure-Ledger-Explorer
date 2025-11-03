@@ -37,6 +37,10 @@ import {
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from '../components/AddFilesWizard';
 import { useTools } from '../hooks/use-tools';
+import { 
+  getLedgerDomain, 
+  clearLedgerDomain 
+} from '../utils/ledger-domain-storage';
 
 const useStyles = makeStyles({
   container: {
@@ -146,6 +150,7 @@ export const ConfigPage: React.FC = () => {
   const { data: allTransactionsCount } = useAllTransactionsCount();
   const [showUploadDialog, setShowUploadDialog] = React.useState(false);
   const [dropDbDialogOpen, setDropDbDialogOpen] = React.useState(false);
+  const [ledgerInfo, setLedgerInfo] = React.useState(getLedgerDomain());
   const { data: stats } = useStats();
   const clearAllDataMutation = useClearAllData();
   const dropDatabaseMutation = useDropDatabase();
@@ -166,6 +171,8 @@ export const ConfigPage: React.FC = () => {
   const handleDropDatabase = async () => {
     try {
       await dropDatabaseMutation.mutateAsync();
+      clearLedgerDomain();
+      setLedgerInfo(getLedgerDomain());
       setDropDbDialogOpen(false);
     } catch (error) {
       console.error('Failed to drop database:', error);
@@ -190,10 +197,45 @@ export const ConfigPage: React.FC = () => {
                 Ledger data gets imported and then is exposed in various pages. It can also be queried.
               </Text>
 
+              {ledgerInfo.domain ? (
+                <div style={{
+                  backgroundColor: tokens.colorNeutralBackground3,
+                  padding: tokens.spacingVerticalM,
+                  borderRadius: tokens.borderRadiusMedium,
+                  marginBottom: tokens.spacingVerticalM,
+                }}>
+                  <Text size={200} weight="semibold" block>
+                    Imported Ledger Domain:
+                  </Text>
+                  <Text size={200} style={{ 
+                    fontFamily: 'monospace', 
+                    marginTop: tokens.spacingVerticalXS 
+                  }} block>
+                    {ledgerInfo.domain}
+                  </Text>
+                  {ledgerInfo.type && (
+                    <Caption1 style={{ 
+                      marginTop: tokens.spacingVerticalXS,
+                      color: tokens.colorNeutralForeground3 
+                    }}>
+                      Source: {ledgerInfo.type}
+                      {ledgerInfo.importedAt && 
+                        ` • ${new Date(ledgerInfo.importedAt).toLocaleString()}`}
+                    </Caption1>
+                  )}
+                </div>
+              ) : (
+                <Text size={200} style={{ 
+                  color: tokens.colorNeutralForeground3,
+                  marginBottom: tokens.spacingVerticalM 
+                }} block>
+                  No ledger domain information available (manual file import or not yet imported)
+                </Text>
+              )}
+
               { allTransactionsCount && allTransactionsCount > 0 ? <Text size={200}>Imported transactions: {allTransactionsCount}</Text> : <Text size={200}>No imported data found</Text> }
               
               <div className={styles.actionButtons}>
-                {/* Upload Files Button */}
                 <Button
                   appearance="outline"
                   icon={<DocumentAdd24Regular />}
@@ -207,7 +249,6 @@ export const ConfigPage: React.FC = () => {
                   onOpenChange={setShowUploadDialog}
                 />
 
-                {/* Clear All Data Button */}
                 { hasData && <Dialog>
                   <DialogTrigger disableButtonEnhancement>
                     <Button
@@ -250,7 +291,6 @@ export const ConfigPage: React.FC = () => {
                 </Dialog>
                 }
 
-                {/* Drop Database Button */}
                 <Dialog 
                   open={dropDbDialogOpen} 
                   onOpenChange={(_, data) => setDropDbDialogOpen(data.open)}
