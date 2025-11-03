@@ -8,12 +8,14 @@ import {
   Button,
   TabList,
   Tab,
+  Text,
+  Tooltip,
   tokens,
 } from '@fluentui/react-components';
 import {
-  CloudRegular,
-  ShieldCheckmarkRegular,
-  FolderRegular,
+  CloudArrowUp20Regular,
+  ShieldCheckmark20Regular,
+  Folder20Regular,
   Dismiss24Regular,
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
@@ -65,6 +67,9 @@ const useStyles = makeStyles({
   },
   tabList: {
     marginBottom: '24px',
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
   },
   tabContent: {
     flex: 1,
@@ -149,17 +154,22 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
             <TabList
               selectedValue={selectedTab}
               onTabSelect={(_, data) => setSelectedTab(data.value as AllowedOptions)}
-              
               className={styles.tabList}
             >
-              <Tab value="azure" icon={<CloudRegular />}>
-                Azure Confidential Ledger
+              <Tab value="azure" icon={<CloudArrowUp20Regular />}>
+                <Tooltip content="Azure Confidential Ledger" relationship="label">
+                  <Text size={200}>Azure Ledger</Text>
+                </Tooltip>
               </Tab>
-              <Tab value="mst" icon={<ShieldCheckmarkRegular />}>
-                Microsoft's Signing Transparency
+              <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
+                <Tooltip content="Microsoft's Signing Transparency" relationship="label">
+                  <Text size={200}>Signing</Text>
+                </Tooltip>
               </Tab>
-              <Tab value="local" icon={<FolderRegular />}>
-                Local Files
+              <Tab value="local" icon={<Folder20Regular />}>
+                <Tooltip content="Upload Local Files" relationship="label">
+                  <Text size={200}>Local Files</Text>
+                </Tooltip>
               </Tab>
             </TabList>
 

@@ -13,14 +13,14 @@ test('files page button opens add files dialog', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('tab', { name: 'Files' }).click();
   await page.getByRole('button', { name: 'Add Files' }).click();
-  await page.getByRole('button', { name: 'Select .committed Files' }).click();
+  await page.getByRole('button', { name: 'Browse Files' }).click();
   await expect(page.getByRole('heading', { name: 'Add Ledger Files' })).toBeVisible();
 });
 
 test('cannot upload invalid file names', async ({ page }) => {
   await page.goto('/files');
   await page.getByRole('button', { name: 'Add Files' }).click();
-  await page.getByRole('button', { name: 'Select .committed Files' }).click();
+  await page.getByRole('button', { name: 'Browse Files' }).click();
   await page.getByLabel('Upload CCF ledger files').setInputFiles([
     path.join(testfilepath, '../test_files', 'invalidnameledger_1-14.committed'),
   ]);
@@ -30,7 +30,7 @@ test('cannot upload invalid file names', async ({ page }) => {
 test('successfully imports ledger files', async ({ page }) => {
   await page.goto('/files');
   await page.getByRole('button', { name: 'Add Files' }).click();
-  await page.getByRole('button', { name: 'Select .committed Files' }).click();
+  await page.getByRole('button', { name: 'Browse Files' }).click();
   await page.getByLabel('Upload CCF ledger files').setInputFiles([
     path.join(testfilepath, '../test_files', 'ledger_1-14.committed'),
     path.join(testfilepath, '../test_files', 'ledger_15-3926.committed'),
