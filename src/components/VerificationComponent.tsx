@@ -185,6 +185,7 @@ export const VerificationComponent: React.FC = () => {
               {!isRunning ? (
                 <Button 
                   appearance="primary" 
+                  size="large"
                   icon={<Play24Regular />} 
                   onClick={handleStart}
                 >
@@ -195,6 +196,7 @@ export const VerificationComponent: React.FC = () => {
                   {progress?.status === 'running' ? (
                     <Button 
                       appearance="secondary" 
+                      size="large"
                       icon={<Pause24Regular />} 
                       onClick={handlePause}
                     >
@@ -203,6 +205,7 @@ export const VerificationComponent: React.FC = () => {
                   ) : progress?.status === 'paused' ? (
                     <Button 
                       appearance="secondary" 
+                      size="large"
                       icon={<Play24Regular />} 
                       onClick={handleResume}
                     >
@@ -214,6 +217,7 @@ export const VerificationComponent: React.FC = () => {
               
               <Button 
                 appearance="outline" 
+                size="large"
                 icon={<Delete24Regular />} 
                 onClick={handleClearProgress}
                 disabled={isRunning}
