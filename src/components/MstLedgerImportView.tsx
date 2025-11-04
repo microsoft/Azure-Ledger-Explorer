@@ -19,6 +19,7 @@ import {
     Spinner,
     Card,
     CardHeader,
+    Tooltip,
     tokens,
 } from '@fluentui/react-components';
 import {
@@ -206,7 +207,7 @@ export const MstLedgerImportView: React.FC = () => {
                     disabled={isVerifying}
                     style={{ marginTop: '10px' }}
                 >
-                    {isVerifying ? <Spinner size="tiny" /> : 'Import Files'}
+                    {isVerifying ? <Spinner size="tiny" /> : 'Show available files'}
                 </Button>
             </div>
             {/* Create Table to List all the ledger files present in the backup based on the MST domain provided */}
@@ -239,16 +240,21 @@ export const MstLedgerImportView: React.FC = () => {
                                         </TableCellLayout>
                                     </TableCell>
                                     <TableCell>
-                                        <Button
-                                            appearance="primary"
-                                            disabled={isDownloading}
-                                            onClick={() => {
-                                                setIsDownloading(true);
-                                                handleVisualizeFileSelect(file);
-                                            }}
+                                        <Tooltip
+                                            content="Downloads this file and all earlier ledger files in sequence"
+                                            relationship="description"
                                         >
-                                            {isDownloading ? <Spinner size="tiny" id={file.filename} /> : 'Visualize Files'}
-                                        </Button>
+                                            <Button
+                                                appearance="primary"
+                                                disabled={isDownloading}
+                                                onClick={() => {
+                                                    setIsDownloading(true);
+                                                    handleVisualizeFileSelect(file);
+                                                }}
+                                            >
+                                                {isDownloading ? <Spinner size="tiny" id={file.filename} /> : 'Import (including previous)'}
+                                            </Button>
+                                        </Tooltip>
                                     </TableCell>
                                 </TableRow>
                             ))}
