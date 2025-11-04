@@ -48,19 +48,19 @@ export const VerificationPage: React.FC = () => {
     <div className={styles.container}>
       <div className={styles.content}>
         <Text as="h1" size={800} weight="semibold" className={styles.header}>
-          CCF Ledger Verification
+          Ledger Verification
         </Text>
         <Body1 className={styles.description}>
-          This tool allows you to verify CCF ledger data stored in the database using a web worker.
-          The verification process includes:
+          Verify the integrity and authenticity of your ledger data.
         </Body1>
-        <ul className={styles.featureList}>
-          <li>Transaction digest validation</li>
-          <li>Merkle tree verification against signature transactions</li>
-          <li>Progress reporting every 50 transactions</li>
-          <li>Simple resume capability using browser storage</li>
-          <li>Background processing with pause/resume controls</li>
-        </ul>
+        <ol className={styles.featureList} aria-label="Steps to verify your ledger">
+          <li>Upload your ledger files in the Files tab.</li>
+          <li>Adjust the progress reporting interval if you'd like more frequent updates.</li>
+          <li>Select <strong>Start Verification</strong> to begin.</li>
+          <li>Watch the progress bar to track verification status.</li>
+          <li>Use <strong>Pause</strong> to stop temporarily or <strong>Resume</strong> to continue.</li>
+          <li>Review the results when verification completes.</li>
+        </ol>
         
         <VerificationComponent />
       </div>

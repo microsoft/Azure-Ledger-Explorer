@@ -135,8 +135,8 @@ export const VerificationComponent: React.FC = () => {
     <div className={styles.container}>
       <Card className={styles.card}>
         <CardHeader
-          header={<Text size={600}>Ledger Verification</Text>}
-          description="Verify the integrity of the ledger data using database-stored transactions"
+          header={<Text size={600}>Verification Controls</Text>}
+          description="Start, pause, or monitor your ledger verification"
         />
         <CardPreview>
           <div className={styles.progressContainer}>
