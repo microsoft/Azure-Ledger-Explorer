@@ -16,16 +16,28 @@ const useStyles = makeStyles({
     maxWidth: '1200px',
     margin: '0 auto',
     width: '100%',
+    boxSizing: 'border-box',
+    '@media (max-width: 768px)': {
+      padding: tokens.spacingVerticalL,
+    },
+    '@media (max-width: 480px)': {
+      padding: tokens.spacingVerticalM,
+    },
   },
   header: {
     marginBottom: tokens.spacingVerticalL,
+    display: 'block',
+    wordBreak: 'break-word',
   },
   description: {
     marginBottom: tokens.spacingVerticalL,
+    display: 'block',
+    marginTop: tokens.spacingVerticalM,
   },
   featureList: {
     marginBottom: tokens.spacingVerticalXL,
     paddingLeft: tokens.spacingHorizontalXL,
+    marginTop: tokens.spacingVerticalS,
   },
 });
 

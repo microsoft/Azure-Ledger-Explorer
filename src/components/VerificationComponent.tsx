@@ -28,27 +28,27 @@ import type { VerificationConfig } from '../types/verification-types';
 
 const useStyles = makeStyles({
   container: {
-    padding: tokens.spacingVerticalL,
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalL,
-    maxWidth: '1200px',
-    margin: '0 auto',
-    width: '100%'
   },
   card: {
-    width: '100%'
+    width: '100%',
+    maxWidth: '800px',
+    margin: '0 auto',
   },
   progressContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalS
+    gap: tokens.spacingVerticalL,
+    padding: tokens.spacingVerticalL,
   },
   controls: {
     display: 'flex',
-    gap: tokens.spacingHorizontalM,
+    gap: tokens.spacingHorizontalL,
     alignItems: 'center',
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    marginTop: tokens.spacingVerticalM,
   },
   configSection: {
     padding: tokens.spacingVerticalM,
@@ -56,7 +56,12 @@ const useStyles = makeStyles({
     backgroundColor: tokens.colorNeutralBackground2,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalS
+    gap: tokens.spacingVerticalS,
+    boxSizing: 'border-box',
+  },
+  inputField: {
+    maxWidth: '80px',
+    minWidth: '60px',
   },
   progressInfo: {
     display: 'flex',
@@ -140,6 +145,7 @@ export const VerificationComponent: React.FC = () => {
               <Text size={500} weight="semibold">Configuration</Text>
               <Field label="Progress Report Interval" hint="Number of transactions between progress updates">
                 <Input
+                  className={styles.inputField}
                   type="number"
                   value={config.progressReportInterval.toString()}
                   onChange={(_, data) => setConfig(prev => ({ 
