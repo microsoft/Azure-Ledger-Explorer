@@ -129,7 +129,7 @@ export const MstReceiptVerificationPage: React.FC = () => {
         <div className={styles.header}>
           <div className={styles.headerRow}>
             <ShieldCheckmark24Regular className={styles.icon} />
-            <Text className={styles.title}>MST Receipt Verification</Text>
+            <Text className={styles.title}>Signing Transparency Receipt Verification</Text>
             <Badge 
               appearance="tint" 
               color="informative"
@@ -139,7 +139,7 @@ export const MstReceiptVerificationPage: React.FC = () => {
             </Badge>
           </div>
           <Text className={styles.description}>
-            Verify write receipts from MST (Merkle Service Tree) ledgers using the CCF .NET SDK
+            Verify transparent statements from Microsoft Signing Transparency (MST) using the Azure SDK for .NET
           </Text>
         </div>
 
@@ -150,9 +150,9 @@ export const MstReceiptVerificationPage: React.FC = () => {
           icon={<Info24Regular />}
         >
           <MessageBarBody>
-            <Text weight="semibold">Feature Under Development:</Text> MST receipt verification 
-            is not yet available in this web interface. Please use the CCF .NET SDK for programmatic 
-            verification of MST ledger receipts.
+            <Text weight="semibold">Feature Under Development:</Text> Signing transparency receipt verification 
+            is not yet available in this web interface. Please use the Azure SDK for .NET to verify 
+            transparent statements programmatically.
           </MessageBarBody>
         </MessageBar>
 
@@ -166,7 +166,8 @@ export const MstReceiptVerificationPage: React.FC = () => {
                 Verification with Azure SDK for .NET
               </Text>
               <Text>
-                To verify MST transparent statement receipts, please refer to the official Azure SDK for .NET documentation:
+                To verify signing transparency statements (transparent statements with COSE signature envelopes), 
+                please refer to the official Azure SDK for .NET documentation:
               </Text>
               <div style={{ marginTop: tokens.spacingVerticalM }}>
                 <Link 
