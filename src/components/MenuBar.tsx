@@ -6,6 +6,11 @@ import {
   TabList,
   Tab,
   tokens,
+  Menu,
+  MenuTrigger,
+  MenuPopover,
+  MenuList,
+  MenuItem,
 } from '@fluentui/react-components';
 import {
   WeatherMoon24Regular,
@@ -17,6 +22,8 @@ import {
   ShieldCheckmarkRegular,
   DocumentSearch24Regular,
   Settings24Regular,
+  Wrench24Regular,
+  ChevronDown20Regular,
 } from '@fluentui/react-icons';
 import { 
   useStats,
@@ -53,7 +60,9 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '24px',
   },
-
+  toolsButton: {
+    minWidth: 'auto',
+  },
 });
 
 interface MenuBarProps {
@@ -80,12 +89,18 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       navigate('/stats');
     } else if (tabValue === 'chat') {
       navigate('/chat');
-    } else if (tabValue === 'verification') {
-      navigate('/verification');
-    } else if (tabValue === 'write-receipt') {
-      navigate('/write-receipt');
     } else if (tabValue === 'config') {
       navigate('/config');
+    }
+  };
+
+  const handleToolsMenuSelect = (toolValue: string) => {
+    if (toolValue === 'ledger-verification') {
+      navigate('/verification');
+    } else if (toolValue === 'acl-receipt-verification') {
+      navigate('/write-receipt');
+    } else if (toolValue === 'mst-receipt-verification') {
+      navigate('/mst-receipt');
     }
   };
 
@@ -114,17 +129,51 @@ export const MenuBar: React.FC<MenuBarProps> = ({
               <Tab value="stats" icon={<NumberSymbolRegular />}>
                 Stats
               </Tab>
-              <Tab value="verification" icon={<ShieldCheckmarkRegular />}>
-                Ledger Verification
-              </Tab>
-              <Tab value="write-receipt" icon={<DocumentSearch24Regular />}>
-                Receipt Verification
-              </Tab>
             </>)}
             <Tab value="config" icon={<Settings24Regular />}>
               Configuration
             </Tab>
           </TabList>
+
+        {/* Tools Dropdown Menu */}
+        { hasData && (
+          <Menu>
+            <MenuTrigger disableButtonEnhancement>
+              <Button 
+                appearance="subtle" 
+                icon={<Wrench24Regular />}
+                iconPosition="before"
+                className={styles.toolsButton}
+                aria-label="Tools menu"
+              >
+                Tools
+                <ChevronDown20Regular />
+              </Button>
+            </MenuTrigger>
+            <MenuPopover>
+              <MenuList>
+                <MenuItem 
+                  icon={<ShieldCheckmarkRegular />}
+                  onClick={() => handleToolsMenuSelect('ledger-verification')}
+                >
+                  Ledger Verification
+                </MenuItem>
+                <MenuItem 
+                  icon={<DocumentSearch24Regular />}
+                  onClick={() => handleToolsMenuSelect('acl-receipt-verification')}
+                >
+                  ACL Receipt Verification
+                </MenuItem>
+                <MenuItem 
+                  icon={<DocumentSearch24Regular />}
+                  onClick={() => handleToolsMenuSelect('mst-receipt-verification')}
+                >
+                  MST Receipt Verification
+                </MenuItem>
+              </MenuList>
+            </MenuPopover>
+          </Menu>
+        )}
 
         {/* Header Actions */}
         <div className={styles.headerActions}>

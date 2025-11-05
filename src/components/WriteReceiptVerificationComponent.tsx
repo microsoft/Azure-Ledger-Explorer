@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   Button,
   Card,
@@ -9,31 +9,34 @@ import {
   MessageBarBody,
   Badge,
   Field,
-  Textarea,
   makeStyles,
   tokens,
   Spinner,
-  CardFooter
+  CardFooter,
+  Caption1,
+  Accordion,
+  AccordionItem,
+  AccordionHeader,
+  AccordionPanel
 } from '@fluentui/react-components';
 import {
   DocumentSearch24Regular,
   Checkmark24Regular,
   ErrorCircle24Regular,
   Info24Regular,
-  Certificate24Regular
+  Certificate24Regular,
+  ArrowUpload24Regular,
+  Dismiss24Regular
 } from '@fluentui/react-icons';
 import { useWriteReceiptVerification } from '../hooks/write-receipt-verification';
 import type { WriteReceipt } from '../types/write-receipt-types';
 
 const useStyles = makeStyles({
   container: {
-    padding: tokens.spacingVerticalL,
     display: 'flex',
     overflow: 'hidden',
     height: '100%',
     flexDirection: 'column',
-    maxWidth: '1200px',
-    margin: '0 auto',
   },
   containerItem: {
     flex: 1,
@@ -41,9 +44,14 @@ const useStyles = makeStyles({
     height: '100%',
     minHeight: 0,
     paddingBottom: '50px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
   },
   card: {
     width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
   },
   inputSection: {
     display: 'flex',
@@ -51,11 +59,14 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalM,
     width: '100%',
     padding: tokens.spacingVerticalM,
+    boxSizing: 'border-box',
   },
   resultsSection: {
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
+    width: '100%',
+    boxSizing: 'border-box',
   },
   statusBadge: {
     minWidth: '60px',
@@ -64,9 +75,12 @@ const useStyles = makeStyles({
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
     gap: tokens.spacingHorizontalM,
+    width: '100%',
+    boxSizing: 'border-box',
   },
   resultCard: {
     padding: tokens.spacingVerticalM,
+    boxSizing: 'border-box',
   },
   hashText: {
     fontFamily: tokens.fontFamilyMonospace,
@@ -82,6 +96,56 @@ const useStyles = makeStyles({
     alignItems: 'center',
     flexWrap: 'wrap',
   },
+  fileUploadCard: {
+    border: `2px dashed ${tokens.colorNeutralStroke2}`,
+    borderRadius: tokens.borderRadiusMedium,
+    padding: tokens.spacingVerticalL,
+    backgroundColor: tokens.colorNeutralBackground2,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    textAlign: 'center',
+    boxSizing: 'border-box',
+  },
+  fileUploadCardHover: {
+    border: `2px dashed #0078D4`,
+    backgroundColor: tokens.colorNeutralBackground2Hover,
+  },
+  fileUploadCardActive: {
+    border: `2px dashed #0078D4`,
+    backgroundColor: 'rgba(0,120,212,0.08)',
+  },
+  fileUploadContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: tokens.spacingVerticalS,
+  },
+  uploadIcon: {
+    fontSize: '32px',
+    color: '#0078D4',
+  },
+  fileSelectedCard: {
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    padding: tokens.spacingVerticalS,
+    backgroundColor: tokens.colorNeutralBackground1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalM,
+    boxSizing: 'border-box',
+  },
+  fileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+  },
+  hiddenInput: {
+    display: 'none',
+  },
 });
 
 export const WriteReceiptVerificationComponent: React.FC = () => {
@@ -90,6 +154,15 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
   const [networkCertText, setNetworkCertText] = useState('');
   const [parsedReceipt, setParsedReceipt] = useState<WriteReceipt | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  
+  // File upload state
+  const [receiptFileName, setReceiptFileName] = useState<string | null>(null);
+  const [certFileName, setCertFileName] = useState<string | null>(null);
+  const [isDraggingReceipt, setIsDraggingReceipt] = useState(false);
+  const [isDraggingCert, setIsDraggingCert] = useState(false);
+  
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+  const certInputRef = useRef<HTMLInputElement>(null);
 
   const { verificationResult, isLoading, error } = useWriteReceiptVerification(
     networkCertText || undefined,
@@ -132,7 +205,86 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
     setNetworkCertText('');
     setParsedReceipt(null);
     setParseError(null);
+    setReceiptFileName(null);
+    setCertFileName(null);
   }, []);
+  
+  // File upload handlers
+  const handleReceiptFileSelect = useCallback(async (file: File) => {
+    if (!file.name.endsWith('.json')) {
+      setParseError('Please select a JSON file for the receipt');
+      return;
+    }
+    
+    try {
+      const text = await file.text();
+      setReceiptText(text);
+      setReceiptFileName(file.name);
+      setParseError(null);
+    } catch (error) {
+      setParseError('Failed to read receipt file');
+    }
+  }, []);
+  
+  const handleCertFileSelect = useCallback(async (file: File) => {
+    try {
+      const text = await file.text();
+      setNetworkCertText(text);
+      setCertFileName(file.name);
+    } catch (error) {
+      setParseError('Failed to read certificate file');
+    }
+  }, []);
+  
+  const handleReceiptInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleReceiptFileSelect(file);
+    }
+  }, [handleReceiptFileSelect]);
+  
+  const handleCertInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleCertFileSelect(file);
+    }
+  }, [handleCertFileSelect]);
+  
+  const handleReceiptDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingReceipt(true);
+  }, []);
+  
+  const handleReceiptDragLeave = useCallback(() => {
+    setIsDraggingReceipt(false);
+  }, []);
+  
+  const handleReceiptDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingReceipt(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleReceiptFileSelect(file);
+    }
+  }, [handleReceiptFileSelect]);
+  
+  const handleCertDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingCert(true);
+  }, []);
+  
+  const handleCertDragLeave = useCallback(() => {
+    setIsDraggingCert(false);
+  }, []);
+  
+  const handleCertDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDraggingCert(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleCertFileSelect(file);
+    }
+  }, [handleCertFileSelect]);
 
   const getStatusIcon = (isValid: boolean, isCompleted: boolean) => {
     if (!isCompleted) return <Info24Regular />;
@@ -154,34 +306,6 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
     );
   };
 
-  const exampleReceipt = `{
-    "cert": "-----BEGIN CERTIFICATE-----\\nMIICOjCCAeCgAwIBAgIQOFPtEfZJthBhwTYj2kYnQjAKBggqhkjOPQQDAjAWMRQw\\nEgYDVQQDDAtDQ0YgU2VydmljZTAeFw0yNTA1MjIxODM3MjlaFw0yNTA4MjAxODM3\\nMjhaMBMxETAPBgNVBAMMCENDRiBOb2RlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcD\\nQgAEdbvxbxdDDEU/NXqhGE6VI1NvvvQlYSk9TAdLRHelGQ1fd3AyIKegZg5AI+KI\\n++iDkiEHWMKrWzreKjAj9Cd4taOCAREwggENMAwGA1UdEwEB/wQCMAAwHQYDVR0O\\nBBYEFJuP+HBZpc2z36JvTzt1nbxucHb5MB8GA1UdIwQYMBaAFG3PYWNt9D8LQBYC\\nXNvu8GC2vIOBMIG8BgNVHREEgbQwgbGCNXdyaXRlLmFjbC1kZWVwZmFrZS1kZW1v\\nLmNvbmZpZGVudGlhbC1sZWRnZXIuYXp1cmUuY29tghFhY2wtZGVlcGZha2UtZGVt\\nb4IuYWNsLWRlZXBmYWtlLWRlbW8ucHJvZC5wcml2YXRlLmF6dXJlbGVkZ2VyLmNv\\nbYcECvAOR4IvYWNsLWRlZXBmYWtlLWRlbW8uY29uZmlkZW50aWFsLWxlZGdlci5h\\nenVyZS5jb20wCgYIKoZIzj0EAwIDSAAwRQIhAI36pmdT83l6Oy2GMPAlnhggh903\\nCOYxHZjYfNCdI/oSAiBz8rakQI7cAbORpKVkpBOQU/P2XhxPdsYtdwZE6msWig==\\n-----END CERTIFICATE-----\\n",
-    "leafComponents": {
-        "claimsDigest": "0000000000000000000000000000000000000000000000000000000000000000",
-        "commitEvidence": "ce:10.675:c4dcf8d815740f94b3bdc3b76bc4d7463987ce036d4e8b612f104838d6c09a84",
-        "writeSetDigest": "d1727ca306bdf12a0893242f46cc5cef5bcb2e5a5412f6de6e6312d140d9f674"
-    },
-    "nodeId": "4d4748c36fc12087239d4874a5d5321bb114cfaf79dad3a35ff988ea2dfb4845",
-    "proof": [
-        {
-            "left": "1cc81b1b9499d0f6263bdd837756d2da01be2f5e16da3f0813ab071923946fd4"
-        },
-        {
-            "left": "f27a83514d3c8304f402bdee81af019844bb5a00ad7c729cf55db694ce3e0a1b"
-        },
-        {
-            "left": "0d7364e8d4770cc04c2ba869d88212b53b6f92acfd224e2e0c4c5fd1dbfb3170"
-        },
-        {
-            "left": "4e5002773497d470db9891e7142104354c9fc5c43df63e4a86998c834a22a818"
-        },
-        {
-            "left": "586e3fcdbdd3a118ebb2a3085ca4d65ca36ff9e53a1b5b7689f25d0690fa2cfc"
-        }
-    ],
-    "signature": "MEQCIFNuV44YbhXPGtw8OCd64LJkuHG57tnUMXO83Lv2ZW8xAiAIZ+k2blOxD/M3a0Jq61M2R1OVenEg9Yoqcia/y7sTrQ=="
-}`;
-
   return (
     <div className={classes.container}>
       <div className={classes.containerItem}>
@@ -202,6 +326,163 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
             />
         </Card>
 
+        {/* Scope Clarification Banner */}
+        <MessageBar intent="info" role="status" icon={<Info24Regular />}>
+          <MessageBarBody>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalXS }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalXS }}>
+                <Text weight="semibold">ACL Receipt Verification Only</Text>
+              </div>
+              <Text>
+                This page verifies <strong>Azure Confidential Ledger (ACL)</strong> write transaction receipts using Merkle tree proofs. 
+                For MST (Merkle Service Tree) ledger verification, please use the CCF .NET SDK as described in the{' '}
+                <a 
+                  href="https://microsoft.github.io/CCF/main/use_apps/verify_tx.html" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={{ color: '#0078D4', textDecoration: 'none' }}
+                  onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  CCF documentation
+                </a>.
+              </Text>
+            </div>
+          </MessageBarBody>
+        </MessageBar>
+
+        {/* Prerequisites and Instructions */}
+        <Card className={classes.card}>
+          <Accordion collapsible>
+            <AccordionItem value="instructions">
+              <AccordionHeader>
+                <Text weight="semibold">How to obtain verification files</Text>
+              </AccordionHeader>
+              <AccordionPanel>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM }}>
+                  <div>
+                    <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                      Prerequisites
+                    </Text>
+                    <ul style={{ margin: 0, paddingLeft: tokens.spacingHorizontalXL }}>
+                      <li>
+                        <Text>An active Azure Confidential Ledger resource</Text>
+                      </li>
+                      <li>
+                        <Text>Azure CLI or Azure SDK installed and configured</Text>
+                      </li>
+                      <li>
+                        <Text>Appropriate permissions to access the ledger</Text>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                      Step 1: Get the network certificate
+                    </Text>
+                    <Text block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                      Retrieve the service identity certificate for your ledger instance:
+                    </Text>
+                    <div style={{
+                      backgroundColor: tokens.colorNeutralBackground2,
+                      padding: tokens.spacingVerticalM,
+                      borderRadius: tokens.borderRadiusMedium,
+                      fontFamily: tokens.fontFamilyMonospace,
+                      fontSize: tokens.fontSizeBase200,
+                      overflowX: 'auto'
+                    }}>
+                      <Text block style={{ color: tokens.colorNeutralForeground2 }}>
+                        # Using Python SDK
+                      </Text>
+                      <Text block>
+                        from azure.confidentialledger.certificate import ConfidentialLedgerCertificateClient
+                      </Text>
+                      <Text block>
+                        identity_client = ConfidentialLedgerCertificateClient("https://identity.confidential-ledger.core.azure.com")
+                      </Text>
+                      <Text block>
+                        network_identity = identity_client.get_ledger_identity(ledger_id="your-ledger-name")
+                      </Text>
+                      <Text block>
+                        certificate = network_identity["ledgerTlsCertificate"]
+                      </Text>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                      Step 2: Get the write receipt
+                    </Text>
+                    <Text block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                      Obtain a receipt for a specific transaction using the transaction ID:
+                    </Text>
+                    <div style={{
+                      backgroundColor: tokens.colorNeutralBackground2,
+                      padding: tokens.spacingVerticalM,
+                      borderRadius: tokens.borderRadiusMedium,
+                      fontFamily: tokens.fontFamilyMonospace,
+                      fontSize: tokens.fontSizeBase200,
+                      overflowX: 'auto'
+                    }}>
+                      <Text block style={{ color: tokens.colorNeutralForeground2 }}>
+                        # Using Python SDK
+                      </Text>
+                      <Text block>
+                        from azure.confidentialledger import ConfidentialLedgerClient
+                      </Text>
+                      <Text block>
+                        ledger_client = ConfidentialLedgerClient(endpoint="https://your-ledger-name.confidential-ledger.azure.com", ...)
+                      </Text>
+                      <Text block>
+                        receipt = ledger_client.begin_get_receipt(transaction_id="2.40").result()
+                      </Text>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                      Additional resources
+                    </Text>
+                    <ul style={{ margin: 0, paddingLeft: tokens.spacingHorizontalXL }}>
+                      <li>
+                        <a 
+                          href="https://learn.microsoft.com/en-us/azure/confidential-ledger/write-transaction-receipts" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#0078D4', textDecoration: 'none' }}
+                        >
+                          Azure Confidential Ledger write transaction receipts
+                        </a>
+                      </li>
+                      <li>
+                        <a 
+                          href="https://learn.microsoft.com/en-us/azure/confidential-ledger/quickstart-python" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#0078D4', textDecoration: 'none' }}
+                        >
+                          Quickstart: Azure Confidential Ledger Python SDK
+                        </a>
+                      </li>
+                      <li>
+                        <a 
+                          href="https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/confidentialledger/azure-confidentialledger" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#0078D4', textDecoration: 'none' }}
+                        >
+                          Azure SDK for Python - Confidential Ledger
+                        </a>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </AccordionPanel>
+            </AccordionItem>
+          </Accordion>
+        </Card>
+
         {/* Input Section */}
         <Card className={classes.card}>
           <CardHeader
@@ -211,28 +492,134 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
             <div className={classes.inputSection}>
               <Field
                 label="Write Receipt JSON"
-                hint="Paste the complete write receipt JSON here"
+                hint="Upload a JSON file containing the receipt or drag and drop"
               >
-                <Textarea
-                  value={receiptText}
-                  onChange={(_, data) => setReceiptText(data.value)}
-                  placeholder={`Paste your receipt JSON here or try this example:\\n\\n${exampleReceipt}`}
-                  rows={8}
-                  style={{ fontFamily: tokens.fontFamilyMonospace, width: '100%' }}
+                <input
+                  ref={receiptInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className={classes.hiddenInput}
+                  onChange={handleReceiptInputChange}
+                  aria-label="Upload write receipt JSON file"
                 />
+                
+                {!receiptFileName ? (
+                  <div
+                    className={`${classes.fileUploadCard} ${isDraggingReceipt ? classes.fileUploadCardActive : ''}`}
+                    onClick={() => receiptInputRef.current?.click()}
+                    onDragOver={handleReceiptDragOver}
+                    onDragLeave={handleReceiptDragLeave}
+                    onDrop={handleReceiptDrop}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        receiptInputRef.current?.click();
+                      }
+                    }}
+                  >
+                    <div className={classes.fileUploadContent}>
+                      <ArrowUpload24Regular className={classes.uploadIcon} />
+                      <Text weight="semibold">Drop receipt JSON file here</Text>
+                      <Caption1>or click to browse</Caption1>
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                        Accepts .json files
+                      </Caption1>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={classes.fileSelectedCard}>
+                    <div className={classes.fileInfo}>
+                      <DocumentSearch24Regular style={{ color: '#0078D4' }} />
+                      <div>
+                        <Text size={300} weight="semibold">{receiptFileName}</Text>
+                        <Caption1 style={{ display: 'block', color: tokens.colorNeutralForeground3 }}>
+                          Receipt file loaded
+                        </Caption1>
+                      </div>
+                    </div>
+                    <Button
+                      appearance="subtle"
+                      icon={<Dismiss24Regular />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReceiptText('');
+                        setReceiptFileName(null);
+                        if (receiptInputRef.current) {
+                          receiptInputRef.current.value = '';
+                        }
+                      }}
+                      aria-label="Remove receipt file"
+                    />
+                  </div>
+                )}
               </Field>
 
               <Field
-                label="Network Certificate"
-                hint="Paste the network certificate (PEM format)"
+                label="Network Certificate (Optional)"
+                hint="Upload a PEM certificate file or drag and drop"
               >
-                <Textarea
-                  value={networkCertText}
-                  onChange={(_, data) => setNetworkCertText(data.value)}
-                  placeholder="-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----"
-                  rows={8}
-                  style={{ fontFamily: tokens.fontFamilyMonospace, width: '100%' }}
+                <input
+                  ref={certInputRef}
+                  type="file"
+                  accept=".pem,.crt,.cer,application/x-pem-file,application/x-x509-ca-cert"
+                  className={classes.hiddenInput}
+                  onChange={handleCertInputChange}
+                  aria-label="Upload network certificate file"
                 />
+                
+                {!certFileName ? (
+                  <div
+                    className={`${classes.fileUploadCard} ${isDraggingCert ? classes.fileUploadCardActive : ''}`}
+                    onClick={() => certInputRef.current?.click()}
+                    onDragOver={handleCertDragOver}
+                    onDragLeave={handleCertDragLeave}
+                    onDrop={handleCertDrop}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        certInputRef.current?.click();
+                      }
+                    }}
+                  >
+                    <div className={classes.fileUploadContent}>
+                      <ArrowUpload24Regular className={classes.uploadIcon} />
+                      <Text weight="semibold">Drop certificate file here</Text>
+                      <Caption1>or click to browse</Caption1>
+                      <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                        Accepts .pem, .crt, .cer files
+                      </Caption1>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={classes.fileSelectedCard}>
+                    <div className={classes.fileInfo}>
+                      <Certificate24Regular style={{ color: '#0078D4' }} />
+                      <div>
+                        <Text size={300} weight="semibold">{certFileName}</Text>
+                        <Caption1 style={{ display: 'block', color: tokens.colorNeutralForeground3 }}>
+                          Certificate file loaded
+                        </Caption1>
+                      </div>
+                    </div>
+                    <Button
+                      appearance="subtle"
+                      icon={<Dismiss24Regular />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNetworkCertText('');
+                        setCertFileName(null);
+                        if (certInputRef.current) {
+                          certInputRef.current.value = '';
+                        }
+                      }}
+                      aria-label="Remove certificate file"
+                    />
+                  </div>
+                )}
               </Field>
 
               {parseError && (
@@ -350,19 +737,216 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
                     )}
 
                     {!verificationResult.isValid && verificationResult.isCompleted && (
-                      <MessageBar intent="warning">
+                      <MessageBar 
+                        intent="error"
+                        role="alert"
+                      >
                         <MessageBarBody>
-                          The receipt verification failed. This could mean the receipt is invalid, 
-                          the network certificate is incorrect, or the transaction was not properly recorded.
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalS }}>
+                            <div>
+                              <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                                <ErrorCircle24Regular style={{ 
+                                  verticalAlign: 'middle', 
+                                  marginRight: tokens.spacingHorizontalXS,
+                                  color: tokens.colorPaletteRedForeground1 
+                                }} />
+                                Receipt Verification Failed
+                              </Text>
+                              <Text block>
+                                The receipt could not be verified successfully. Review the common issues below and try again.
+                              </Text>
+                            </div>
+
+                            {/* Specific Error Details */}
+                            {verificationResult.error && (
+                              <div style={{
+                                backgroundColor: tokens.colorNeutralBackground2,
+                                padding: tokens.spacingVerticalS,
+                                borderRadius: tokens.borderRadiusSmall,
+                                borderLeft: `4px solid ${tokens.colorPaletteRedBorder1}`
+                              }}>
+                                <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  Error Details:
+                                </Text>
+                                <Text block style={{ fontFamily: tokens.fontFamilyMonospace, fontSize: tokens.fontSizeBase200 }}>
+                                  {verificationResult.error}
+                                </Text>
+                              </div>
+                            )}
+
+                            {/* Common Issues */}
+                            <div>
+                              <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                                Common Issues:
+                              </Text>
+                              <ul style={{ margin: 0, paddingLeft: tokens.spacingHorizontalL }}>
+                                {!verificationResult.rootsMatch && (
+                                  <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                    <Text>
+                                      <strong>Merkle root mismatch:</strong> The calculated root does not match the receipt root. 
+                                      This usually indicates the receipt was generated for a different ledger or has been modified.
+                                    </Text>
+                                  </li>
+                                )}
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Network certificate mismatch:</strong> Ensure you're using the correct network certificate 
+                                    from the same Azure Confidential Ledger instance that generated the receipt.
+                                  </Text>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Invalid JSON format:</strong> Verify the receipt JSON is complete, properly formatted, 
+                                    and contains all required fields (cert, leafComponents, proof, signature).
+                                  </Text>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Wrong ledger instance:</strong> Confirm the receipt was generated for the ledger 
+                                    you're verifying against.
+                                  </Text>
+                                </li>
+                              </ul>
+                            </div>
+
+                            {/* Troubleshooting Steps */}
+                            <div>
+                              <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                                Troubleshooting Steps:
+                              </Text>
+                              <ol style={{ margin: 0, paddingLeft: tokens.spacingHorizontalL }}>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Re-download the files:</strong> Obtain fresh copies of both the receipt JSON 
+                                    and network certificate from your Azure Confidential Ledger instance.
+                                  </Text>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Verify file integrity:</strong> Check that files were not corrupted during 
+                                    download or transfer. Ensure no extra whitespace or encoding issues.
+                                  </Text>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Check transaction ID:</strong> Verify you're using the correct transaction ID 
+                                    when retrieving the receipt from the ledger API.
+                                  </Text>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <Text>
+                                    <strong>Review ledger access:</strong> Ensure you have proper permissions to access 
+                                    the ledger and that the ledger is in a healthy state.
+                                  </Text>
+                                </li>
+                              </ol>
+                            </div>
+
+                            {/* Valid File Format Example */}
+                            <div>
+                              <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                                Expected Receipt Format:
+                              </Text>
+                              <div style={{
+                                backgroundColor: tokens.colorNeutralBackground2,
+                                padding: tokens.spacingVerticalS,
+                                borderRadius: tokens.borderRadiusSmall,
+                                fontFamily: tokens.fontFamilyMonospace,
+                                fontSize: tokens.fontSizeBase200,
+                                overflowX: 'auto'
+                              }}>
+                                <Text block style={{ color: tokens.colorNeutralForeground2 }}>{'{'}</Text>
+                                <Text block style={{ paddingLeft: tokens.spacingHorizontalM }}>
+                                  "receipt": {'{'} "cert": "...", "leafComponents": {'{'} ... {'}'}, "proof": [...], "signature": "..." {'}'}
+                                </Text>
+                                <Text block>{'}'}</Text>
+                              </div>
+                            </div>
+
+                            {/* Help Resources */}
+                            <div>
+                              <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                                Need More Help?
+                              </Text>
+                              <ul style={{ margin: 0, paddingLeft: tokens.spacingHorizontalL }}>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <a 
+                                    href="https://learn.microsoft.com/en-us/azure/confidential-ledger/verify-write-transaction-receipts" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#0078D4', textDecoration: 'none' }}
+                                  >
+                                    Azure Confidential Ledger verification documentation
+                                  </a>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <a 
+                                    href="https://learn.microsoft.com/en-us/azure/confidential-ledger/write-transaction-receipts" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#0078D4', textDecoration: 'none' }}
+                                  >
+                                    Understanding write transaction receipts
+                                  </a>
+                                </li>
+                                <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                  <a 
+                                    href="https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/confidentialledger/azure-confidentialledger" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#0078D4', textDecoration: 'none' }}
+                                  >
+                                    Azure SDK examples and samples
+                                  </a>
+                                </li>
+                                <li>
+                                  <Text>
+                                    Contact Azure Support if issues persist after following these steps
+                                  </Text>
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
                         </MessageBarBody>
                       </MessageBar>
                     )}
 
                     {verificationResult.isValid && verificationResult.isCompleted && (
-                      <MessageBar intent="success">
+                      <MessageBar 
+                        intent="success"
+                        role="status"
+                      >
                         <MessageBarBody>
-                          The receipt is cryptographically valid! The Merkle proof successfully validates 
-                          the transaction against the provided certificate.
+                          <Text weight="semibold" block style={{ marginBottom: tokens.spacingVerticalXS }}>
+                            <Checkmark24Regular style={{ 
+                              verticalAlign: 'middle', 
+                              marginRight: tokens.spacingHorizontalXS,
+                              color: tokens.colorPaletteGreenForeground1 
+                            }} />
+                            Receipt Successfully Verified
+                          </Text>
+                          <Text block style={{ marginBottom: tokens.spacingVerticalS }}>
+                            The receipt is cryptographically valid. The Merkle proof successfully validates 
+                            the transaction against the provided network certificate.
+                          </Text>
+                          <div style={{ marginTop: tokens.spacingVerticalS }}>
+                            <Text block style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                              <strong>Node ID:</strong> {parsedReceipt.nodeId}
+                            </Text>
+                            {verificationResult.ledgerComparison?.transactionId !== undefined && (
+                              <Text block style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                <strong>Transaction ID:</strong> {verificationResult.ledgerComparison.transactionId}
+                              </Text>
+                            )}
+                            {verificationResult.merklePath.length > 0 && (
+                              <Text block style={{ marginBottom: tokens.spacingVerticalXXS }}>
+                                <strong>Proof Steps:</strong> {verificationResult.merklePath.length}
+                              </Text>
+                            )}
+                            <Text block style={{ color: tokens.colorNeutralForeground3, fontSize: tokens.fontSizeBase200 }}>
+                              Verified at {new Date().toLocaleString()}
+                            </Text>
+                          </div>
                         </MessageBarBody>
                       </MessageBar>
                     )}

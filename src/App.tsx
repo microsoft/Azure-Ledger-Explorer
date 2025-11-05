@@ -10,6 +10,7 @@ import { AIPage } from './pages/AIPage';
 import { StartPage } from './pages/StartPage';
 import { VerificationPage } from './pages/VerificationPage';
 import { WriteReceiptVerificationPage } from './pages/WriteReceiptVerificationPage';
+import { MstReceiptVerificationPage } from './pages/MstReceiptVerificationPage';
 import { MenuBar } from './components/MenuBar';
 import GridLayout from './components/AppLayout';
 import { ConfigPage } from './pages/ConfigPage';
@@ -76,6 +77,7 @@ function App() {
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/verification" element={<VerificationPage />} />
                 <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
+                <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />
                 <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
                 <Route path="/config" element={<ConfigPage />} />
               </Routes>
