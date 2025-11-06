@@ -30,6 +30,7 @@ import {
 } from '@fluentui/react-icons';
 import { useWriteReceiptVerification } from '../hooks/write-receipt-verification';
 import type { WriteReceipt } from '../types/write-receipt-types';
+import { ERROR_MESSAGES, CONTENT_TEXT } from './WriteReceiptVerificationComponent.constants';
 
 const useStyles = makeStyles({
   container: {
@@ -212,7 +213,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
   // File upload handlers
   const handleReceiptFileSelect = useCallback(async (file: File) => {
     if (!file.name.endsWith('.json')) {
-      setParseError('Please select a JSON file for the receipt');
+      setParseError(ERROR_MESSAGES.INVALID_JSON_FILE);
       return;
     }
     
@@ -222,7 +223,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
       setReceiptFileName(file.name);
       setParseError(null);
     } catch (error) {
-      setParseError('Failed to read receipt file');
+      setParseError(ERROR_MESSAGES.FAILED_READ_RECEIPT);
     }
   }, []);
   
@@ -232,7 +233,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
       setNetworkCertText(text);
       setCertFileName(file.name);
     } catch (error) {
-      setParseError('Failed to read certificate file');
+      setParseError(ERROR_MESSAGES.FAILED_READ_CERTIFICATE);
     }
   }, []);
   
@@ -334,7 +335,9 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
                 <Text weight="semibold">ACL Receipt Verification</Text>
               </div>
               <Text>
-                This page verifies <strong>Azure Confidential Ledger (ACL)</strong> write transaction receipts using Merkle tree proofs.
+                {CONTENT_TEXT.ACL_VERIFICATION_DESCRIPTION.split('Azure Confidential Ledger (ACL)')[0]}
+                <strong>Azure Confidential Ledger (ACL)</strong>
+                {CONTENT_TEXT.ACL_VERIFICATION_DESCRIPTION.split('Azure Confidential Ledger (ACL)')[1]}
               </Text>
             </div>
           </MessageBarBody>
@@ -759,27 +762,23 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
                                 {!verificationResult.rootsMatch && (
                                   <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                     <Text>
-                                      <strong>Merkle root mismatch:</strong> The calculated root does not match the receipt root. 
-                                      This usually indicates the receipt was generated for a different ledger or has been modified.
+                                      <strong>Merkle root mismatch:</strong> {CONTENT_TEXT.MERKLE_ROOT_MISMATCH}
                                     </Text>
                                   </li>
                                 )}
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Network certificate mismatch:</strong> Ensure you're using the correct network certificate 
-                                    from the same Azure Confidential Ledger instance that generated the receipt.
+                                    <strong>Network certificate mismatch:</strong> {CONTENT_TEXT.CERTIFICATE_MISMATCH}
                                   </Text>
                                 </li>
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Invalid JSON format:</strong> Verify the receipt JSON is complete, properly formatted, 
-                                    and contains all required fields (cert, leafComponents, proof, signature).
+                                    <strong>Invalid JSON format:</strong> {CONTENT_TEXT.INVALID_JSON_FORMAT}
                                   </Text>
                                 </li>
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Wrong ledger instance:</strong> Confirm the receipt was generated for the ledger 
-                                    you're verifying against.
+                                    <strong>Wrong ledger instance:</strong> {CONTENT_TEXT.WRONG_LEDGER_INSTANCE}
                                   </Text>
                                 </li>
                               </ul>
@@ -793,26 +792,22 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
                               <ol style={{ margin: 0, paddingLeft: tokens.spacingHorizontalL }}>
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Re-download the files:</strong> Obtain fresh copies of both the receipt JSON 
-                                    and network certificate from your Azure Confidential Ledger instance.
+                                    <strong>Re-download the files:</strong> {CONTENT_TEXT.TROUBLESHOOTING_REDOWNLOAD}
                                   </Text>
                                 </li>
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Verify file integrity:</strong> Check that files were not corrupted during 
-                                    download or transfer. Ensure no extra whitespace or encoding issues.
+                                    <strong>Verify file integrity:</strong> {CONTENT_TEXT.TROUBLESHOOTING_VERIFY_INTEGRITY}
                                   </Text>
                                 </li>
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Check transaction ID:</strong> Verify you're using the correct transaction ID 
-                                    when retrieving the receipt from the ledger API.
+                                    <strong>Check transaction ID:</strong> {CONTENT_TEXT.TROUBLESHOOTING_CHECK_TRANSACTION}
                                   </Text>
                                 </li>
                                 <li style={{ marginBottom: tokens.spacingVerticalXXS }}>
                                   <Text>
-                                    <strong>Review ledger access:</strong> Ensure you have proper permissions to access 
-                                    the ledger and that the ledger is in a healthy state.
+                                    <strong>Review ledger access:</strong> {CONTENT_TEXT.TROUBLESHOOTING_REVIEW_ACCESS}
                                   </Text>
                                 </li>
                               </ol>
