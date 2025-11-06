@@ -94,6 +94,7 @@ export const MenuBar: React.FC<MenuBarProps> = ({
     }
   };
 
+  // TODO: Refactor to use dictionary mapping if more tools are added
   const handleToolsMenuSelect = (toolValue: string) => {
     if (toolValue === 'ledger-verification') {
       navigate('/verification');
