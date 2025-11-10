@@ -12,7 +12,7 @@ let dbInstance: CCFDatabase | null = null;
 export type TableLatestStateSortColumn = 'sequence' | 'transactionId' | 'keyName' | 'value';
 export type TableLatestStateSortDirection = 'asc' | 'desc';
 
-const getDatabase = async (): Promise<CCFDatabase> => {
+export const getDatabase = async (): Promise<CCFDatabase> => {
   if (!dbInstance) {
     dbInstance = new CCFDatabase({
       filename: 'ccf-ledger.db',

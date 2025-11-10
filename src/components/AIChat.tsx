@@ -28,6 +28,7 @@ import { AddFilesWizard } from './AddFilesWizard';
 import { CCFDatabase } from '../database';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
+import { getDatabase } from '../hooks/use-ccf-data';
 import type { WriteReceipt } from '../types/write-receipt-types';
 import { useDownloadMstFiles } from './MstLedgerImportView';
 import type { SavedProgress } from '../services/verification-service';
@@ -935,6 +936,10 @@ export const AIChat: React.FC<AIChatProps> = ({
           continue;
         }
         action.actionResult = 'MST files downloaded successfully';
+        if (!database) {
+          // make sure database is initialized after MST import
+          database = await getDatabase();
+        }
       }
     }
 
