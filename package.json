@@ -1,7 +1,7 @@
 {
-  "name": "ccfvisualizertypescript",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@microsoft/ccf-ledger-explorer",
+  "private": false,
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
