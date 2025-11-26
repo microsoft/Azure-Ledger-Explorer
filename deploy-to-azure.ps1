@@ -13,7 +13,7 @@
 
 param(
     [Parameter(Mandatory=$false)]
-    [string]$ResourceGroupName = "your-rg",
+    [string]$ResourceGroupName = "ccfexplorer-demo-rg",
     
     [Parameter(Mandatory=$false)]
     [string]$StaticWebAppName = "ccfledgerexplorer",
