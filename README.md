@@ -85,7 +85,7 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 |-----------|-------------|---------|
 | `-ResourceGroupName` | Azure resource group name | `ccfexplorer-demo-rg` |
 | `-StaticWebAppName` | Static Web App name | `ccfledgerexplorer` |
-| `-Location` | Azure region | `East US` |
+| `-Location` | Azure region | `eastus` |
 | `-CreateResources` | Create Azure resources if they don't exist | `false` |
 | `-BuildFirst` | Build the application before deployment | `false` |
 | `-DisableSage` | Temporarily set VITE_DISABLE_SAGE=true for the build (requires -BuildFirst) | `false` |
