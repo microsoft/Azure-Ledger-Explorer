@@ -3,6 +3,10 @@
   "private": false,
   "version": "1.0.0",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/CCF-Ledger-Explorer.git"
+  },  
   "type": "module",
   "scripts": {
     "dev": "vite",

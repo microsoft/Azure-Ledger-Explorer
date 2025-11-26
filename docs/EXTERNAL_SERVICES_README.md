@@ -2,7 +2,7 @@
 
 ## Overview
 
-The CCF Ledger Visualizer integrates with several external services to provide enhanced functionality. This document covers the integration patterns, authentication methods, error handling, and best practices for working with external APIs and services.
+CCF Ledger Explorer integrates with several external services to provide enhanced functionality. This document covers the integration patterns, authentication methods, error handling, and best practices for working with external APIs and services.
 
 ## Integrated Services
 
@@ -11,6 +11,7 @@ The CCF Ledger Visualizer integrates with several external services to provide e
 The AI Assistant component integrates with OpenAI's API to provide natural language querying capabilities for CCF ledger data.
 
 #### Configuration
+
 ```typescript
 interface OpenAIConfig {
   apiKey: string;
@@ -27,11 +28,13 @@ const SUPPORTED_MODELS = [
 ```
 
 #### Authentication
+
 - **API Key Storage**: Stored in browser localStorage
 - **Security**: API key never transmitted to our servers
 - **Validation**: Real-time API key validation
 
 #### Implementation Example
+
 ```typescript
 const callOpenAI = async (messages: ChatMessage[], newMessage: string): Promise<string> => {
   if (!config.apiKey) {
@@ -67,6 +70,7 @@ const callOpenAI = async (messages: ChatMessage[], newMessage: string): Promise<
 ```
 
 #### Error Handling
+
 - **Rate Limiting**: Graceful handling of API rate limits
 - **Network Errors**: Retry logic with exponential backoff
 - **Invalid Responses**: Validation of API response format
@@ -77,6 +81,7 @@ const callOpenAI = async (messages: ChatMessage[], newMessage: string): Promise<
 Enables users to import CCF ledger files directly from Azure Storage File Shares using SAS tokens.
 
 #### Service Implementation
+
 ```typescript
 export class AzureFileShareService {
   private shareClient: ShareClient | null = null;
@@ -135,12 +140,14 @@ export class AzureFileShareService {
 ```
 
 #### Authentication & Security
+
 - **SAS Token**: User-provided Shared Access Signature tokens
 - **Permissions Required**: Read and List permissions on the file share
 - **Scope Limitation**: Access limited to the "ledger" directory
 - **Token Validation**: Connection validation without exposing token details
 
 #### Error Handling
+
 - **Network Timeouts**: Configurable timeout handling
 - **Authorization Errors**: Clear messaging for permission issues
 - **File Not Found**: Graceful handling of missing files
@@ -617,18 +624,21 @@ describe('External Services Integration', () => {
 ## Security Considerations
 
 ### 1. API Key Management
+
 - Store API keys in localStorage (never in code)
 - Validate API keys before use
 - Provide clear error messages for invalid keys
 - Never log or expose API keys in error messages
 
 ### 2. Data Privacy
+
 - All external API calls are initiated by user action
 - No automatic data transmission to external services
 - Clear disclosure of data being sent to external services
 - Option to review data before transmission
 
 ### 3. Network Security
+
 - Use HTTPS for all external API calls
 - Implement proper CORS handling
 - Validate SSL certificates

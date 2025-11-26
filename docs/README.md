@@ -1,13 +1,15 @@
-# CCF Ledger Visualizer - Documentation Index
+# CCF Ledger Explorer - Documentation Index
 
 ## 📚 Documentation Overview
 
-This directory contains comprehensive documentation for the CCF Ledger Visualizer TypeScript application. Each document covers a specific aspect of the system and should be consulted before making changes to the related components.
+This directory contains comprehensive documentation for CCF Ledger Explorer. Each document covers a specific aspect of the system and should be consulted before making changes to the related components.
 
 ## 📋 Documentation Files
 
 ### 🏗️ [Architecture Overview](./ARCHITECTURE_README.md)
+
 **High-level system architecture and component relationships**
+
 - System architecture diagram with component flow
 - Technology stack and architectural decisions
 - Data flow patterns and integration points
@@ -15,7 +17,9 @@ This directory contains comprehensive documentation for the CCF Ledger Visualize
 - Browser compatibility and deployment architecture
 
 ### 🔧 [Parser System](./PARSER_README.md)
+
 **CCF ledger file parsing and processing**
+
 - LedgerChunkV2 class implementation details
 - Binary file format handling and data extraction
 - Transaction parsing and cryptographic verification
@@ -23,7 +27,9 @@ This directory contains comprehensive documentation for the CCF Ledger Visualize
 - Integration with database layer
 
 ### 🗄️ [Database & Persistence](./DATABASE_README.md)
+
 **SQL.js database layer and OPFS storage**
+
 - Database schema and table structures
 - SQL.js integration with OPFS persistence
 - Query optimization and indexing strategies
@@ -31,7 +37,9 @@ This directory contains comprehensive documentation for the CCF Ledger Visualize
 - Data integrity and backup procedures
 
 ### 📜 [Code Standards](./CODE_STANDARDS.md)
+
 **Mandatory coding patterns and requirements**
+
 - **CRITICAL**: TanStack Query usage requirements
 - TypeScript strict mode compliance
 - Component architecture standards
@@ -39,7 +47,9 @@ This directory contains comprehensive documentation for the CCF Ledger Visualize
 - Performance optimization guidelines
 
 ### 🌐 [External Services](./EXTERNAL_SERVICES_README.md)
+
 **Integration with OpenAI and Azure services**
+
 - OpenAI API integration for AI assistant
 - Azure File Share service integration
 - Authentication and security patterns
@@ -47,7 +57,9 @@ This directory contains comprehensive documentation for the CCF Ledger Visualize
 - Service monitoring and analytics
 
 ### 🤖 [AI Assistant](./AI_ASSISTANT_README.md)
+
 **Natural language querying interface**
+
 - OpenAI integration and prompt engineering
 - SQL query generation and execution
 - Security measures and query validation
@@ -159,6 +171,7 @@ For new developers joining the project:
 ### Documentation Issues
 
 If you find:
+
 - Outdated information
 - Missing examples
 - Unclear explanations

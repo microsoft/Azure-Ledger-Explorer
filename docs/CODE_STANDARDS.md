@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the coding standards, patterns, and requirements for the CCF Ledger Visualizer project. All contributors must follow these guidelines to ensure code consistency, maintainability, and reliability.
+This document outlines the coding standards, patterns, and requirements for the CCF Ledger Explorer project. All contributors must follow these guidelines to ensure code consistency, maintainability, and reliability.
 
 ## Core Technology Requirements
 
@@ -11,6 +11,7 @@ This document outlines the coding standards, patterns, and requirements for the 
 **All data fetching and mutations MUST use TanStack Query**
 
 #### ✅ Correct Usage
+
 ```typescript
 // Use useQuery for data fetching
 export const useLedgerFiles = () => {
@@ -40,6 +41,7 @@ export const useUploadLedgerFile = () => {
 ```
 
 #### ❌ Prohibited Patterns
+
 ```typescript
 // DON'T use useState for server state
 const [data, setData] = useState(null);
@@ -60,6 +62,7 @@ const handleClick = async () => {
 **All code MUST be written in TypeScript with strict type checking enabled**
 
 #### Configuration Requirements
+
 ```json
 // tsconfig.json - Required settings
 {
@@ -76,6 +79,7 @@ const handleClick = async () => {
 ```
 
 #### Type Definition Requirements
+
 ```typescript
 // ✅ Always define interfaces for props
 interface TransactionViewerProps {
@@ -102,6 +106,7 @@ const handleData = (data: any) => { // FORBIDDEN
 ### 3. Component Architecture
 
 #### Functional Components Only
+
 ```typescript
 // ✅ Use functional components with hooks
 export const TransactionViewer: React.FC<TransactionViewerProps> = ({
@@ -119,6 +124,7 @@ class TransactionViewer extends React.Component { // FORBIDDEN
 ```
 
 #### Custom Hooks Pattern
+
 ```typescript
 // ✅ Extract reusable logic into custom hooks
 export const useTransactionPagination = (fileId: number) => {

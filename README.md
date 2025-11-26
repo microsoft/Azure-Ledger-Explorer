@@ -1,6 +1,6 @@
-# CCF Ledger Visualizer (TypeScript)
+# CCF Ledger Explorer
 
-A TypeScript/React application for visualizing and exploring CCF (Confidential Consortium Framework) ledger data with AI-powered querying capabilities.
+A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with AI-powered querying capabilities.
 
 ## Features
 
@@ -76,7 +76,7 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `-ResourceGroupName` | Azure resource group name | `sage-transparency-demo-rg` |
-| `-StaticWebAppName` | Static Web App name | `ccfvisualizer` |
+| `-StaticWebAppName` | Static Web App name | `ccf-ledger-explorer` |
 | `-Location` | Azure region | `East US 2` |
 | `-CreateResources` | Create Azure resources if they don't exist | `false` |
 | `-BuildFirst` | Build the application before deployment | `false` |
