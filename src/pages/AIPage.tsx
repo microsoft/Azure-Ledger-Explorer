@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AIChat } from '../components/AIChat';
 import type { ChatMessage } from '../components/AIChat';
-import { ConversationHistory, saveConversationToHistory } from '../components/ConversationHistory';
+import { ConversationHistory } from '../components/ConversationHistory';
+import { saveConversationToHistory } from '../utils/conversation-storage';
 import type { SavedConversation } from '../types/conversation-types';
 import { useDatabase } from '../hooks/use-ccf-data';
 import { Spinner, Text, makeStyles, tokens } from '@fluentui/react-components';

@@ -33,7 +33,7 @@ const initializeSQLite = async () => {
           error('Error creating or accessing OPFS database, falling back to readonly mode:', err);
           try {
             db = new sqlite3.oo1.OpfsDb('/ccf-ledger.sqlite3', 'rt');
-          } catch (transientErr) {
+          } catch {
             error('Error creating or accessing OPFS readonly database, falling back to transient:', err);
             db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
           }
