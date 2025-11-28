@@ -110,13 +110,6 @@ const useStyles = makeStyles({
     maxWidth: '830px',
     marginBottom: '220px', // Space for input area
   },
-  chatCard: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: 0,
-    backgroundColor: tokens.colorNeutralBackground1,
-  },
   messagesArea: {
     display: 'flex',
     flexDirection: 'column',
@@ -291,11 +284,6 @@ const useStyles = makeStyles({
   errorSection: {
     margin: '8px 0 0 0',
   },
-  messageTimestamp: {
-    fontSize: '11px',
-    color: tokens.colorNeutralForeground3,
-    margin: '4px 0 0 0',
-  },
   loadingContainer: {
     display: 'flex',
     alignItems: 'center',
@@ -430,10 +418,6 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorNeutralBackground2Hover,
       border: `1px solid ${tokens.colorNeutralStroke1Hover}`,
     },
-  },
-  helpText: {
-    fontSize: '14px',
-    color: tokens.colorNeutralForeground3,
   },
   cleanedResult: {
     margin: '8px 0',
