@@ -163,7 +163,7 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
               </Tab>
               <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
                 <Tooltip content="Microsoft's Signing Transparency" relationship="label">
-                  <Text size={200}>Signing</Text>
+                  <Text size={200}>Signing Transparency</Text>
                 </Tooltip>
               </Tab>
               <Tab value="local" icon={<Folder20Regular />}>
