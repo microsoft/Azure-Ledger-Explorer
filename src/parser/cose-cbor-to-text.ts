@@ -24,7 +24,7 @@ export function cborArrayToText(cbor: Uint8Array): string {
         const diagnosed = prettyPrintDecodedCbor(decoded as Uint8Array);
         return typeof diagnosed === 'string' ? diagnosed : JSON.stringify(diagnosed, null, 2);
     }
-    
+
     if (parts.length === 4) {
         output['protected'] = ArrayBuffer.isView(parts[0]) && parts[0] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[0], {preferMap:true}) as Map<CborKey, CborValue>) : parts[0];
         output['unprotected'] = ArrayBuffer.isView(parts[1]) && parts[1] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[1], {preferMap:true}) as Map<CborKey, CborValue>) : parts[1];
@@ -259,7 +259,7 @@ const cwtClaimKeys: Record<string, string> = {
 // https://www.ietf.org/rfc/rfc9679.html
 const coseKeyKeys: Record<string, string> = {
     "1": "kty",
-}
+};
 
 function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): CborValue {
     if (value instanceof Uint8Array) {
@@ -271,6 +271,7 @@ function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): Cbor
     } else {
         return value;
     }
+
 }
 
 function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: CborValue): [CborKey, CborValue] {
@@ -305,14 +306,14 @@ function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: Cbor
         }
 
         return [prettyKey, prettyPrintArbitraryCborVal(value)];
-    } else {
+    } else if (parentKey !== undefined && parentKey !== null) {
         if (parentKey.toString() === '15') { // If parent was CWT Claims
             const keyStr = key.toString();
             const prettyKey = cwtClaimKeys[keyStr] || key;
             return [prettyKey, prettyPrintArbitraryCborVal(value)];
         }
-        if (parentKey === 'msft-css-dev') {
-            // Reserved for future msft-css-dev specific handling
+        if (parentKey === 'msft-css-dev' || parentKey === 'attestedsvc') {
+            // reserved for future pretty-printing rules
         }
         if (parentKey === 'cose_key') {
             const keyStr = key.toString();
@@ -321,6 +322,9 @@ function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: Cbor
         }
         return [key, prettyPrintArbitraryCborVal(value, key)];
     }
+
+    // Fallback – should not normally be hit
+    return [key, value];
 }
 
 function prettyPrintCborMap(parentKey: CborKey | null, headers: Map<CborKey, CborValue>): Record<string, CborValue> {

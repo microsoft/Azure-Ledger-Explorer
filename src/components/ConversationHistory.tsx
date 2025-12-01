@@ -155,11 +155,10 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const remaining = deleteConversationFromHistory(id);
-      setConversations(remaining);
+      const remainingConversations = deleteConversationFromHistory(id);
+      setConversations(remainingConversations);
       if (activeConversationId === id) onNewConversation();
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError('Failed to delete');
     }
   };

@@ -1,5 +1,5 @@
 name: Build
-on: [push]
+on: [push, pull_request]
 permissions:
   contents: read
 jobs:
@@ -10,9 +10,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci && npm run build
+      - run: npm ci
+        name: Install dependencies
+      - run: npm run lint
+        name: Run linter
+      - run: npm run build
         name: Build app
-        working-directory: ./
       - run: npm test
         name: Run tests
-        working-directory: ./

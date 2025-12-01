@@ -1,4 +1,4 @@
-### Microsoft Signing Transparency
+### Microsoft's Signing Transparency
 
 Provides transparency and auditability for software supply chain security.
 
@@ -14,4 +14,4 @@ Maintains tamper-evident logs of software artifacts for trust and verification.
 
 ### Learn More
 
-- [Microsoft Signing Transparency](https://www.microsoft.com/security/blog/2023/05/09/microsoft-announces-new-supply-chain-transparency-initiatives/)
+- [Signing Transparency](https://www.microsoft.com/security/blog/2023/05/09/microsoft-announces-new-supply-chain-transparency-initiatives/)
