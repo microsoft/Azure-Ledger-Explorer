@@ -416,9 +416,21 @@ export const ConfigPage: React.FC = () => {
               </Field>
               {/* add a note if systemPrompt is different from defaultSystemPrompt */}
               {config.systemPrompt !== config.defaultSystemPrompt && (
-                <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
-                  Note: You have modified the system prompt from the default. Delete it to reset.
-                </Text>
+                <div className={styles.actionButtons}>
+                  <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
+                    Note: You have modified the system prompt from the default.
+                  </Text>
+                  <Button
+                    appearance="secondary"
+                    size="small"
+                    onClick={() => setConfig(prev => ({
+                      ...prev,
+                      systemPrompt: prev.defaultSystemPrompt,
+                    }))}
+                  >
+                    Reset to default
+                  </Button>
+                </div>
               )}
               {config.systemPrompt === config.defaultSystemPrompt && (
                 <Text size={200} style={{ color: tokens.colorStatusSuccessForeground1 }}>

@@ -2,9 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { makeStyles, tokens, Button, Text, Spinner, MessageBar } from '@fluentui/react-components';
 import { DeleteRegular, ChevronLeftRegular, ChevronRightRegular, ChatRegular } from '@fluentui/react-icons';
 import type { ConversationHistoryProps, SavedConversation } from '../types/conversation-types';
-import type { ChatMessage } from './AIChat';
-
-const STORAGE_KEY = 'ccf-saved-conversations';
+import { loadConversationHistory, deleteConversationFromHistory } from '../utils/conversation-storage';
 
 const useStyles = makeStyles({
   root: {
@@ -122,12 +120,9 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
   const load = () => {
     try {
       setLoading(true);
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) { setConversations([]); return; }
-      const parsed = JSON.parse(raw) as SavedConversation[];
-      setConversations(parsed);
-    } catch (e) {
-      console.error(e);
+      const items = loadConversationHistory();
+      setConversations(items);
+    } catch {
       setError('Failed to load conversations');
     } finally {
       setLoading(false);
@@ -140,12 +135,10 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const remainingConversations = conversations.filter(c => c.id !== id);
+      const remainingConversations = deleteConversationFromHistory(id);
       setConversations(remainingConversations);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingConversations));
       if (activeConversationId === id) onNewConversation();
-    } catch(err) {
-      console.error(err);
+    } catch {
       setError('Failed to delete');
     }
   };
@@ -200,29 +193,4 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
       </div>
     </div>
   );
-};
-
-// Helper for saving conversations
-export const saveConversationToHistory = (messages: ChatMessage[]) => {
-  if (!messages.length) return;
-  const firstUserMessage = messages.find(m => m.role === 'user');
-  const titleBase = firstUserMessage?.content?.trim() || 'New Conversation';
-  const title = titleBase.slice(0, 30) + (titleBase.length > 30 ? '...' : '');
-  const id = 'conv-' + Date.now();
-  const conversation: SavedConversation = {
-    id,
-    title,
-    messages: messages,
-    createdAt: firstUserMessage?.timestamp || new Date(),
-    updatedAt: new Date(),
-  };
-  try {
-    const savedConversationsJson = localStorage.getItem(STORAGE_KEY);
-    const savedConversations: SavedConversation[] = savedConversationsJson ? JSON.parse(savedConversationsJson) : [];
-    savedConversations.unshift(conversation);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedConversations));
-  } catch (e) {
-    console.error('Failed to save conversation', e);
-  }
-  return id;
 };

@@ -222,7 +222,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
       setReceiptText(text);
       setReceiptFileName(file.name);
       setParseError(null);
-    } catch (error) {
+    } catch {
       setParseError(ERROR_MESSAGES.FAILED_READ_RECEIPT);
     }
   }, []);
@@ -232,7 +232,7 @@ export const WriteReceiptVerificationComponent: React.FC = () => {
       const text = await file.text();
       setNetworkCertText(text);
       setCertFileName(file.name);
-    } catch (error) {
+    } catch {
       setParseError(ERROR_MESSAGES.FAILED_READ_CERTIFICATE);
     }
   }, []);

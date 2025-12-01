@@ -7,29 +7,20 @@ import {
   MessageBar,
   makeStyles,
   tokens,
-  Menu,
-  MenuTrigger,
-  MenuPopover,
-  MenuList,
-  MenuItem,
 } from '@fluentui/react-components';
 import {
   Send24Regular,
   ChatAddRegular,
-  Add24Regular,
-  DocumentAdd24Regular,
   Edit24Regular,
   Stop24Regular,
 } from '@fluentui/react-icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { AddFilesWizard } from './AddFilesWizard';
 
 import { CCFDatabase } from '../database';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import { getDatabase } from '../hooks/use-ccf-data';
-import type { WriteReceipt } from '../types/write-receipt-types';
 import { useDownloadMstFiles } from './MstLedgerImportView';
 import type { SavedProgress } from '../services/verification-service';
 
@@ -46,7 +37,6 @@ const UIActionName = {
   ImportMST: 'importmst',
   RunSQL: 'runsql',
   VerifyLedger: 'verifyledger',
-  VerifyReceipt: 'verifyreceipt',
 } as const;
 
 type UIActionName = typeof UIActionName[keyof typeof UIActionName] | string;
@@ -76,10 +66,6 @@ export interface ChatMessage {
   timestamp: Date;
   error?: string;
   actions?: UIAction[];
-  receiptData?: {
-    receipt: WriteReceipt;
-    networkCert: string;
-  };
 }
 
 interface AIChatProps {
@@ -123,13 +109,6 @@ const useStyles = makeStyles({
     width: '100%',
     maxWidth: '830px',
     marginBottom: '220px', // Space for input area
-  },
-  chatCard: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: 0,
-    backgroundColor: tokens.colorNeutralBackground1,
   },
   messagesArea: {
     display: 'flex',
@@ -305,11 +284,6 @@ const useStyles = makeStyles({
   errorSection: {
     margin: '8px 0 0 0',
   },
-  messageTimestamp: {
-    fontSize: '11px',
-    color: tokens.colorNeutralForeground3,
-    margin: '4px 0 0 0',
-  },
   loadingContainer: {
     display: 'flex',
     alignItems: 'center',
@@ -445,10 +419,6 @@ const useStyles = makeStyles({
       border: `1px solid ${tokens.colorNeutralStroke1Hover}`,
     },
   },
-  helpText: {
-    fontSize: '14px',
-    color: tokens.colorNeutralForeground3,
-  },
   cleanedResult: {
     margin: '8px 0',
     padding: '12px',
@@ -517,8 +487,6 @@ export const AIChat: React.FC<AIChatProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Add state for Plus button dropdown and dialogs
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Add verification hooks
@@ -661,51 +629,6 @@ export const AIChat: React.FC<AIChatProps> = ({
         lastProcessedTransaction: 0,
         totalTransactions: 0,
         status: 'error'
-      };
-    }
-  };
-
-  const executeReceiptVerification = async (receiptJson?: string, networkCert?: string): Promise<unknown> => {
-    try {
-      if (!receiptJson || !networkCert) {
-        return {
-          status: 'error',
-          error: 'Both receipt JSON and network certificate are required for verification',
-          message: 'Please provide both the write receipt JSON and network certificate'
-        };
-      }
-
-      // Parse the receipt
-      let receipt: WriteReceipt;
-      try {
-        receipt = JSON.parse(receiptJson);
-      } catch {
-        return {
-          status: 'error',
-          error: 'Invalid receipt JSON format',
-          message: 'The provided receipt JSON is not valid'
-        };
-      }
-
-      // For now, return a message that receipt verification needs to be implemented
-      // with proper database integration
-      return {
-        status: 'not_implemented',
-        message: 'Receipt verification against ledger database is not yet implemented in the AI assistant. Please use the Write Receipt Verification page for full verification.',
-        receiptStructure: {
-          cert: !!receipt.cert,
-          nodeId: receipt.nodeId,
-          signature: !!receipt.signature,
-          proof: receipt.proof?.length || 0,
-          leafComponents: !!receipt.leafComponents
-        }
-      };
-    } catch (error) {
-      console.error('Receipt verification error:', error);
-      return {
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown verification error',
-        message: 'Failed to execute receipt verification'
       };
     }
   };
@@ -918,12 +841,6 @@ export const AIChat: React.FC<AIChatProps> = ({
         } catch (err) {
           action.actionError = err instanceof Error ? err.message : 'Ledger verification failed';
         }
-      } else if (action.actionName === UIActionName.VerifyReceipt) {
-        try {
-          action.actionResult = await executeReceiptVerification();
-        } catch (err) {
-          action.actionError = err instanceof Error ? err.message : 'Receipt verification failed';
-        }
       } else if (action.actionName === UIActionName.ImportMST) {
         if (!action.actionContent) {
           action.actionError = 'MST domain was missing';
@@ -1121,10 +1038,37 @@ Please provide a clean, human-readable summary that captures the essential infor
     return JSON.stringify(result, null, 2);
   };
 
+  const renderMessageTemplates = () => {
+
+    if (hasMessages) return null;
+
+    const messages = [
+      {show: true, group: "Azure Attestation", text: "How does MAA's SGX attestation work?"},
+      {show: true, group: "Azure Attestation", text: "How can I trust MAA?"},
+      {show: true, group: "Transparency", text: "Can you verify that MAA is transparent right now?"},
+      {show: true, group: "Transparency", text: "Can you show me the history of MAA builds?"},
+      {show: allTransactionsCount && allTransactionsCount > 0, group: "Ledger", text: "How many transactions are in the database?"},
+      {show: allTransactionsCount && allTransactionsCount > 0, group: "Ledger", text: "Show me recent transactions"},
+      {show: allTransactionsCount && allTransactionsCount > 0, group: "Ledger", text: "Find transactions with specific keys"},
+    ];
+
+    return <div className={styles.starterTemplates}>
+      {messages.map((msg) => 
+        !!msg.show &&
+        <CompoundButton
+          icon={<ChatAddRegular />}
+          secondaryContent={msg.text}
+          appearance="transparent"
+          onClick={() => startFromExample(msg.text)}
+        >{msg.group}</CompoundButton>
+      )}
+    </div>;
+  };
+
   return (
     <>
       <div className={"chat-messages-container " + (hasMessages ? styles.containerWithMessages : styles.container)}>
-        {/* Sage Title - visible when no messages */}
+        {/* Title - visible when no messages */}
         {!hasMessages && (
           <div className={styles.sageTitle}>
             Sage
@@ -1161,26 +1105,8 @@ Please provide a clean, human-readable summary that captures the essential infor
 
             {/* Buttons row below */}
             <div className={styles.buttonsRow}>
-              {/* Plus button with dropdown on left */}
-              <Menu>
-                <MenuTrigger disableButtonEnhancement>
-                  <Button
-                    appearance="subtle"
-                    icon={<Add24Regular />}
-                    className={styles.plusButton}
-                  />
-                </MenuTrigger>
-                <MenuPopover>
-                  <MenuList>
-                    <MenuItem
-                      icon={<DocumentAdd24Regular />}
-                      onClick={() => setShowUploadDialog(true)}
-                    >
-                      Add Files
-                    </MenuItem>
-                  </MenuList>
-                </MenuPopover>
-              </Menu>
+              <div>
+              </div>
 
               {/* Right side buttons group */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1213,74 +1139,7 @@ Please provide a clean, human-readable summary that captures the essential infor
         </div>
 
         {/* Starter templates - visible when no messages, positioned under input area */}
-        {!hasMessages && (
-          <div className={styles.starterTemplates}>
-            <CompoundButton
-              icon={<ChatAddRegular />}
-              secondaryContent="How does MAA's SGX attestation work?"
-              appearance="transparent"
-              onClick={() => startFromExample("How does MAA's SGX attestation work?")}
-            >
-              Azure Attestation
-            </CompoundButton>
-
-            <CompoundButton
-              icon={<ChatAddRegular />}
-              secondaryContent="How can I trust MAA?"
-              appearance="transparent"
-              onClick={() => startFromExample("How can I trust MAA?")}
-            >
-              Azure Attestation
-            </CompoundButton>
-
-            <CompoundButton
-              icon={<ChatAddRegular />}
-              secondaryContent="Can you verify that MAA is transparent right now?"
-              appearance="transparent"
-              onClick={() => startFromExample("Can you verify that MAA is transparent right now?")}
-            >
-              Transparency
-            </CompoundButton>
-
-            <CompoundButton
-              icon={<ChatAddRegular />}
-              secondaryContent="Can you show me the history of MAA builds?"
-              appearance="transparent"
-              onClick={() => startFromExample("Can you show me the history of MAA builds?")}
-            >
-              Transparency
-            </CompoundButton>
-
-            {allTransactionsCount && allTransactionsCount > 0 ? (
-              <>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="How many transactions are in the database?"
-                  appearance="transparent"
-                  onClick={() => startFromExample("How many transactions are in the database?")}
-                >
-                  Ledger
-                </CompoundButton>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="Show me recent transactions"
-                  appearance="transparent"
-                  onClick={() => startFromExample("Show me recent transactions")}
-                >
-                  Ledger
-                </CompoundButton>
-                <CompoundButton
-                  icon={<ChatAddRegular />}
-                  secondaryContent="Find transactions with specific keys"
-                  appearance="transparent"
-                  onClick={() => startFromExample("Find transactions with specific keys")}
-                >
-                  Ledger
-                </CompoundButton>
-              </>
-            ) : null}
-          </div>
-        )}
+        {renderMessageTemplates()}
 
         {/* Chat Area with Messages - only visible when there are messages */}
         {hasMessages && (
@@ -1420,11 +1279,6 @@ Please provide a clean, human-readable summary that captures the essential infor
         )}
       </div>
 
-      {/* Dialogs */}
-      <AddFilesWizard
-        open={showUploadDialog}
-        onOpenChange={setShowUploadDialog}
-      />
     </>
   );
 };
