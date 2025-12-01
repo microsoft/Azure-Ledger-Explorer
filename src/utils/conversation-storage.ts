@@ -49,5 +49,4 @@ export const saveConversationToHistory = (messages: ChatMessage[]) => {
   } catch (e) {
     console.error('Failed to save conversation', e);
   }
-  return id;
 };
