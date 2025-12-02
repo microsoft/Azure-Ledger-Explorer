@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 

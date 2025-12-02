@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import React, { useState } from 'react';
 /* eslint-disable react-refresh/only-export-components */
 import { MstFilesService } from '../services/MstFilesService';

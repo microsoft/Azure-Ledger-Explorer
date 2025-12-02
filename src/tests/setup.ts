@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom';

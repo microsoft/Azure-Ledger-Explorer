@@ -1,4 +1,9 @@
-// Simplified Verification Component - UI for ledger verification without checkpointing
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import React, { useState } from 'react';
 import {

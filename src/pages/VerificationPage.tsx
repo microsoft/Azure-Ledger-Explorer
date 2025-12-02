@@ -1,4 +1,9 @@
-// Example integration of the verification component
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import React from 'react';
 import { makeStyles, tokens, Text, Body1 } from '@fluentui/react-components';

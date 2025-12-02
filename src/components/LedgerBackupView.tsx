@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import React, { useState } from 'react';
 import { AzureFileShareService } from '../services/AzureFileShareService';
 import {parseLedgerFilename, type LedgerFileInfo} from '../utils/ledger-validation';

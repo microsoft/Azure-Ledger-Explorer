@@ -1,8 +1,16 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import React, { useEffect, useState } from 'react';
 import { makeStyles, tokens, Button, Text, Spinner, MessageBar } from '@fluentui/react-components';
 import { DeleteRegular, ChevronLeftRegular, ChevronRightRegular, ChatRegular } from '@fluentui/react-icons';
 import type { ConversationHistoryProps, SavedConversation } from '../types/conversation-types';
-import { loadConversationHistory, deleteConversationFromHistory } from '../utils/conversation-storage';
+import { 
+  loadConversationsFromHistory, 
+  deleteConversationFromHistory 
+} from '../utils/conversation-storage';
 
 const useStyles = makeStyles({
   root: {
@@ -78,9 +86,8 @@ const useStyles = makeStyles({
       backgroundColor: tokens.colorPaletteRedBackground2,
     },
   },
-  // Hover handled via React state now
   collapsedContent: {
-  display: 'none', // no longer show extra icons when collapsed
+    display: 'none',
   },
   empty: {
     display: 'flex',
@@ -91,6 +98,17 @@ const useStyles = makeStyles({
     padding: '32px 12px',
     gap: '8px',
     color: tokens.colorNeutralForeground3,
+  },
+  spinnerContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    padding: '16px',
+  },
+  errorBar: {
+    margin: '8px',
+  },
+  iconLarge: {
+    fontSize: '32px',
   },
 });
 
@@ -120,9 +138,11 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
   const load = () => {
     try {
       setLoading(true);
-      const items = loadConversationHistory();
-      setConversations(items);
-    } catch {
+      const loaded = loadConversationsFromHistory();
+      setConversations(loaded);
+      setError(null);
+    } catch (e) {
+      console.error(e);
       setError('Failed to load conversations');
     } finally {
       setLoading(false);
@@ -159,13 +179,13 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
         <Text className={styles.title}>Conversations</Text>
         <Button appearance="subtle" icon={<ChevronLeftRegular />} onClick={onToggleCollapse} title="Collapse" />
       </div>
-      {error && <MessageBar intent="error" style={{ margin: '8px' }}>{error}</MessageBar>}
+      {error && <MessageBar intent="error" className={styles.errorBar}>{error}</MessageBar>}
       <div className={styles.list}>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><Spinner size="small" /></div>
+          <div className={styles.spinnerContainer}><Spinner size="small" /></div>
         ) : conversations.length === 0 ? (
           <div className={styles.empty}>
-            <ChatRegular style={{ fontSize: 32 }} />
+            <ChatRegular className={styles.iconLarge} />
             <Text>Older conversations will appear here.</Text>
           </div>
         ) : (

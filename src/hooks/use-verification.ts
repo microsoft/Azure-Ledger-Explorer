@@ -1,4 +1,9 @@
-// Simplified React hook for verification functionality
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { verificationService, type SavedProgress, type VerificationServiceEvents } from '../services/verification-service';

@@ -1,4 +1,9 @@
-// Simplified Verification Service - Manages the verification web worker
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import type { 
   WorkerInMessage, 

@@ -1,4 +1,9 @@
-//import { StrictMode } from 'react'
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 

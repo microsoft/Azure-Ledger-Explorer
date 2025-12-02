@@ -1,5 +1,9 @@
-// File operations - Ledger file management
-// Handles insertions, queries, and deletions of ledger files
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import type { DatabaseWorkerClient } from '../worker/worker-client';
 

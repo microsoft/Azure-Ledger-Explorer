@@ -1,7 +1,9 @@
-/**
- * TypeScript implementation of MerkleTree
- * Ported from C# CCFParser.MerkleTree
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
  */
+
+
 
 export class MerkleTree {
   // First leaf is always a 32-byte zero hash

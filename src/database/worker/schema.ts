@@ -1,5 +1,9 @@
-// Database schema definitions for CCF Ledger
-// Centralizes all table creation and schema management
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 

@@ -1,4 +1,9 @@
-// Types for the simplified verification web worker
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 export interface VerificationProgress {
   currentTransaction: number;

@@ -1,4 +1,9 @@
-// Simplified Verification Web Worker - Database-based approach with browser storage for progress
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '../utils/merkle-tree';
 import { CCFDatabase } from '../database';

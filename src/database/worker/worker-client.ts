@@ -1,5 +1,9 @@
-// Worker client - Communication layer between main thread and database worker
-// Provides a clean promise-based API for all database operations
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 /**
  * Message types for worker communication

@@ -1,7 +1,9 @@
-/**
- * Constants for WriteReceiptVerificationComponent
- * Contains multi-line text content and error messages
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
  */
+
+
 
 // Error Messages
 export const ERROR_MESSAGES = {

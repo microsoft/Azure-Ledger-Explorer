@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import React from 'react';
 import { LedgerVisualization } from '../components/LedgerVisualization';
 import { useAllTransactions } from '../hooks/use-ccf-data';

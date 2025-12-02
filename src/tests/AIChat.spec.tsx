@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AIChat } from '../components/AIChat';
