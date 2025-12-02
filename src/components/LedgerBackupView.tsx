@@ -103,7 +103,7 @@ export const LedgerBackupView: React.FC = () => {
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
-    const [selectedLedgerFile, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
+    const [, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
     const fileShareService = React.useMemo(() => new AzureFileShareService(), []);
     const { handleFiles} = useFileDrop(); 
 

@@ -39,7 +39,7 @@ export function useVerification(): UseVerificationResult {
         setError(null);
       },
       
-      onCompleted: (_data) => {
+      onCompleted: () => {
         setIsRunning(false);
         setProgress(prev => prev ? { ...prev, status: 'completed' } : null);
         setError(null);

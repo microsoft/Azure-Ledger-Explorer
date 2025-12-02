@@ -127,7 +127,6 @@ export const MstLedgerImportView: React.FC = () => {
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
-    const [selectedLedgerFile, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
     const fileShareService = React.useMemo(() => new MstFilesService(), []);
     const { handleFiles } = useFileDrop();
 
@@ -162,7 +161,6 @@ export const MstLedgerImportView: React.FC = () => {
     };
 
     const handleVisualizeFileSelect = async (fileToVisualize: LedgerFileInfo) => {
-        setSelectedFileToVisualize(fileToVisualize);
         const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
         if (downloadedFiles.length > 0) {
             handleFiles(downloadedFiles);
