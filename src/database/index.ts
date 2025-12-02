@@ -9,4 +9,5 @@ export { CCFDatabase } from './ccf-database';
 export type { DatabaseConfig } from './ccf-database';
 
 // Re-export types that consumers might need
-export type { Transaction, LedgerKeyValue, DatabaseTransaction } from '../types/ccf-types';
+export type { Transaction, LedgerKeyValue } from '@ccf/ledger-parser';
+export type { DatabaseTransaction } from '../types/ccf-types';

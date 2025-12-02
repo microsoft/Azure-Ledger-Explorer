@@ -128,7 +128,7 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'insertLedgerFile': {
         // Import LedgerChunkV2 dynamically in the worker
-        const { LedgerChunkV2 } = await import('../parser/ledger-chunk');
+        const { LedgerChunkV2 } = await import('@ccf/ledger-parser');
 
         const { filename, fileSize, arrayBuffer } = payload;
 
@@ -162,7 +162,7 @@ self.onmessage = async (event: MessageEvent) => {
         const ledgerChunk = new LedgerChunkV2(filename, arrayBuffer);
 
         // Import CBOR decoder
-        const { cborArrayToText } = await import('../parser/cose-cbor-to-text');
+        const { cborArrayToText } = await import('@ccf/ledger-parser');
         const DecodeCborTables = ["public:scitt.entry"];
 
         // Collect all data in memory first for bulk insert

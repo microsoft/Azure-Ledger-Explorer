@@ -3,21 +3,32 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
 import type { 
   Transaction, 
   TransactionHeader, 
   GcmHeader, 
   PublicDomain, 
   LedgerKeyValue,
-} from '../types/ccf-types';
+} from './types.js';
 import { 
   EntryType,
   LEDGER_CONSTANTS,
   entryTypeHelpers
-} from '../types/ccf-types';
+} from './types.js';
 
+/**
+ * Parser for CCF LedgerChunkV2 format files.
+ * 
+ * @example
+ * ```typescript
+ * const buffer = await file.arrayBuffer();
+ * const chunk = new LedgerChunkV2(file.name, buffer);
+ * 
+ * for await (const transaction of chunk.readAllTransactions()) {
+ *   console.log(transaction.gcmHeader.seqNo);
+ * }
+ * ```
+ */
 export class LedgerChunkV2 {
   public fileName: string;
   private buffer: ArrayBuffer;

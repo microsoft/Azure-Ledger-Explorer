@@ -6,8 +6,9 @@
 
 
 import { DatabaseWorkerClient } from './worker/worker-client';
-import type { Transaction, LedgerKeyValue, DatabaseTransaction } from '../types/ccf-types';
-import { cborArrayToText } from '../parser/cose-cbor-to-text';
+import type { Transaction, LedgerKeyValue } from '@ccf/ledger-parser';
+import type { DatabaseTransaction } from '../types/ccf-types';
+import { cborArrayToText } from '@ccf/ledger-parser';
 
 export interface DatabaseConfig {
   filename: string;

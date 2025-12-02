@@ -1,0 +1,46 @@
+{
+  "name": "@ccf/ledger-parser",
+  "version": "1.0.0",
+  "description": "Parser for CCF ledger chunk files (LedgerChunkV2 format)",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "cbor2": "^2.0.1"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "~5.8.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/CCF-Ledger-Explorer.git",
+    "directory": "packages/ledger-parser"
+  },
+  "keywords": [
+    "ccf",
+    "ledger",
+    "parser",
+    "confidential-computing",
+    "cbor"
+  ]
+}
