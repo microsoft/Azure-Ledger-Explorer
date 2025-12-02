@@ -1,5 +1,9 @@
-// CCF Ledger Type Definitions
-// Ported from C# models
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 export interface TransactionHeader {
   version: number;
@@ -87,12 +91,12 @@ export const LEDGER_CONSTANTS: LedgerConstants = {
 // Helper functions for EntryType
 export const entryTypeHelpers = {
   hasClaims: (entryType: EntryType): boolean => {
-    return entryType == EntryType.WriteSetWithClaims ||
-                   entryType == EntryType.WriteSetWithCommitEvidenceAndClaims;
+    return entryType === EntryType.WriteSetWithClaims ||
+                   entryType === EntryType.WriteSetWithCommitEvidenceAndClaims;
   },
 
   hasCommitEvidence: (entryType: EntryType): boolean => {
-    return entryType == EntryType.WriteSetWithCommitEvidence ||
-                   entryType == EntryType.WriteSetWithCommitEvidenceAndClaims;
+    return entryType === EntryType.WriteSetWithCommitEvidence ||
+                   entryType === EntryType.WriteSetWithCommitEvidenceAndClaims;
   },
 };

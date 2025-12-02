@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import React, { useState } from 'react';
 import { AIChat } from '../components/AIChat';
 import type { ChatMessage } from '../components/AIChat';

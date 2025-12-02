@@ -1,5 +1,9 @@
-// SQLite database worker using official @sqlite.org/sqlite-wasm with OPFS
-// This worker handles all database operations to enable OPFS support
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { createTables, dropAllTables, verifyTables } from '../database/worker/schema';

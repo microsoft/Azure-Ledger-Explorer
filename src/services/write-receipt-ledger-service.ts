@@ -1,6 +1,11 @@
-// Service for comparing write receipts against ledger data
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
 
-import { CCFDatabase } from '../database';
+
+
+import type { CCFDatabase } from '../database';
 import type { WriteReceiptVerificationResult } from '../types/write-receipt-types';
 
 export interface LedgerComparisonResult {

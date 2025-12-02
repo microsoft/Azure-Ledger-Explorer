@@ -1,5 +1,9 @@
-// React hooks for CCF data using TanStack Query
-// Provides state management for the application
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CCFDatabase } from '../database';

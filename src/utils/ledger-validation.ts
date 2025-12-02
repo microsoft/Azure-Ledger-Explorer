@@ -1,4 +1,9 @@
-// Utility functions for validating CCF ledger file sequences
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 export interface LedgerFileInfo {
   filename: string;

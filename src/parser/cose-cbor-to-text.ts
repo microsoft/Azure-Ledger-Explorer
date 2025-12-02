@@ -1,35 +1,35 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import {decode, diagnose} from 'cbor2';
 import { Buffer } from "buffer";
 
+/** CBOR values can be primitives, arrays, maps, or binary data */
+type CborValue = unknown;
+/** CBOR map keys are typically strings or numbers */
+type CborKey = string | number;
 
 export function cborArrayToText(cbor: Uint8Array): string {
     const decoded = decode(cbor) as { tag?: number; contents?: unknown[] } | unknown[];
-
+    
     const output: Record<string, unknown> = {};
     let parts: unknown[] = [];
-    if (typeof (decoded as { tag?: number }).tag === 'number' && (decoded as { contents?: unknown[] }).contents) {
-        parts = (decoded as { contents: unknown[] }).contents;
+    if (typeof decoded === 'object' && decoded !== null && 'tag' in decoded && decoded.tag === 18) {
+        parts = decoded.contents ?? [];
     } else if (Array.isArray(decoded) && decoded.length === 4) {
         parts = decoded;
     } else {
-        // Fallback to generic CBOR pretty-printer
-        return String(prettyPrintDecodedCbor(cbor));
+        const diagnosed = prettyPrintDecodedCbor(decoded as Uint8Array);
+        return typeof diagnosed === 'string' ? diagnosed : JSON.stringify(diagnosed, null, 2);
     }
 
     if (parts.length === 4) {
-        const [prot, unprot, payload, sig] = parts;
-        output['protected'] = ArrayBuffer.isView(prot) && prot instanceof Uint8Array
-            ? prettyPrintCborMap(null, decode(prot, { preferMap: true }) as Map<unknown, unknown>)
-            : prot;
-        output['unprotected'] = ArrayBuffer.isView(unprot) && unprot instanceof Uint8Array
-            ? prettyPrintCborMap(null, decode(unprot, { preferMap: true }) as Map<unknown, unknown>)
-            : unprot;
-        if (payload instanceof Uint8Array) {
-            output['payload'] = prettyPrintCosePayload(payload);
-        }
-        if (sig instanceof Uint8Array) {
-            output['signature'] = uint8ArrayToHexString(sig);
-        }
+        output['protected'] = ArrayBuffer.isView(parts[0]) && parts[0] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[0], {preferMap:true}) as Map<CborKey, CborValue>) : parts[0];
+        output['unprotected'] = ArrayBuffer.isView(parts[1]) && parts[1] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[1], {preferMap:true}) as Map<CborKey, CborValue>) : parts[1];
+        output['payload'] = prettyPrintCosePayload(parts[2] as Uint8Array);
+        output['signature'] = uint8ArrayToHexString(parts[3] as Uint8Array);
     }
 
     return JSON.stringify(output, null, 2);
@@ -261,22 +261,20 @@ const coseKeyKeys: Record<string, string> = {
     "1": "kty",
 };
 
-type CborKey = string | number;
-
-function prettyPrintArbitraryCborVal (value: unknown, idxOrKey?: CborKey): unknown {
+function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): CborValue {
     if (value instanceof Uint8Array) {
         return uint8ArrayToHexString(value);
     } else if (value instanceof Map) {
-        return prettyPrintCborMap(idxOrKey ?? null, value as Map<unknown, unknown>);
+        return prettyPrintCborMap(idxOrKey ?? null, value as Map<CborKey, CborValue>);
     } else if (Array.isArray(value)) {
-        return value.map((item, idx) => prettyPrintArbitraryCborVal(item, `${String(idxOrKey ?? '')}.${idx}`));
+        return value.map((item, idx) => prettyPrintArbitraryCborVal(item, idxOrKey != null ? `${idxOrKey}.${idx}` : idx));
     } else {
         return value;
     }
 
 }
 
-function prettyCborKeyValue(parentKey: CborKey | null | undefined, key: CborKey, value: unknown): [unknown, unknown] {
+function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: CborValue): [CborKey, CborValue] {
     if (!parentKey) {
         const keyStr = key.toString();
         const prettyKey = coseHeaderParameters[keyStr] || key;
@@ -291,31 +289,20 @@ function prettyCborKeyValue(parentKey: CborKey | null | undefined, key: CborKey,
 
         if (keyStr === '15' || value instanceof Map) {
             // process nested maps
-            return [prettyKey, prettyPrintCborMap(key, value as Map<unknown, unknown>)];
+            return [prettyKey, prettyPrintCborMap(key, value as Map<CborKey, CborValue>)];
         }
 
         if (keyStr === '33') { // X5chain
-            return [
-                prettyKey,
-                (Array.isArray(value) ? value : [])
-                    .map((v) => uint8ArrayToB64String(v as Uint8Array)),
-            ];
+            return [prettyKey, (value as Uint8Array[]).map(uint8ArrayToB64String)];
         }
 
         if (keyStr === '34') { // X5 thumbprint
-            const arr = Array.isArray(value) ? value : [];
-            return [
-                prettyKey,
-                coseAlgorithms[String(arr[0])] + ':' + uint8ArrayToHexString(arr[1] as Uint8Array),
-            ];
+            const thumbprint = value as [number, Uint8Array];
+            return [prettyKey, coseAlgorithms[thumbprint[0]] + ':' + uint8ArrayToHexString(thumbprint[1])];
         }
 
         if (keyStr === '394') { // Attached receipts
-            return [
-                prettyKey,
-                (Array.isArray(value) ? value : [])
-                    .map((v) => prettyPrintDecodedCbor(v as Uint8Array)),
-            ];
+            return [prettyKey, (value as Uint8Array[]).map(prettyPrintDecodedCbor)];
         }
 
         return [prettyKey, prettyPrintArbitraryCborVal(value)];
@@ -340,10 +327,10 @@ function prettyCborKeyValue(parentKey: CborKey | null | undefined, key: CborKey,
     return [key, value];
 }
 
-function prettyPrintCborMap(parentKey: CborKey | null, headers: Map<unknown, unknown>): Record<string, unknown> {
-    const output: Record<string, unknown> = {};
+function prettyPrintCborMap(parentKey: CborKey | null, headers: Map<CborKey, CborValue>): Record<string, CborValue> {
+    const output: Record<string, CborValue> = {};
     headers.forEach((value, key) => {
-        const [newKey, newValue] = prettyCborKeyValue(parentKey, key as CborKey, value);
+        const [newKey, newValue] = prettyCborKeyValue(parentKey, key, value);
         output[String(newKey)] = newValue;
     });
     return output;
@@ -363,11 +350,11 @@ function uint8ArrayToB64String(uint8Array: Uint8Array): string {
     return Buffer.from(uint8Array).toString('base64');
 }
 
-function prettyPrintCosePayload(input: Uint8Array): object | string {
+function prettyPrintCosePayload(input: Uint8Array): CborValue {
     // test if Uint8Array is json
     const text = new TextDecoder().decode(input);
     try {
-        const json = JSON.parse(text) as object;
+        const json = JSON.parse(text) as unknown;
         return json;
     } catch {
         // not json
@@ -380,8 +367,8 @@ function prettyPrintCosePayload(input: Uint8Array): object | string {
 
     // test if CBOR
     try {
-        const decoded = decode(input) as unknown;
-        return prettyPrintArbitraryCborVal(decoded) as object | string;
+        const decoded = decode(input);
+        return prettyPrintArbitraryCborVal(decoded);
     } catch {
         // not cbor
     }

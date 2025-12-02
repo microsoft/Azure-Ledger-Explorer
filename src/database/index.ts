@@ -1,5 +1,9 @@
-// Public API exports for the database layer
-// Use this as the single import point for database functionality
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 export { CCFDatabase } from './ccf-database';
 export type { DatabaseConfig } from './ccf-database';

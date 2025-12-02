@@ -1,5 +1,9 @@
-// Shared utilities for transaction classification and filtering
-// Used by both LedgerVisualization and CCFVisualizerApp components
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 // Transaction type classification based on the Python script logic
 export type TransactionType = 

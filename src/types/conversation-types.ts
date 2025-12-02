@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import type { ChatMessage } from '../components/AIChat';
 
 export interface SavedConversation {

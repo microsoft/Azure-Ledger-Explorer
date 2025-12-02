@@ -1,5 +1,9 @@
-// CCF Ledger Parser
-// Ported from C# LedgerChunkV2 class
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 import type { 
   Transaction, 

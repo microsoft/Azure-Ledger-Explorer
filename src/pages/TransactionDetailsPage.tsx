@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, makeStyles, tokens } from '@fluentui/react-components';

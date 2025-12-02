@@ -1,9 +1,9 @@
-/**
- * Ledger domain localStorage management
- * 
- * Tracks which ledger was imported (MST, ACL, or Manual) 
- * and displays in Configuration page UI
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
  */
+
+
 
 const LEDGER_DOMAIN_KEY = 'ledger_domain';
 const LEDGER_IMPORT_TYPE_KEY = 'ledger_import_type';

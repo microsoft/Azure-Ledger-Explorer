@@ -1,5 +1,9 @@
-// Client interface to communicate with the database worker
-// Provides a simple promise-based API for executing SQL queries
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 export class DatabaseWorkerClient {
   private worker: Worker;

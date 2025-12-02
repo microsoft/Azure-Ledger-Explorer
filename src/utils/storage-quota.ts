@@ -1,5 +1,9 @@
-// Storage quota and disk space management utilities
-// Provides OPFS storage monitoring and quota management
+/*
+ * Copyright (c) Microsoft Corporation.
+ * Licensed under the Apache License, Version 2.0.
+ */
+
+
 
 export interface StorageQuota {
   usage: number;           // Bytes currently used
