@@ -107,6 +107,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       navigate('/write-receipt');
     } else if (toolValue === 'mst-receipt-verification') {
       navigate('/mst-receipt');
+    } else if (toolValue === 'cose-viewer') {
+      navigate('/cose-viewer');
     }
   };
 
@@ -142,44 +144,52 @@ export const MenuBar: React.FC<MenuBarProps> = ({
           </TabList>
 
         {/* Tools Dropdown Menu */}
-        { hasData && (
-          <Menu>
-            <MenuTrigger disableButtonEnhancement>
-              <Button 
-                appearance="subtle" 
-                icon={<Wrench24Regular />}
-                iconPosition="before"
-                className={styles.toolsButton}
-                aria-label="Tools menu"
+        <Menu>
+          <MenuTrigger disableButtonEnhancement>
+            <Button 
+              appearance="subtle" 
+              icon={<Wrench24Regular />}
+              iconPosition="before"
+              className={styles.toolsButton}
+              aria-label="Tools menu"
+            >
+              Tools
+              <ChevronDown20Regular />
+            </Button>
+          </MenuTrigger>
+          <MenuPopover>
+            <MenuList>
+              { hasData && (
+                <>
+                  <MenuItem 
+                    icon={<ShieldCheckmarkRegular />}
+                    onClick={() => handleToolsMenuSelect('ledger-verification')}
+                  >
+                    Ledger Verification
+                  </MenuItem>
+                </>
+              )}
+              <MenuItem 
+                icon={<DocumentSearch24Regular />}
+                onClick={() => handleToolsMenuSelect('acl-receipt-verification')}
               >
-                Tools
-                <ChevronDown20Regular />
-              </Button>
-            </MenuTrigger>
-            <MenuPopover>
-              <MenuList>
-                <MenuItem 
-                  icon={<ShieldCheckmarkRegular />}
-                  onClick={() => handleToolsMenuSelect('ledger-verification')}
-                >
-                  Ledger Verification
-                </MenuItem>
-                <MenuItem 
-                  icon={<DocumentSearch24Regular />}
-                  onClick={() => handleToolsMenuSelect('acl-receipt-verification')}
-                >
-                  ACL Receipt Verification
-                </MenuItem>
-                <MenuItem 
-                  icon={<DocumentSearch24Regular />}
-                  onClick={() => handleToolsMenuSelect('mst-receipt-verification')}
-                >
-                  MST Receipt Verification
-                </MenuItem>
-              </MenuList>
-            </MenuPopover>
-          </Menu>
-        )}
+                ACL Receipt Verification
+              </MenuItem>
+              <MenuItem 
+                icon={<DocumentSearch24Regular />}
+                onClick={() => handleToolsMenuSelect('mst-receipt-verification')}
+              >
+                MST Receipt Verification
+              </MenuItem>
+              <MenuItem 
+                icon={<DocumentSearch24Regular />}
+                onClick={() => handleToolsMenuSelect('cose-viewer')}
+              >
+                COSE/CBOR Viewer
+              </MenuItem>
+            </MenuList>
+          </MenuPopover>
+        </Menu>
 
         {/* Header Actions */}
         <div className={styles.headerActions}>

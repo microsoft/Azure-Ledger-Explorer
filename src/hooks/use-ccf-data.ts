@@ -217,17 +217,12 @@ export const useUploadLedgerFile = () => {
     mutationFn: async (file: File): Promise<{ fileId: number; transactionCount: number }> => {
       const db = await getDatabase();
       
-      console.log(`[Upload] Starting upload for ${file.name}`);
-      
       // Read file into ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
       
       // Transfer the ArrayBuffer to the worker for processing
       // The worker will parse and insert everything
-      console.log(`[Upload] Transferring ${file.name} to worker for processing...`);
       const result = await db.insertLedgerFileWithData(file.name, file.size, arrayBuffer);
-      
-      console.log(`[Upload] Completed: ${result.transactionCount} transactions from ${file.name}`);
       
       return result;
     },
@@ -344,28 +339,20 @@ export const useFileDrop = () => {
   const handleFiles = async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     
-    console.log(`[useFileDrop] Processing ${fileArray.length} files`);
-    
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      console.log(`[useFileDrop] Processing file ${i + 1}/${fileArray.length}: ${file.name} (${file.size} bytes)`);
-      
+    for (const file of fileArray) {
       // Check if file appears to be a ledger file
       if (file.size > 0) {
         try {
-          const result = await uploadMutation.mutateAsync(file);
-          console.log(`[useFileDrop] Successfully processed ${file.name}:`, result);
+          await uploadMutation.mutateAsync(file);
         } catch (error) {
-          console.error(`[useFileDrop] Failed to process file ${file.name}:`, error);
+          console.error(`Failed to process file ${file.name}:`, error);
           // Re-throw to stop processing more files if there's an error
           throw error;
         }
       } else {
-        console.warn(`[useFileDrop] Skipping empty file: ${file.name}`);
+        console.warn(`Skipping empty file: ${file.name}`);
       }
     }
-    
-    console.log(`[useFileDrop] Completed processing all ${fileArray.length} files`);
   };
 
   const handleDrop = (event: React.DragEvent<HTMLElement>) => {

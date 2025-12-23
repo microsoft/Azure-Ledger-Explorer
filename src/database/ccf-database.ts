@@ -1141,7 +1141,6 @@ export class CCFDatabase {
     
     console.warn('[CCFDatabase] Deleting and recreating entire database - all data will be lost!');
     await this.client.deleteDatabase();
-    console.log('[CCFDatabase] Database deleted and recreated successfully');
   }
 
   async checkIntegrity(): Promise<boolean> {

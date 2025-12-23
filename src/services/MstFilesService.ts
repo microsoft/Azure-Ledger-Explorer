@@ -200,7 +200,6 @@ export class MstFilesService {
       const filesDownloaded: LedgerFileInfo[] = [];
       for (const downloadFile of ledgerFileToDownloadFromStorage) {
         filesDownloaded.push(downloadFile);
-        console.log(`Downloading file: ${downloadFile.filename}`);
         const downloadResponse = await this.mstClient.downloadFile(downloadFile.filename);
         const blob = await downloadResponse.blobBody;
         if (!blob) {
@@ -233,7 +232,6 @@ export class MstFilesService {
       const filesDownloaded: LedgerFileInfo[] = [];
       for (const downloadFile of ledgerFileListFromStorage) {
         filesDownloaded.push(downloadFile);
-        console.log(`Downloading file: ${downloadFile.filename}`);
         const downloadResponse = await this.mstClient.downloadFile(downloadFile.filename);
         const blob = await downloadResponse.blobBody;
         if (!blob) {

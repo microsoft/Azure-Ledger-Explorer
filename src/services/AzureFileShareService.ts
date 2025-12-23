@@ -12,11 +12,9 @@ export class AzureFileShareService {
 
   async initialize(sasUrl: string): Promise<void> {
     try {
-      console.log('Initializing with SAS URL:', sasUrl.split('?')[0]); // Log URL without token
       this.shareClient = new ShareClient(sasUrl);
-      
     } catch (error) {
-      console.error('Initialization error:', error);
+      console.error('Failed to initialize Azure file share client:', error);
       throw new Error(
         'Failed to initialize file share client. Please ensure your SAS token is valid and has Read/List permissions.'
       );
@@ -33,7 +31,6 @@ export class AzureFileShareService {
       const files: LedgerFileInfo[] = [];
 
       // List only files in the "ledger" directory
-      console.log('Listing files in the "ledger" directory');
       for await (const entity of directoryClient.listFilesAndDirectories()) {
         if (entity.kind === 'directory') {
               continue; // Skip directories, we only want files
@@ -79,7 +76,6 @@ export class AzureFileShareService {
         for (const downloadFile of ledgerFileToDownloadFromStorage) 
         {
             filesDownloaded.push(downloadFile);
-            console.log(`Downloading file: ${downloadFile.filename}`);
             const fileClient = directoryClient.getFileClient(downloadFile.filename);
             const downloadResponse = await fileClient.download(0);
             const blob = await downloadResponse.blobBody;

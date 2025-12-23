@@ -256,22 +256,6 @@ export const CCFVisualizerApp: React.FC = () => {
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Transaction data:', {
-      selectedFileId,
-      searchQuery,
-      fileTransactions,
-      transactions,
-      transactionsLoading,
-      totalTransactions,
-      hasData,
-      stats,
-      currentPage: transactionPage + 1,
-      totalPages: Math.ceil((totalTransactions || 0) / pageSize)
-    });
-  }, [selectedFileId, searchQuery, fileTransactions, transactions, transactionsLoading, totalTransactions, hasData, stats, transactionPage]);
-
   const handleFileSelect = (fileId: number) => {
     setSelectedFileId(fileId);
     setTransactionPage(0);
