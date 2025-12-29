@@ -352,7 +352,10 @@ export const TransactionViewer: React.FC<TransactionViewerProps> = ({
           {/* Empty State */}
           {transactionDetails.writes.length === 0 && transactionDetails.deletes.length === 0 && (
             <div className={styles.emptyState}>
-              <Text>No key-value operations found in this transaction.</Text>
+              <Text>
+                No public key-value operations found in this transaction. This can happen for private-domain
+                transactions, where state updates are encrypted and not available without the appropriate secrets.
+              </Text>
             </div>
           )}
         </div>

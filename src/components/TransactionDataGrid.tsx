@@ -16,7 +16,6 @@ import {
   createTableColumn,
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
-import { EntryType } from '../types/ccf-types';
 
 const useStyles = makeStyles({
   monoFontSmall: {
@@ -62,18 +61,6 @@ interface TransactionDataGridProps {
   onTransactionClick: (transactionId: number) => void;
 }
 
-// Helper function to format entry type
-const getEntryTypeLabel = (entryType: number): string => {
-  switch (entryType) {
-    case EntryType.WriteSet: return 'WriteSet';
-    case EntryType.Snapshot: return 'Snapshot';
-    case EntryType.WriteSetWithClaims: return 'WithClaims';
-    case EntryType.WriteSetWithCommitEvidence: return 'WithEvidence';
-    case EntryType.WriteSetWithCommitEvidenceAndClaims: return 'WithBoth';
-    default: return 'Unknown';
-  }
-};
-
 // Helper function to format bytes
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
@@ -99,16 +86,6 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
         <div className={styles.monoFontMedium}>
           #{item.id}
         </div>
-      ),
-    }),
-    createTableColumn<TransactionRow>({
-      columnId: 'type',
-      compare: (a, b) => a.entryType - b.entryType,
-      renderHeaderCell: () => 'Type',
-      renderCell: (item) => (
-        <Badge appearance="outline" size="small">
-          {getEntryTypeLabel(item.entryType)}
-        </Badge>
       ),
     }),
     createTableColumn<TransactionRow>({
