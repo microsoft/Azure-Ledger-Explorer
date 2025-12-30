@@ -207,6 +207,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
           </>
         )}
 
+        {state === 'success' && (
+          <>
+            <Spinner size="large" />
+            <Text className={styles.statusText}>{statusMessage}</Text>
+          </>
+        )}        
+
         {state === 'error' && !showErrorDialog && (
           <>
             <ErrorCircleRegular className={styles.errorIcon} />
