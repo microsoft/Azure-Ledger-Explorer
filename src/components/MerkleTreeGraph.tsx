@@ -347,7 +347,7 @@ export const MerkleTreeGraph: React.FC<{ value: Uint8Array }> = ({ value }) => {
   const highlightedEdges = new Set<string>();
   if (hoveredNodeId) {
     let cur: NodeId | undefined = hoveredNodeId;
-    while (cur) {
+    while (cur !== undefined) {
       highlightedNodes.add(cur);
       const parent = parentByChild.get(cur);
       if (!parent) break;
