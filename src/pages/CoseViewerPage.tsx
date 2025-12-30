@@ -25,7 +25,7 @@ import {
   Copy24Regular,
   Checkmark24Regular,
 } from '@fluentui/react-icons';
-import { cborArrayToText } from '../parser/cose-cbor-to-text';
+import { cborArrayToText } from '@ccf/ledger-parser';
 
 const useStyles = makeStyles({
   container: {

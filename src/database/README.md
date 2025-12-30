@@ -4,15 +4,18 @@ This folder contains all database-related code for CCF Ledger Explorer.
 
 ## Architecture
 
-```
+```text
 src/database/
 ├── index.ts                    # Public API - use this for all imports
 ├── ccf-database.ts             # Main database class (facade pattern)
+├── decode-cbor-tables.ts        # Shared list of tables whose values are CBOR-decoded
 ├── worker/
 │   ├── worker-client.ts        # Worker communication layer
 │   └── schema.ts               # Database schema definitions
 ├── queries/                    # Query modules (future organization)
-│   └── file-queries.ts         # File operations
+│   ├── file-queries.ts         # File operations
+│   ├── transaction-list-queries.ts # Shared SQL builders for transaction list/count
+│   └── table-latest-state-queries.ts # Shared SQL builders for latest-state list/count
 └── types/                      # Database-specific types (future)
 ```
 
@@ -73,25 +76,25 @@ Runs SQLite operations in a separate thread for:
 
 ### Tables
 
-**ledger_files**
+### ledger_files
 
 - Tracks imported ledger files
 - Primary key: `id` (auto-increment)
 - Unique constraint on `filename`
 
-**transactions**
+### transactions
 
 - Stores ledger transactions
 - Primary key: `sequence_no` (from ledger, NOT auto-increment)
 - Foreign key: `file_id` → `ledger_files(id)`
 
-**kv_writes**
+### kv_writes
 
 - Key-value write operations
 - Primary key: `id` (auto-increment)
 - Foreign key: `sequence_no` → `transactions(sequence_no)`
 
-**kv_deletes**
+### kv_deletes
 
 - Key-value delete operations
 - Primary key: `id` (auto-increment)
@@ -140,9 +143,9 @@ CCFDatabase acts as a facade to:
 
 ## Future Improvements
 
-1. **Query Modules**: Split ccf-database.ts into focused query modules
+1. **Query Modules**: Continue splitting ccf-database.ts into focused query modules
    - `queries/file-queries.ts` - File operations
-   - `queries/transaction-queries.ts` - Transaction CRUD
+   - `queries/transaction-queries.ts` - Transaction CRUD (beyond list/count)
    - `queries/kv-queries.ts` - Key-value operations
    - `queries/search-queries.ts` - Search functionality
    - `queries/stats-queries.ts` - Statistics and analytics

@@ -6,20 +6,34 @@
 
 
 import { DatabaseWorkerClient } from './worker/worker-client';
-import type { Transaction, LedgerKeyValue, DatabaseTransaction } from '../types/ccf-types';
-import { cborArrayToText } from '../parser/cose-cbor-to-text';
+import type { Transaction, LedgerKeyValue } from '@ccf/ledger-parser';
+import type { DatabaseTransaction } from '../types/ccf-types';
+import { cborArrayToText } from '@ccf/ledger-parser';
+import { shouldDecodeCborValue } from './decode-cbor-tables';
+import {
+  deleteLedgerFile as deleteLedgerFileQuery,
+  getLedgerFiles as getLedgerFilesQuery,
+  insertLedgerFile as insertLedgerFileQuery,
+} from './queries/file-queries';
+import {
+  buildAllTransactionsCountQuery,
+  buildAllTransactionsListQuery,
+  buildFileTransactionsCountQuery,
+  buildFileTransactionsListQuery,
+} from './queries/transaction-list-queries';
+import {
+  buildTableLatestStateCountQuery,
+  buildTableLatestStateQuery,
+  type TableLatestStateSortColumn,
+  type TableLatestStateSortDirection,
+} from './queries/table-latest-state-queries';
 
 export interface DatabaseConfig {
   filename: string;
   useOpfs?: boolean;
 }
 
-const DecodeCborTables = [
-  "public:scitt.entry",
-];
 
-type TableLatestStateSortColumn = 'sequence' | 'transactionId' | 'keyName' | 'value';
-type TableLatestStateSortDirection = 'asc' | 'desc';
 
 export class CCFDatabase {
   private client: DatabaseWorkerClient | null = null;
@@ -43,7 +57,7 @@ export class CCFDatabase {
     let valueText = '';
     if (value && value.length > 0) {
       try {
-        if (DecodeCborTables.includes(table || '')) {
+        if (shouldDecodeCborValue(table)) {
           valueText = cborArrayToText(value);
         } else {
           valueText = new TextDecoder('utf-8', { fatal: false }).decode(value);
@@ -74,32 +88,7 @@ export class CCFDatabase {
 
   async insertLedgerFile(filename: string, fileSize: number): Promise<number> {
     if (!this.client) throw new Error('Database not initialized');
-    
-    // Check if file already exists
-    const existing = await this.exec(
-      'SELECT id FROM ledger_files WHERE filename = ?',
-      [filename]
-    );
-    
-    if (existing.length > 0) {
-      // Update existing file
-      const fileId = existing[0].id as number;
-      await this.exec(`
-        UPDATE ledger_files 
-        SET file_size = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `, [fileSize, fileId]);
-      return fileId;
-    }
-    
-    // Insert new file
-    await this.exec(`
-      INSERT INTO ledger_files (filename, file_size, updated_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
-    `, [filename, fileSize]);
-    
-    const result = await this.exec('SELECT last_insert_rowid() as id');
-    return result[0].id as number;
+    return insertLedgerFileQuery(this.exec.bind(this), filename, fileSize);
   }
 
   async insertLedgerFileWithData(filename: string, fileSize: number, arrayBuffer: ArrayBuffer): Promise<{ fileId: number; transactionCount: number }> {
@@ -205,33 +194,7 @@ export class CCFDatabase {
     updatedAt: string;
   }>> {
     if (!this.client) throw new Error('Database not initialized');
-
-    const result = await this.exec(`
-      SELECT id, filename, file_size, created_at, updated_at
-      FROM ledger_files
-      ORDER BY filename ASC
-    `);
-
-    const files = result.map((row) => ({
-      id: row.id as number,
-      filename: row.filename as string,
-      fileSize: row.file_size as number,
-      createdAt: row.created_at as string,
-      updatedAt: row.updated_at as string,
-    }));
-
-    // Sort by ledger sequence
-    return files.sort((a, b) => {
-      const parseFilename = (filename: string) => {
-        const regex = /^ledger_(\d+)-(\d+)\.committed$/;
-        const match = filename.match(regex);
-        return match ? parseInt(match[1], 10) : 999999;
-      };
-      
-      const aStart = parseFilename(a.filename);
-      const bStart = parseFilename(b.filename);
-      return aStart - bStart;
-    });
+    return getLedgerFilesQuery(this.exec.bind(this));
   }
 
   async getTransactions(fileId: number, limit = 100, offset = 0): Promise<Array<{
@@ -287,36 +250,12 @@ export class CCFDatabase {
   }>> {
     if (!this.client) throw new Error('Database not initialized');
 
-    let sql = `
-      SELECT DISTINCT
-        t.sequence_no as id, t.file_id, f.filename, t.version, t.flags, t.size,
-        t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
-        (SELECT COUNT(*) FROM kv_writes WHERE sequence_no = t.sequence_no) as write_count,
-        (SELECT COUNT(*) FROM kv_deletes WHERE sequence_no = t.sequence_no) as delete_count,
-        (SELECT map_name FROM kv_writes WHERE sequence_no = t.sequence_no LIMIT 1) as map_name
-      FROM transactions t
-      JOIN ledger_files f ON t.file_id = f.id
-      WHERE t.file_id = ?
-    `;
-
-    const params: (string | number)[] = [fileId];
-
-    if (searchQuery && searchQuery.trim()) {
-      sql += ` AND (
-        f.filename LIKE ? OR
-        CAST(t.sequence_no AS TEXT) LIKE ? OR
-        CAST(t.version AS TEXT) LIKE ? OR
-        EXISTS (
-          SELECT 1 FROM kv_writes kw 
-          WHERE kw.sequence_no = t.sequence_no AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
-        )
-      )`;
-      const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-    }
-
-    sql += ` ORDER BY t.sequence_no LIMIT ? OFFSET ?`;
-    params.push(limit, offset);
+    const { sql, params } = buildFileTransactionsListQuery({
+      fileId,
+      limit,
+      offset,
+      searchQuery,
+    });
 
     const result = await this.exec(sql, params);
 
@@ -341,29 +280,7 @@ export class CCFDatabase {
   async getFileTransactionsCount(fileId: number, searchQuery?: string): Promise<number> {
     if (!this.client) throw new Error('Database not initialized');
 
-    let sql = `
-      SELECT COUNT(*) as count 
-      FROM transactions t
-      JOIN ledger_files f ON t.file_id = f.id
-      WHERE t.file_id = ?
-    `;
-
-    const params: (string | number)[] = [fileId];
-
-    if (searchQuery && searchQuery.trim()) {
-      sql += ` AND (
-        f.filename LIKE ? OR
-        CAST(t.sequence_no AS TEXT) LIKE ? OR
-        CAST(t.version AS TEXT) LIKE ? OR
-        EXISTS (
-          SELECT 1 FROM kv_writes kw 
-          WHERE kw.sequence_no = t.sequence_no AND (kw.map_name LIKE ? OR kw.value_text LIKE ?)
-        )
-      )`;
-      const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-    }
-
+    const { sql, params } = buildFileTransactionsCountQuery({ fileId, searchQuery });
     const result = await this.exec(sql, params);
     return result[0]?.count as number || 0;
   }
@@ -672,7 +589,7 @@ export class CCFDatabase {
 
   async deleteLedgerFile(fileId: number): Promise<void> {
     if (!this.client) throw new Error('Database not initialized');
-    await this.exec('DELETE FROM ledger_files WHERE id = ?', [fileId]);
+    await deleteLedgerFileQuery(this.exec.bind(this), fileId);
   }
 
   async clearAllData(): Promise<void> {
@@ -727,41 +644,7 @@ export class CCFDatabase {
   }>> {
     if (!this.client) throw new Error('Database not initialized');
 
-    let sql = `
-      SELECT DISTINCT
-        t.sequence_no as id, t.file_id, f.filename, t.version, t.flags, t.size,
-        t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
-        (SELECT COUNT(*) FROM kv_writes WHERE sequence_no = t.sequence_no) as write_count,
-        (SELECT COUNT(*) FROM kv_deletes WHERE sequence_no = t.sequence_no) as delete_count,
-        (SELECT map_name FROM kv_writes WHERE sequence_no = t.sequence_no LIMIT 1) as map_name
-      FROM transactions t
-      JOIN ledger_files f ON t.file_id = f.id
-    `;
-
-    const params: unknown[] = [];
-
-    if (searchQuery && searchQuery.trim()) {
-      sql += `
-        WHERE (
-          f.filename LIKE ? OR
-          EXISTS (
-            SELECT 1 FROM kv_writes w WHERE w.sequence_no = t.sequence_no AND (w.key_name LIKE ? OR w.map_name LIKE ?)
-          ) OR
-          EXISTS (
-            SELECT 1 FROM kv_deletes d WHERE d.sequence_no = t.sequence_no AND (d.key_name LIKE ? OR d.map_name LIKE ?)
-          )
-        )
-      `;
-      const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-    }
-
-    sql += `
-      ORDER BY t.file_id, t.sequence_no
-      LIMIT ? OFFSET ?
-    `;
-    params.push(limit, offset);
-
+    const { sql, params } = buildAllTransactionsListQuery({ limit, offset, searchQuery });
     const result = await this.exec(sql, params);
 
     return result.map((row) => ({
@@ -785,30 +668,7 @@ export class CCFDatabase {
   async getAllTransactionsCount(searchQuery?: string): Promise<number> {
     if (!this.client) throw new Error('Database not initialized');
 
-    let sql = `
-      SELECT COUNT(DISTINCT t.sequence_no) as total
-      FROM transactions t
-      JOIN ledger_files f ON t.file_id = f.id
-    `;
-
-    const params: unknown[] = [];
-
-    if (searchQuery && searchQuery.trim()) {
-      sql += `
-        WHERE (
-          f.filename LIKE ? OR
-          EXISTS (
-            SELECT 1 FROM kv_writes w WHERE w.sequence_no = t.sequence_no AND (w.key_name LIKE ? OR w.map_name LIKE ?)
-          ) OR
-          EXISTS (
-            SELECT 1 FROM kv_deletes d WHERE d.sequence_no = t.sequence_no AND (d.key_name LIKE ? OR d.map_name LIKE ?)
-          )
-        )
-      `;
-      const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
-    }
-
+    const { sql, params } = buildAllTransactionsCountQuery({ searchQuery });
     const result = await this.exec(sql, params);
     return result[0]?.total as number || 0;
   }
@@ -914,92 +774,14 @@ export class CCFDatabase {
   }>> {
     if (!this.client) throw new Error('Database not initialized');
 
-    let sql = `
-      WITH latest_versions AS (
-        SELECT 
-          key_name,
-          MAX(version) as max_version
-        FROM (
-          SELECT key_name, version FROM kv_writes WHERE map_name = ?
-          UNION ALL
-          SELECT key_name, version FROM kv_deletes WHERE map_name = ?
-        ) AS all_keys
-        GROUP BY key_name
-      ),
-      latest_operations AS (
-        SELECT 
-          lv.key_name,
-          COALESCE(w.value_text, NULL) as value_text,
-          lv.max_version as version,
-          COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
-          CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted,
-          t.transaction_id as transaction_id
-        FROM latest_versions lv
-        LEFT JOIN kv_writes w ON lv.key_name = w.key_name 
-          AND lv.max_version = w.version 
-          AND w.map_name = ?
-        LEFT JOIN kv_deletes d ON lv.key_name = d.key_name 
-          AND lv.max_version = d.version 
-          AND d.map_name = ?
-        LEFT JOIN transactions t ON t.sequence_no = COALESCE(w.sequence_no, d.sequence_no)
-      )
-      SELECT 
-        lo.key_name,
-        lo.value_text,
-        lo.version,
-        lo.sequence_no,
-        lo.is_deleted,
-        lo.transaction_id
-      FROM latest_operations lo
-    `;
-
-    const params: unknown[] = [mapName, mapName, mapName, mapName];
-
-    if (searchQuery && searchQuery.trim()) {
-      sql += `
-        WHERE (
-          lo.key_name LIKE ? OR
-          (lo.value_text IS NOT NULL AND lo.value_text LIKE ?)
-        )
-      `;
-      const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern);
-    }
-
-    const directionKeyword = sortDirection === 'desc' ? 'DESC' : 'ASC';
-    const orderExpressions: string[] = [];
-
-    switch (sortColumn) {
-      case 'sequence':
-        orderExpressions.push(`lo.sequence_no ${directionKeyword}`);
-        break;
-      case 'transactionId':
-        orderExpressions.push('CASE WHEN lo.transaction_id IS NULL THEN 1 ELSE 0 END ASC');
-        orderExpressions.push(`lo.transaction_id COLLATE NOCASE ${directionKeyword}`);
-        break;
-      case 'value':
-        orderExpressions.push('CASE WHEN lo.value_text IS NULL THEN 1 ELSE 0 END ASC');
-        orderExpressions.push(`lo.value_text COLLATE NOCASE ${directionKeyword}`);
-        break;
-      default:
-        orderExpressions.push(`lo.key_name COLLATE NOCASE ${directionKeyword}`);
-        break;
-    }
-
-    if (sortColumn !== 'sequence') {
-      orderExpressions.push('lo.sequence_no ASC');
-    }
-
-    if (sortColumn !== 'keyName' || sortDirection === 'desc') {
-      orderExpressions.push('lo.key_name COLLATE NOCASE ASC');
-    }
-
-    sql += `
-      ORDER BY ${orderExpressions.join(', ')}
-      LIMIT ? OFFSET ?
-    `;
-
-    params.push(limit, offset);
+    const { sql, params } = buildTableLatestStateQuery({
+      mapName,
+      limit,
+      offset,
+      searchQuery,
+      sortColumn,
+      sortDirection,
+    });
 
     const result = await this.exec(sql, params);
 
@@ -1016,50 +798,7 @@ export class CCFDatabase {
   async getTableLatestStateCount(mapName: string, searchQuery?: string): Promise<number> {
     if (!this.client) throw new Error('Database not initialized');
 
-    let sql = `
-      WITH latest_versions AS (
-        SELECT 
-          key_name,
-          MAX(version) as max_version
-        FROM (
-          SELECT key_name, version FROM kv_writes WHERE map_name = ?
-          UNION ALL
-          SELECT key_name, version FROM kv_deletes WHERE map_name = ?
-        ) AS all_keys
-        GROUP BY key_name
-      ),
-      latest_operations AS (
-        SELECT 
-          lv.key_name,
-          COALESCE(w.value_text, NULL) as value_text,
-          lv.max_version as version,
-          COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
-          CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted
-        FROM latest_versions lv
-        LEFT JOIN kv_writes w ON lv.key_name = w.key_name 
-          AND lv.max_version = w.version 
-          AND w.map_name = ?
-        LEFT JOIN kv_deletes d ON lv.key_name = d.key_name 
-          AND lv.max_version = d.version 
-          AND d.map_name = ?
-      )
-      SELECT COUNT(*) as count
-      FROM latest_operations lo
-    `;
-
-    const params: unknown[] = [mapName, mapName, mapName, mapName];
-
-    if (searchQuery && searchQuery.trim()) {
-      sql += `
-        WHERE (
-          lo.key_name LIKE ? OR
-          (lo.value_text IS NOT NULL AND lo.value_text LIKE ?)
-        )
-      `;
-      const searchPattern = `%${searchQuery.trim()}%`;
-      params.push(searchPattern, searchPattern);
-    }
-
+    const { sql, params } = buildTableLatestStateCountQuery({ mapName, searchQuery });
     const result = await this.exec(sql, params);
     return result[0]?.count as number || 0;
   }

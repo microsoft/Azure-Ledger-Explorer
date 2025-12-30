@@ -40,8 +40,8 @@ import {
   Eye24Regular,
 } from '@fluentui/react-icons';
 import { useTransactions, useTransactionDetails } from '../hooks/use-ccf-data';
-import { EntryType } from '../types/ccf-types';
-import type { LedgerKeyValue } from '../types/ccf-types';
+import { EntryType } from '@ccf/ledger-parser';
+import type { LedgerKeyValue } from '@ccf/ledger-parser';
 import { ValueViewer } from './ValueViewer';
 
 // Helper functions for organizing data by table

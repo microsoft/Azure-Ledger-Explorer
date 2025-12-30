@@ -16,7 +16,7 @@ import {
   createTableColumn,
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
-import { EntryType } from '../types/ccf-types';
+import { EntryType } from '@ccf/ledger-parser';
 
 const useStyles = makeStyles({
   monoFontSmall: {
