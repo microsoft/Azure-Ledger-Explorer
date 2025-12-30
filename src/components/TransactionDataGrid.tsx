@@ -14,30 +14,63 @@ import {
   DataGridBody,
   Badge,
   createTableColumn,
+  tokens,
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
 import { EntryType } from '../types/ccf-types';
 
 const useStyles = makeStyles({
-  monoFontSmall: {
-    fontFamily: 'monospace',
-    fontSize: '13px',
+  dataGrid: {
+    height: '100%',
+    '& [role="gridcell"]': {
+      padding: tokens.spacingVerticalS + ' ' + tokens.spacingHorizontalM,
+    },
   },
-  monoFontMedium: {
-    fontFamily: 'monospace',
-    fontSize: '14px',
+  headerCell: {
+    fontWeight: tokens.fontWeightSemibold,
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
+  },
+  sequenceCell: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: tokens.fontSizeBase300,
+    fontWeight: tokens.fontWeightMedium,
+    color: tokens.colorBrandForeground1,
+  },
+  sizeCell: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2,
   },
   operationsContainer: {
     display: 'flex',
-    gap: '4px',
+    gap: tokens.spacingHorizontalXS,
   },
-  mapNameContainer: {
-    fontFamily: 'monospace',
-    fontSize: '13px',
+  operationBadge: {
+    fontFamily: 'var(--font-mono)',
+    fontWeight: tokens.fontWeightMedium,
+    fontSize: tokens.fontSizeBase100,
+  },
+  mapNameCell: {
+    fontFamily: 'var(--font-mono)',
+    fontSize: tokens.fontSizeBase200,
     maxWidth: '200px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground1,
+  },
+  typeBadge: {
+    fontSize: tokens.fontSizeBase100,
+    fontFamily: 'var(--font-mono)',
+  },
+  row: {
+    cursor: 'pointer',
+    transitionProperty: 'background-color',
+    transitionDuration: '100ms',
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
   },
 });
 
@@ -94,19 +127,19 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
     createTableColumn<TransactionRow>({
       columnId: 'sequence',
       compare: (a, b) => a.id - b.id,
-      renderHeaderCell: () => 'Sequence #',
+      renderHeaderCell: () => <span className={styles.headerCell}>Sequence</span>,
       renderCell: (item) => (
-        <div className={styles.monoFontMedium}>
+        <span className={styles.sequenceCell}>
           #{item.id}
-        </div>
+        </span>
       ),
     }),
     createTableColumn<TransactionRow>({
       columnId: 'type',
       compare: (a, b) => a.entryType - b.entryType,
-      renderHeaderCell: () => 'Type',
+      renderHeaderCell: () => <span className={styles.headerCell}>Type</span>,
       renderCell: (item) => (
-        <Badge appearance="outline" size="small">
+        <Badge appearance="outline" size="small" className={styles.typeBadge}>
           {getEntryTypeLabel(item.entryType)}
         </Badge>
       ),
@@ -114,27 +147,32 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
     createTableColumn<TransactionRow>({
       columnId: 'size',
       compare: (a, b) => a.size - b.size,
-      renderHeaderCell: () => 'Size',
+      renderHeaderCell: () => <span className={styles.headerCell}>Size</span>,
       renderCell: (item) => (
-        <div className={styles.monoFontSmall}>
+        <span className={styles.sizeCell}>
           {formatBytes(item.size)}
-        </div>
+        </span>
       ),
     }),
     createTableColumn<TransactionRow>({
       columnId: 'operations',
       compare: (a, b) => (a.writeCount + a.deleteCount) - (b.writeCount + b.deleteCount),
-      renderHeaderCell: () => 'Operations',
+      renderHeaderCell: () => <span className={styles.headerCell}>Operations</span>,
       renderCell: (item) => (
         <div className={styles.operationsContainer}>
           {item.writeCount > 0 && (
-            <Badge appearance="filled" color="success" size="small">
+            <Badge appearance="filled" color="success" size="small" className={styles.operationBadge}>
               {item.writeCount}W
             </Badge>
           )}
           {item.deleteCount > 0 && (
-            <Badge appearance="filled" color="danger" size="small">
+            <Badge appearance="filled" color="danger" size="small" className={styles.operationBadge}>
               {item.deleteCount}D
+            </Badge>
+          )}
+          {item.writeCount === 0 && item.deleteCount === 0 && (
+            <Badge appearance="tint" color="subtle" size="small" className={styles.operationBadge}>
+              Private
             </Badge>
           )}
         </div>
@@ -143,11 +181,11 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
     createTableColumn<TransactionRow>({
       columnId: 'map',
       compare: (a, b) => (a.mapName || '').localeCompare(b.mapName || ''),
-      renderHeaderCell: () => 'Map',
+      renderHeaderCell: () => <span className={styles.headerCell}>Map</span>,
       renderCell: (item) => (
-        <div className={styles.mapNameContainer}>
-          {item.mapName || 'N/A'}
-        </div>
+        <span className={styles.mapNameCell}>
+          {item.mapName || '—'}
+        </span>
       ),
     }),
   ];
@@ -168,7 +206,7 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
           }
         }
       }}
-      style={{ height: '100%' }}
+      className={styles.dataGrid}
     >
       <DataGridHeader>
         <DataGridRow>
@@ -179,7 +217,7 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
       </DataGridHeader>
       <DataGridBody<TransactionRow>>
         {({ item, rowId }) => (
-          <DataGridRow<TransactionRow> key={rowId}>
+          <DataGridRow<TransactionRow> key={rowId} className={styles.row}>
             {({ renderCell }) => (
               <DataGridCell>
                 {renderCell(item)}
