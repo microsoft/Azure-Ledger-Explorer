@@ -8,14 +8,20 @@
     "url": "https://github.com/microsoft/CCF-Ledger-Explorer.git"
   },
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run build:parser && tsc -b && vite build",
+    "build:parser": "npm run build -w @ccf/ledger-parser",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "test:parser": "npm run test -w @ccf/ledger-parser"
   },
   "dependencies": {
+    "@ccf/ledger-parser": "*",
     "@azure-rest/confidential-ledger": "1.1.2-beta.3",
     "@azure/storage-file-share": "^12.27.0",
     "@fluentui/react-components": "^9.68.0",

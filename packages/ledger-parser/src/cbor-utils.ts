@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import {decode, diagnose} from 'cbor2';
+import { decode, diagnose } from 'cbor2';
 import { Buffer } from "buffer";
 
 /** CBOR values can be primitives, arrays, maps, or binary data */
@@ -11,6 +11,19 @@ type CborValue = unknown;
 /** CBOR map keys are typically strings or numbers */
 type CborKey = string | number;
 
+/**
+ * Decodes a COSE Sign1 structure (CBOR array with tag 18) into a human-readable JSON string.
+ * 
+ * @param cbor - The CBOR-encoded data as a Uint8Array
+ * @returns A formatted JSON string representation of the COSE structure
+ * 
+ * @example
+ * ```typescript
+ * const coseData = new Uint8Array([...]);
+ * const readable = cborArrayToText(coseData);
+ * console.log(readable);
+ * ```
+ */
 export function cborArrayToText(cbor: Uint8Array): string {
     const decoded = decode(cbor) as { tag?: number; contents?: unknown[] } | unknown[];
     
@@ -37,8 +50,6 @@ export function cborArrayToText(cbor: Uint8Array): string {
 
 // https://www.iana.org/assignments/cose/cose.xhtml
 const coseHeaderParameters: Record<string, string> = {
-  // "less than -65536": "Reserved for Private Use",
-  // "-65536 to -1": "delegated to the COSE Header Algorithm Parameters registry",
   "0": "Reserved",
   "1": "alg",
   "2": "crit",
@@ -56,17 +67,14 @@ const coseHeaderParameters: Record<string, string> = {
   "14": "kccs",
   "15": "CWT Claims",
   "16": "typ (type)",
-  // "17-21": "Unassigned",
   "22": "c5t",
   "23": "c5u",
   "24": "c5b",
   "25": "c5c",
-  // "26-31": "Unassigned",
   "32": "x5bag",
   "33": "x5chain",
   "34": "x5t",
   "35": "x5u",
-  // "36-255": "Unassigned",
   "256": "CUPHNonce",
   "257": "CUPHOwnerPubKey",
   "258": "payload-hash-alg",
@@ -82,16 +90,13 @@ const coseHeaderParameters: Record<string, string> = {
   "268": "uHeaders",
   "269": "3161-ttc",
   "270": "3161-ctt",
-  // "271-393": "Unassigned",
   "394": "receipts",
   "395": "vds",
   "396": "vdp"
-}
+};
 
 // https://www.iana.org/assignments/cose/cose.xhtml
 const coseAlgorithms: Record<string, string> = {
-    // "less than -65536": "Reserved for Private Use",
-    // "-65536": "Unassigned",
   "-65535": "RS1",
   "-65534": "A128CTR",
   "-65533": "A192CTR",
@@ -157,7 +162,6 @@ const coseAlgorithms: Record<string, string> = {
   "-5": "A256KW",
   "-4": "A192KW",
   "-3": "A128KW",
-  // "0": "Reserved",
   "1": "A128GCM",
   "2": "A192GCM",
   "3": "A256GCM",
@@ -188,7 +192,6 @@ const cwtClaimKeys: Record<string, string> = {
   "-259": "EUPHNonce",
   "-258": "EATMAROEPrefix",
   "-257": "EAT-FDO",
-  //"0": "Reserved",
   "1": "iss",
   "2": "sub",
   "3": "aud",
@@ -271,7 +274,6 @@ function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): Cbor
     } else {
         return value;
     }
-
 }
 
 function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: CborValue): [CborKey, CborValue] {
@@ -340,13 +342,19 @@ function prettyPrintDecodedCbor(input: Uint8Array): object | string {
     return diagnose(input, { pretty: true });
 }
 
-function uint8ArrayToHexString(uint8Array: Uint8Array): string {
+/**
+ * Converts a Uint8Array to a hexadecimal string
+ */
+export function uint8ArrayToHexString(uint8Array: Uint8Array): string {
     return Array.from(uint8Array)
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
 }
 
-function uint8ArrayToB64String(uint8Array: Uint8Array): string {
+/**
+ * Converts a Uint8Array to a base64-encoded string
+ */
+export function uint8ArrayToB64String(uint8Array: Uint8Array): string {
     return Buffer.from(uint8Array).toString('base64');
 }
 

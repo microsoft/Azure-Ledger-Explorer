@@ -10,13 +10,7 @@ import { globalIgnores } from 'eslint/config'
 header.rules.header.meta.schema = false
 
 export default tseslint.config([
-  globalIgnores([
-    'dist',
-    'packages/**/dist',
-    'node_modules',
-    'coverage',
-    '*.config.js',
-  ]),
+  globalIgnores(['dist', 'node_modules', 'coverage', '*.config.js', 'packages/*/dist']),
 
   // Main TypeScript/React configuration
   {
