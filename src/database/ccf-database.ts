@@ -307,7 +307,10 @@ export class CCFDatabase {
       if (value instanceof Uint8Array) return value;
       if (value instanceof ArrayBuffer) return new Uint8Array(value);
       // sqlite-wasm can return a view-like object depending on API usage
-      if (typeof value === 'object' && value !== null && 'buffer' in (value as Record<string, unknown>)) {
+      if (!value || typeof value !== 'object') {
+        return null;
+      }
+      if ('buffer' in (value as Record<string, unknown>)) {
         const maybeBuffer = (value as { buffer?: unknown }).buffer;
         if (maybeBuffer instanceof ArrayBuffer) {
           return new Uint8Array(maybeBuffer);
