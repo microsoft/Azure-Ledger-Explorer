@@ -72,6 +72,7 @@ export const SCHEMA_STATEMENTS = [
     map_name TEXT NOT NULL,
     key_name TEXT NOT NULL,
     value_text TEXT,
+    value_bytes BLOB,
     version INTEGER NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (sequence_no) REFERENCES transactions(sequence_no) ON DELETE CASCADE
@@ -131,6 +132,30 @@ export function createTables(db: SQLiteDB, logger?: { log: (msg: string) => void
     for (const stmt of SCHEMA_STATEMENTS) {
       db.exec(stmt);
     }
+
+    // Lightweight migrations for existing OPFS DBs created with older schema.
+    // CREATE TABLE IF NOT EXISTS will not add new columns.
+    try {
+      const infoStmt = db.prepare(`PRAGMA table_info(kv_writes)`);
+      let hasValueBytes = false;
+      while (infoStmt.step()) {
+        const row = infoStmt.get({}) as { name?: string };
+        if (row.name === 'value_bytes') {
+          hasValueBytes = true;
+          break;
+        }
+      }
+      infoStmt.finalize();
+
+      if (!hasValueBytes) {
+        logger?.log('Migrating schema: adding kv_writes.value_bytes BLOB');
+        db.exec('ALTER TABLE kv_writes ADD COLUMN value_bytes BLOB');
+      }
+    } catch (err) {
+      // If migration fails, keep going – reads will fall back to value_text.
+      logger?.log(`Warning: schema migration check failed: ${err}`);
+    }
+
     logger?.log('Database tables created successfully');
   } catch (err) {
     console.error('Failed to create tables:', err);

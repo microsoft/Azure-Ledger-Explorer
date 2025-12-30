@@ -266,7 +266,8 @@ self.onmessage = async (event: MessageEvent) => {
               }
             }
 
-            writeBinds.push([seqNo, write.mapName || '', write.key, valueText, write.version]);
+            const valueBytes = write.value && write.value.length > 0 ? write.value : null;
+            writeBinds.push([seqNo, write.mapName || '', write.key, valueText, valueBytes, write.version]);
           }
 
           // Collect deletes data
@@ -293,8 +294,8 @@ self.onmessage = async (event: MessageEvent) => {
         `);
 
         const writeStmt = db.prepare(`
-          INSERT INTO kv_writes (sequence_no, map_name, key_name, value_text, version)
-          VALUES (?, ?, ?, ?, ?)
+          INSERT INTO kv_writes (sequence_no, map_name, key_name, value_text, value_bytes, version)
+          VALUES (?, ?, ?, ?, ?, ?)
         `);
 
         const deleteStmt = db.prepare(`

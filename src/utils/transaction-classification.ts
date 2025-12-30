@@ -63,6 +63,12 @@ export function classifyTransaction(transaction: TransactionQueryResult): Transa
     return 'userPublic';
   }
 
+  // No public-domain writes/deletes recorded: likely private-domain only.
+  // Private-domain contents are encrypted, so we can't decode KV operations here.
+  if (transaction.writeCount === 0 && transaction.deleteCount === 0) {
+    return 'userPrivate';
+  }
+
   // If we can't classify, mark as unknown
   return 'unknown';
 }

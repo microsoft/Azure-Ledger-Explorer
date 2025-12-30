@@ -13,6 +13,16 @@ import {
   Text,
 } from '@fluentui/react-components';
 
+import {
+  computeCcfInternalTreeRoot,
+  decodeCcfInternalTree,
+  formatCcfInternalTreeSummary,
+} from '../utils/ccf-internal-tree';
+
+import { extractCoseSignatureTimeFromCcfValue } from '../utils/cose-signature-time';
+
+import { MerkleTreeGraph } from './MerkleTreeGraph';
+
 const useStyles = makeStyles({
   container: {
     display: 'flex',
@@ -59,7 +69,7 @@ const useStyles = makeStyles({
   },
 });
 
-export type ContentType = 'javascript' | 'json' | 'x509' | 'raw' | 'auto';
+export type ContentType = 'javascript' | 'json' | 'x509' | 'raw' | 'merkletree' | 'auto';
 
 interface ValueViewerProps {
   keyName: string;
@@ -99,15 +109,23 @@ const TABLE_CONTENT_TYPE_MAP: Record<string, ContentType> = {
   'public:ccf.gov.service_info': 'json',
   'public:ccf.internal.nodes': 'json',
   'public:ccf.internal.consensus': 'json',
+
+  // CCF internal merkle tree
+  'public:ccf.internal.tree': 'merkletree',
   
   // Add more mappings as needed
 };
+
+const CCF_INTERNAL_TREE_TABLE = 'public:ccf.internal.tree';
+const CCF_COSE_SIGNATURES_TABLE = 'public:ccf.internal.cose_signatures';
 
 export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableName }) => {
   const styles = useStyles();
   const [contentType, setContentType] = useState<ContentType>('auto');
   const [displayContent, setDisplayContent] = useState<string>('');
   const [editorLanguage, setEditorLanguage] = useState<string>('plaintext');
+  const [coseSignatureTime, setCoseSignatureTime] = useState<string | null>(null);
+  const [coseSignatureBase64, setCoseSignatureBase64] = useState<string | null>(null);
   
   // Detect current theme - check if dark mode is active
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
@@ -139,7 +157,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
     };
   }, []);
 
-  const detectContentType = (data: Uint8Array, tableName?: string): ContentType => {
+  const detectContentType = useCallback((data: Uint8Array, tableName?: string): ContentType => {
     // First check table mapping
     if (tableName && TABLE_CONTENT_TYPE_MAP[tableName]) {
       return TABLE_CONTENT_TYPE_MAP[tableName];
@@ -205,9 +223,45 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
       // Not valid UTF-8, default to raw
       return 'raw';
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (tableName !== CCF_COSE_SIGNATURES_TABLE) {
+      setCoseSignatureTime(null);
+      setCoseSignatureBase64(null);
+      return;
+    }
+
+    const extracted = extractCoseSignatureTimeFromCcfValue(value);
+    if (!extracted) {
+      // Still try to show the raw base64 if it's JSON-encoded without a valid timestamp.
+      try {
+        const valueText = new TextDecoder('utf-8', { fatal: false }).decode(value).trim();
+        const parsed = valueText.startsWith('"') ? (JSON.parse(valueText) as unknown) : valueText;
+        setCoseSignatureBase64(typeof parsed === 'string' ? parsed : null);
+      } catch {
+        setCoseSignatureBase64(null);
+      }
+      setCoseSignatureTime(null);
+      return;
+    }
+
+    setCoseSignatureTime(extracted.isoTime);
+    setCoseSignatureBase64(extracted.base64);
+  }, [tableName, value]);
 
   const formatContent = useCallback((data: Uint8Array, type: ContentType): { content: string; language: string } => {
+    if (tableName === CCF_COSE_SIGNATURES_TABLE) {
+      const base64 = coseSignatureBase64;
+      const ts = coseSignatureTime;
+      if (base64) {
+        return {
+          content: `${ts ? `[${ts}] ` : ''}${base64}`,
+          language: 'plaintext',
+        };
+      }
+    }
+
     switch (type) {
       case 'javascript': {
         try {
@@ -261,12 +315,18 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
         const autoType = detectContentType(data, tableName);
         return formatContent(data, autoType);
       }
+
+      case 'merkletree': {
+        // Graphical renderer handles this outside Monaco.
+        // Provide a small placeholder if forced through formatter.
+        return { content: 'Merkle tree viewer', language: 'plaintext' };
+      }
       
       default: {
         return { content: formatHex(data), language: 'plaintext' };
       }
     }
-  }, [tableName]);
+  }, [tableName, detectContentType, coseSignatureBase64, coseSignatureTime]);
 
   const formatHex = (data: Uint8Array): string => {
     if (!data || data.length === 0) return '';
@@ -351,11 +411,43 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
     return lines.join('\n');
   };
 
+  const effectiveContentType: ContentType =
+    contentType === 'auto' ? detectContentType(value, tableName) : contentType;
+
   useEffect(() => {
-    const { content, language } = formatContent(value, contentType);
-    setDisplayContent(content);
-    setEditorLanguage(language);
-  }, [value, contentType, tableName, formatContent]);
+    let cancelled = false;
+
+    const run = async () => {
+      if (effectiveContentType === 'merkletree' && tableName === CCF_INTERNAL_TREE_TABLE) {
+        try {
+          const decoded = decodeCcfInternalTree(value);
+          const root = await computeCcfInternalTreeRoot(decoded);
+          const summary = formatCcfInternalTreeSummary(decoded, root);
+          if (!cancelled) {
+            setDisplayContent(summary);
+            setEditorLanguage('plaintext');
+          }
+        } catch (e) {
+          if (!cancelled) {
+            setDisplayContent(String(e));
+            setEditorLanguage('plaintext');
+          }
+        }
+        return;
+      }
+
+      const { content, language } = formatContent(value, contentType);
+      if (!cancelled) {
+        setDisplayContent(content);
+        setEditorLanguage(language);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [value, contentType, tableName, formatContent, effectiveContentType]);
 
   const handleContentTypeChange = (_event: unknown, data: { optionValue?: string }) => {
     if (data.optionValue) {
@@ -372,6 +464,11 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
             Size: {value.length} bytes
             {tableName && ` • Table: ${tableName}`}
           </Text>
+          {tableName === CCF_COSE_SIGNATURES_TABLE && coseSignatureTime && (
+            <Text style={{ fontSize: '11px', color: tokens.colorNeutralForeground3, fontFamily: tokens.fontFamilyMonospace }}>
+              Time: [{coseSignatureTime}]
+            </Text>
+          )}
         </div>
         <div className={styles.controls}>
           <Text style={{ fontSize: '12px', color: tokens.colorNeutralForeground2 }}>
@@ -384,6 +481,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
             size="small"
           >
             <Option value="auto">Auto Detect</Option>
+            <Option value="merkletree">Merkle Tree</Option>
             <Option value="javascript">JavaScript</Option>
             <Option value="json">JSON</Option>
             <Option value="x509">X.509 Certificate</Option>
@@ -393,21 +491,25 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
       </div>
       
       <div className={styles.editorContainer}>
-        <Editor
-          height="100%"
-          language={editorLanguage}
-          value={displayContent}
-          options={{
-            readOnly: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            wordWrap: 'on',
-            automaticLayout: true,
-            fontSize: 12,
-            fontFamily: 'Consolas, "Courier New", monospace',
-          }}
-          theme={isDarkTheme ? "vs-dark" : "vs"}
-        />
+        {effectiveContentType === 'merkletree' && tableName === CCF_INTERNAL_TREE_TABLE ? (
+          <MerkleTreeGraph value={value} />
+        ) : (
+          <Editor
+            height="100%"
+            language={editorLanguage}
+            value={displayContent}
+            options={{
+              readOnly: true,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              automaticLayout: true,
+              fontSize: 12,
+              fontFamily: 'Consolas, "Courier New", monospace',
+            }}
+            theme={isDarkTheme ? "vs-dark" : "vs"}
+          />
+        )}
       </div>
     </div>
   );

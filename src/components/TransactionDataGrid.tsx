@@ -17,7 +17,6 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import type { TableColumnDefinition } from '@fluentui/react-components';
-import { EntryType } from '@ccf/ledger-parser';
 
 const useStyles = makeStyles({
   dataGrid: {
@@ -95,18 +94,6 @@ interface TransactionDataGridProps {
   onTransactionClick: (transactionId: number) => void;
 }
 
-// Helper function to format entry type
-const getEntryTypeLabel = (entryType: number): string => {
-  switch (entryType) {
-    case EntryType.WriteSet: return 'WriteSet';
-    case EntryType.Snapshot: return 'Snapshot';
-    case EntryType.WriteSetWithClaims: return 'WithClaims';
-    case EntryType.WriteSetWithCommitEvidence: return 'WithEvidence';
-    case EntryType.WriteSetWithCommitEvidenceAndClaims: return 'WithBoth';
-    default: return 'Unknown';
-  }
-};
-
 // Helper function to format bytes
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B';
@@ -132,16 +119,6 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
         <span className={styles.sequenceCell}>
           #{item.id}
         </span>
-      ),
-    }),
-    createTableColumn<TransactionRow>({
-      columnId: 'type',
-      compare: (a, b) => a.entryType - b.entryType,
-      renderHeaderCell: () => <span className={styles.headerCell}>Type</span>,
-      renderCell: (item) => (
-        <Badge appearance="outline" size="small" className={styles.typeBadge}>
-          {getEntryTypeLabel(item.entryType)}
-        </Badge>
       ),
     }),
     createTableColumn<TransactionRow>({

@@ -159,10 +159,17 @@ export class CCFDatabase {
         const valueText = this.decodeWriteTransactionValue(write.value, write.mapName);
         writeDeleteStatements.push({
           sql: `
-            INSERT INTO kv_writes (sequence_no, map_name, key_name, value_text, version)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO kv_writes (sequence_no, map_name, key_name, value_text, value_bytes, version)
+            VALUES (?, ?, ?, ?, ?, ?)
           `,
-          bind: [seqNo, write.mapName || '', write.key, valueText, write.version],
+          bind: [
+            seqNo,
+            write.mapName || '',
+            write.key,
+            valueText,
+            write.value && write.value.length > 0 ? write.value : null,
+            write.version,
+          ],
         });
       }
 
@@ -289,15 +296,36 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
 
     const result = await this.exec(`
-      SELECT key_name, value_text, version, map_name
+      SELECT key_name, value_text, value_bytes, version, map_name
       FROM kv_writes
       WHERE sequence_no = ?
       ORDER BY map_name, key_name
     `, [transactionId]);
 
+    const toUint8Array = (value: unknown): Uint8Array | null => {
+      if (value === null || value === undefined) return null;
+      if (value instanceof Uint8Array) return value;
+      if (value instanceof ArrayBuffer) return new Uint8Array(value);
+      // sqlite-wasm can return a view-like object depending on API usage
+      if (!value || typeof value !== 'object') {
+        return null;
+      }
+      if ('buffer' in (value as Record<string, unknown>)) {
+        const maybeBuffer = (value as { buffer?: unknown }).buffer;
+        if (maybeBuffer instanceof ArrayBuffer) {
+          return new Uint8Array(maybeBuffer);
+        }
+      }
+      return null;
+    };
+
     return result.map((row) => ({
       key: row.key_name as string,
-      value: row.value_text ? new TextEncoder().encode(row.value_text as string) : new Uint8Array(0),
+      value:
+        toUint8Array((row as { value_bytes?: unknown }).value_bytes) ??
+        ((row as { value_text?: unknown }).value_text
+          ? new TextEncoder().encode((row as { value_text: string }).value_text)
+          : new Uint8Array(0)),
       version: row.version as number,
       mapName: row.map_name as string,
     }));
