@@ -43,19 +43,22 @@ import { Sidebar } from './Sidebar';
 
 
 const useStyles = makeStyles({
+  // Main container - full height flex column
   container: {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    maxHeight: '90vh',
-    width: '100%'
+    width: '100%',
+    overflow: 'hidden',
   },
+  // Middle section with sidebar + content
   mainContent: {
     flex: 1,
     display: 'flex',
     overflow: 'hidden',
     backgroundColor: tokens.colorNeutralBackground1,
   },
+  // Main canvas area (right of sidebar)
   canvas: {
     flex: 1,
     display: 'flex',
@@ -68,65 +71,64 @@ const useStyles = makeStyles({
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexShrink: 0,
+  },
+  canvasTitle: {
+    fontWeight: 600,
+    margin: 0,
   },
   searchContainer: {
     maxWidth: '400px',
     flex: 1,
   },
+  visualizationContainer: {
+    padding: '16px 24px',
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    flexShrink: 0,
+  },
   tableContainer: {
     flex: 1,
-    maxWidth: '100%',
+    overflowY: 'auto',
     overflowX: 'hidden',
-    overflowY: 'scroll',
     margin: '16px 24px',
     borderRadius: '8px',
     border: `1px solid ${tokens.colorNeutralStroke2}`,
   },
-  emptyState: {
-    padding: '48px',
-    textAlign: 'center',
-    color: tokens.colorNeutralForeground2,
-  },
-  statusBar: {
-    padding: '8px 24px',
+  paginationContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 16px',
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    flexShrink: 0,
+  },
+  paginationControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: '8px',
   },
+  paginationInfo: {
+    fontSize: '13px',
+    color: tokens.colorNeutralForeground2,
+  },
+  // Footer status bar - minimal height
+  statusBar: {
+    padding: '6px 24px',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    flexShrink: 0,
+  },
+  // Utility styles
   uploadProgress: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
   },
-  treeItem: {
-    cursor: 'pointer',
-  },
-  badge: {
-    marginLeft: '8px',
-  },
-  headerActions: {
-    display: 'flex',
-    gap: '12px',
-    alignItems: 'center',
-  },
-  fileTreeItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-  },
-  fileNameContainer: {
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '150px',
-  },
-  fileNameTooltip: {
-    maxWidth: '120px',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+  emptyState: {
+    padding: '48px',
+    textAlign: 'center',
+    color: tokens.colorNeutralForeground2,
   },
   centerContent: {
     flex: 1,
@@ -140,31 +142,24 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     height: '200px',
   },
-  canvasTitle: {
-    fontWeight: 600,
-    margin: 0,
+  // File tree styles
+  treeItem: {
+    cursor: 'pointer',
   },
-  paginationContainer: {
+  fileTreeItem: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 16px',
-    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
+    width: '100%',
   },
-  paginationControls: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
+  fileNameContainer: {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    maxWidth: '150px',
   },
-  paginationInfo: {
-    fontSize: '13px',
-    color: tokens.colorNeutralForeground2,
-  },
-  visualizationContainer: {
-    padding: '16px 24px',
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground1,
+  badge: {
+    marginLeft: '8px',
   },
 });
 
@@ -313,9 +308,7 @@ export const CCFVisualizerApp: React.FC = () => {
                 onClick={() => handleFileSelect(file.id)}
               >
                 <div className={styles.fileTreeItem}>
-                  <div className={styles.fileNameContainer}>
-                    {file.filename}
-                  </div>
+                  <div className={styles.fileNameContainer}>{file.filename}</div>
                   <Badge appearance="outline" size="small" className={styles.badge}>
                     {formatBytes(file.fileSize)}
                   </Badge>
@@ -332,11 +325,36 @@ export const CCFVisualizerApp: React.FC = () => {
     </Sidebar>
   );
 
+  const renderTransactionContent = () => {
+    if (transactionsLoading) {
+      return (
+        <div className={styles.loadingContainer}>
+          <Spinner label="Loading transactions..." />
+        </div>
+      );
+    }
+    if (transactions && transactions.length > 0) {
+      return (
+        <TransactionDataGrid
+          transactions={transactions}
+          onTransactionClick={handleTransactionClick}
+        />
+      );
+    }
+    return (
+      <div className={styles.emptyState}>
+        <Body1>{searchQuery ? 'No transactions match your search' : 'No transactions found'}</Body1>
+      </div>
+    );
+  };
 
-  // Main explorer view with sidebar and data table
+  const selectedFileName = ledgerFiles?.find(f => f.id === selectedFileId)?.filename;
+  const showPagination = transactions && transactions.length > 0 && totalTransactions && totalTransactions > pageSize;
+
+  // Main layout: container (column) -> messages, mainContent (row: sidebar + canvas), footer
   return (
     <div className={styles.container}>
-      {/* Upload Progress */}
+      {/* Status Messages */}
       {isUploading && (
         <MessageBar intent="info">
           <div className={styles.uploadProgress}>
@@ -345,35 +363,23 @@ export const CCFVisualizerApp: React.FC = () => {
           </div>
         </MessageBar>
       )}
-
-      {/* Upload Error Message */}
       {uploadError && (
         <MessageBar intent="error">
           Failed to upload file: {uploadError.message}
         </MessageBar>
       )}
 
-      {/* Main Content */}
-      <div
-        className={styles.mainContent}
-      >
-        {/* Sidebar - File Tree */}
+      {/* Main Content: Sidebar + Canvas */}
+      <div className={styles.mainContent}>
         {renderSideBar()}
 
-        {/* Main Canvas - Transaction Table */}
         <div className={styles.canvas}>
-          {/* Canvas Header with Search */}
+          {/* Header */}
           <div className={styles.canvasHeader}>
             <Body1 className={styles.canvasTitle}>
-              {selectedFileId && !searchQuery ? (
-                <>
-                  Transactions in {ledgerFiles?.find(f => f.id === selectedFileId)?.filename}
-                </>
-              ) : (
-                <>
-                  All Transactions {searchQuery && `(filtered: "${searchQuery}")`}
-                </>
-              )}
+              {selectedFileId && !searchQuery
+                ? `Transactions in ${selectedFileName}`
+                : `All Transactions${searchQuery ? ` (filtered: "${searchQuery}")` : ''}`}
             </Body1>
             <div className={styles.searchContainer}>
               <SearchBox
@@ -384,7 +390,7 @@ export const CCFVisualizerApp: React.FC = () => {
             </div>
           </div>
 
-          {/* Ledger Visualization */}
+          {/* Visualization */}
           {transactions && transactions.length > 0 && (
             <div className={styles.visualizationContainer}>
               <LedgerVisualization
@@ -399,29 +405,14 @@ export const CCFVisualizerApp: React.FC = () => {
 
           {/* Transaction Table */}
           <div className={styles.tableContainer}>
-            {transactions && transactions.length > 0 ? (
-              <TransactionDataGrid
-                transactions={transactions}
-                onTransactionClick={handleTransactionClick}
-              />
-            ) : transactionsLoading ? (
-              <div className={styles.loadingContainer}>
-                <Spinner label="Loading transactions..." />
-              </div>
-            ) : (
-              <div className={styles.emptyState}>
-                <Body1>
-                  {searchQuery ? 'No transactions match your search' : 'No transactions found'}
-                </Body1>
-              </div>
-            )}
+            {renderTransactionContent()}
           </div>
 
-          {/* Pagination Controls */}
-          {transactions && transactions.length > 0 && totalTransactions && totalTransactions > pageSize && (
+          {/* Pagination */}
+          {showPagination && (
             <div className={styles.paginationContainer}>
               <div className={styles.paginationInfo}>
-                Page {currentPage} of {totalPages} ({totalTransactions} total transactions)
+                Page {currentPage} of {totalPages} ({totalTransactions} total)
               </div>
               <div className={styles.paginationControls}>
                 <Button
@@ -447,17 +438,12 @@ export const CCFVisualizerApp: React.FC = () => {
         </div>
       </div>
 
-      {/* Status Bar */}
+      {/* Footer */}
       <footer className={styles.statusBar}>
         <Caption1>
-          Showing {transactions?.length || 0}
-          {totalTransactions && totalTransactions > pageSize && ` of ${totalTransactions}`} transactions
-          {selectedFileId && ledgerFiles && (
-            <> • Selected: {ledgerFiles.find(f => f.id === selectedFileId)?.filename}</>
-          )}
-          {storageInfo?.quota && (
-            <> • Storage: {formatBytes(storageInfo.quota.usage)} / {formatBytes(storageInfo.quota.quota)} used ({storageInfo.quota.usagePercentage.toFixed(1)}%)</>
-          )}
+          {transactions?.length || 0}{totalTransactions && totalTransactions > pageSize ? ` of ${totalTransactions}` : ''} transactions
+          {selectedFileName && ` • ${selectedFileName}`}
+          {storageInfo?.quota && ` • Storage: ${formatBytes(storageInfo.quota.usage)} / ${formatBytes(storageInfo.quota.quota)} (${storageInfo.quota.usagePercentage.toFixed(1)}%)`}
         </Caption1>
       </footer>
     </div>
