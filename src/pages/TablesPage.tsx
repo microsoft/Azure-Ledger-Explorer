@@ -36,9 +36,11 @@ import {
     AccordionPanel,
 } from '@fluentui/react-components';
 import { useTableFeatures, useTableColumnSizing_unstable, type TableColumnDefinition, type TableColumnSizingOptions, type TableFeaturePlugin } from '@fluentui/react-table';
-import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular, Info16Regular } from '@fluentui/react-icons';
+import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular, Info16Regular, TableStackLeftRegular } from '@fluentui/react-icons';
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import { Sidebar } from '../components/Sidebar';
+import { SchemaViewerDialog } from '../components/SchemaViewerDialog';
+import { getDatabaseSchema, type DatabaseSchema } from '../database/queries/schema-queries';
 import type { DialogOpenChangeData } from '@fluentui/react-components';
 import type { CCFDatabase } from '../database';
 
@@ -367,6 +369,9 @@ const TablesPage: React.FC = () => {
     const [sortDirection, setSortDirection] = useState<TableLatestStateSortDirection>(initialSortDirection);
     const [selectedKey, setSelectedKey] = useState<{ mapName: string; keyName: string } | null>(null);
     const [isSqlDialogOpen, setIsSqlDialogOpen] = useState(false);
+    const [isSchemaDialogOpen, setIsSchemaDialogOpen] = useState(false);
+    const [schemaInfo, setSchemaInfo] = useState<DatabaseSchema | null>(null);
+    const [isLoadingSchema, setIsLoadingSchema] = useState(false);
     const [sqlQuery, setSqlQuery] = useState('');
     const [sqlResult, setSqlResult] = useState<unknown[] | null>(null);
     const [sqlError, setSqlError] = useState<string | null>(null);
@@ -881,6 +886,24 @@ const TablesPage: React.FC = () => {
         }
     }, [database, sqlQuery]);
 
+    const openSchemaDialog = useCallback(async () => {
+        if (!database) return;
+        
+        setIsSchemaDialogOpen(true);
+        setIsLoadingSchema(true);
+        setSchemaInfo(null);
+        
+        try {
+            const schema = await getDatabaseSchema((sql) => database.executeQuery(sql));
+            setSchemaInfo(schema);
+        } catch (error) {
+            console.error('Failed to load schema:', error);
+            setSchemaInfo({ tables: [] });
+        } finally {
+            setIsLoadingSchema(false);
+        }
+    }, [database]);
+
     const renderKeyTransactionsModal = () => {
         if (!selectedKey) return null;
 
@@ -1087,13 +1110,25 @@ const TablesPage: React.FC = () => {
                     icon={<DatabaseRegular />}
                     collapsible={false}
                     headerActions={
-                        <Button
-                            appearance="secondary"
-                            size="small"
-                            onClick={openSqlRunnerDialog}
-                        >
-                            Run SQL
-                        </Button>
+                        <div className={classes.actionButtons}>
+                            <Tooltip content="View database schema" relationship="label">
+                                <Button
+                                    appearance="subtle"
+                                    size="small"
+                                    icon={<TableStackLeftRegular />}
+                                    onClick={openSchemaDialog}
+                                    disabled={!database || databaseLoading}
+                                    aria-label="View Schema"
+                                />
+                            </Tooltip>
+                            <Button
+                                appearance="secondary"
+                                size="small"
+                                onClick={openSqlRunnerDialog}
+                            >
+                                Run SQL
+                            </Button>
+                        </div>
                     }
                 >
                     {tablesLoading ? (
@@ -1476,6 +1511,12 @@ const TablesPage: React.FC = () => {
             </div>
 
             {renderSqlRunnerDialog()}
+            <SchemaViewerDialog
+                isOpen={isSchemaDialogOpen}
+                onClose={() => setIsSchemaDialogOpen(false)}
+                schemaInfo={schemaInfo}
+                isLoading={isLoadingSchema}
+            />
             {renderKeyTransactionsModal()}
         </div>
     );
