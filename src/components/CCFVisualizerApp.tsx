@@ -56,37 +56,6 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     backgroundColor: tokens.colorNeutralBackground1,
   },
-  sidebar: {
-    width: 'var(--sidebar-width, 250px)',
-    minWidth: '150px',
-    maxWidth: '500px',
-    borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  resizeHandle: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: '4px',
-    height: '100%',
-    cursor: 'col-resize',
-    backgroundColor: 'transparent',
-    borderRight: '1px solid transparent',
-    zIndex: 10,
-    '&:hover': {
-      borderRight: `1px solid ${tokens.colorBrandBackground}`,
-    },
-  },
-  resizeHandleActive: {
-    borderRight: `1px solid ${tokens.colorBrandBackground}`,
-  },
-  resizing: {
-    cursor: 'col-resize',
-  },
   canvas: {
     flex: 1,
     display: 'flex',
@@ -171,10 +140,6 @@ const useStyles = makeStyles({
     justifyContent: 'center',
     height: '200px',
   },
-  sidebarTitle: {
-    fontWeight: 600,
-    margin: 0,
-  },
   canvasTitle: {
     fontWeight: 600,
     margin: 0,
@@ -209,8 +174,6 @@ export const CCFVisualizerApp: React.FC = () => {
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [transactionPage, setTransactionPage] = useState(0);
-  const [sidebarWidth, setSidebarWidth] = useState(300); // Default sidebar width
-  const [isResizing, setIsResizing] = useState(false);
   const [selectedTypeFilters, setSelectedTypeFilters] = useState<Set<TransactionType>>(new Set());
   const pageSize = 50;
 
@@ -282,47 +245,6 @@ export const CCFVisualizerApp: React.FC = () => {
   const hasNextPage = currentPage < totalPages;
   const hasPreviousPage = currentPage > 1;
 
-  // Sidebar resize handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  };
-
-  const handleMouseMove = React.useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-
-    const newWidth = e.clientX;
-    if (newWidth >= 150 && newWidth <= 500) {
-      setSidebarWidth(newWidth);
-    }
-  }, [isResizing]);
-
-  const handleMouseUp = React.useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  // Add/remove event listeners for resize
-  React.useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-    } else {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, handleMouseMove, handleMouseUp]);
-
   // Helper function to format bytes (still used in status bar and file tree)
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
@@ -373,8 +295,8 @@ export const CCFVisualizerApp: React.FC = () => {
     );
   }
 
-  const renderSideBar = () =>
-    <Sidebar icon={<DocumentRegular />} title="Ledger Files">
+  const renderSideBar = () => (
+    <Sidebar icon={<DocumentRegular />} title="Ledger Files" resizable collapsible>
       {ledgerFiles && ledgerFiles.length > 0 ? (
         <Tree aria-label="Ledger Files">
           {ledgerFiles.map((file) => (
@@ -407,12 +329,8 @@ export const CCFVisualizerApp: React.FC = () => {
           <Body1>No files uploaded</Body1>
         </div>
       )}
-      
-      <div
-        className={isResizing ? `${styles.resizeHandle} ${styles.resizeHandleActive}` : styles.resizeHandle}
-        onMouseDown={handleMouseDown}
-      />
     </Sidebar>
+  );
 
 
   // Main explorer view with sidebar and data table
@@ -438,8 +356,6 @@ export const CCFVisualizerApp: React.FC = () => {
       {/* Main Content */}
       <div
         className={styles.mainContent}
-        // @ts-expect-error CSS custom properties for dynamic sidebar width
-        style={{ '--sidebar-width': `${sidebarWidth}px` }}
       >
         {/* Sidebar - File Tree */}
         {renderSideBar()}
