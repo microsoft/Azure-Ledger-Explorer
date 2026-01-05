@@ -72,7 +72,8 @@ const groupByTable = (items: LedgerKeyValue[]): Record<string, LedgerKeyValue[]>
 const useStyles = makeStyles({
   container: {
     padding: tokens.spacingVerticalXL + ' ' + tokens.spacingHorizontalXXL,
-    height: '80vh',
+    flex: 1,
+    minHeight: 0,
     overflowY: 'auto',
     overflowX: 'hidden',
     display: 'flex',
