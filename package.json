@@ -12,7 +12,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run build:parser && vite",
     "build": "npm run build:parser && tsc -b && vite build",
     "build:parser": "npm run build -w @ccf/ledger-parser",
     "lint": "eslint .",
