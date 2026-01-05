@@ -5,8 +5,9 @@
 
 import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const testfilepath = import.meta.url.replace('file://', '');
+const testfilepath = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DOMAIN = 'test-ledger.confidential-ledger.azure.com';
 
 test.describe('Configuration Page - Domain Persistence', () => {
@@ -90,7 +91,7 @@ test.describe('Configuration Page - Domain Persistence', () => {
     
     // Upload a local file using same path pattern as files.spec.ts
     await page.getByLabel('Upload CCF ledger files').setInputFiles([
-      path.join(testfilepath, '../test_files', 'ledger_1-14.committed'),
+      path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
     ]);
 
     // Wait for processing to complete
