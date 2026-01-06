@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { AIChat } from '../components/AIChat';
 import type { ChatMessage } from '../components/AIChat';
 import { ConversationHistory } from '../components/ConversationHistory';
+import { SIDEBAR_WIDTH } from '../components/sidebar-constants';
 import { saveConversationToHistory } from '../utils/conversation-storage';
 import type { SavedConversation } from '../types/conversation-types';
 import { useDatabase } from '../hooks/use-ccf-data';
@@ -15,9 +16,8 @@ import { Spinner, Text, makeStyles, tokens } from '@fluentui/react-components';
 const useStyles = makeStyles({
   container: {
     display: 'flex',
-    flexDirection: 'column',
     height: '100%',
-    minHeight: 0, // Critical for flex child to shrink
+    overflow: 'hidden',
   },
   loadingContainer: {
     display: 'flex',
@@ -35,6 +35,10 @@ const useStyles = makeStyles({
     flexDirection: 'column',
     gap: '16px',
     color: tokens.colorPaletteRedForeground1,
+  },
+  mainContent: {
+    flex: 1,
+    overflow: 'hidden',
   },
 });
 
@@ -102,7 +106,7 @@ export const AIPage: React.FC<AIPageProps> = ({
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div className={styles.container}>
       <ConversationHistory
         onConversationSelect={handleConversationSelect}
         onNewConversation={handleNewConversation}
@@ -111,7 +115,7 @@ export const AIPage: React.FC<AIPageProps> = ({
         onToggleCollapse={() => setIsCollapsed(c => !c)}
         refreshSignal={refreshSignal}
       />
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div className={styles.mainContent}>
         <AIChat
           database={database}
           onChatStateChange={onChatStateChange}
@@ -119,7 +123,7 @@ export const AIPage: React.FC<AIPageProps> = ({
           clearChatFunction={clearChatFunction}
           onSaveConversation={handleSaveConversation}
           loadedMessages={loadedMessages}
-          sidebarWidth={isCollapsed ? 48 : 300}
+          sidebarWidth={isCollapsed ? SIDEBAR_WIDTH.collapsed : SIDEBAR_WIDTH.expanded}
         />
       </div>
     </div>

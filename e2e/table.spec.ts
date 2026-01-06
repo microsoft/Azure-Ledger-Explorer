@@ -5,16 +5,17 @@
 
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const testfilepath = import.meta.url.replace('file://', '');
+const testfilepath = path.dirname(fileURLToPath(import.meta.url));
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/files');
   await page.getByRole('button', { name: 'Add Files' }).click();
   await page.getByRole('button', { name: 'Browse Files' }).click();
   await page.getByLabel('Upload CCF ledger files').setInputFiles([
-    path.join(testfilepath, '../test_files', 'ledger_1-14.committed'),
-    path.join(testfilepath, '../test_files', 'ledger_15-3926.committed'),
+    path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
+    path.join(testfilepath, 'test_files', 'ledger_15-3926.committed'),
   ]);
   await expect(page.getByText('Total: 14 transactions')).toBeVisible();
   // make sure file is fully processed
@@ -23,7 +24,8 @@ test.beforeEach(async ({ page }) => {
 
 test('shows scitt entry columns', async ({ page }) => {
   await page.goto('/tables/public%3Ascitt.entry');
-  await expect(page.getByText('public:scitt.entry')).toBeVisible();
+  // Target the main content header (the first one, sidebar item is after the main heading loads)
+  await expect(page.getByText('public:scitt.entry').first()).toBeVisible();
 
   const table = page.getByRole('table').first();
 

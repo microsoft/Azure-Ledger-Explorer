@@ -5,41 +5,18 @@
 
 import React, { useEffect, useState } from 'react';
 import { makeStyles, tokens, Button, Text, Spinner, MessageBar } from '@fluentui/react-components';
-import { DeleteRegular, ChevronLeftRegular, ChevronRightRegular, ChatRegular } from '@fluentui/react-icons';
+import { DeleteRegular, ChatRegular } from '@fluentui/react-icons';
 import type { ConversationHistoryProps, SavedConversation } from '../types/conversation-types';
 import { 
   loadConversationsFromHistory, 
   deleteConversationFromHistory 
 } from '../utils/conversation-storage';
+import { Sidebar } from './Sidebar';
 
 const useStyles = makeStyles({
-  root: {
+  list: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
-    transition: 'width 0.2s ease',
-    backgroundColor: tokens.colorNeutralBackground2,
-  },
-  expanded: {
-    width: '300px',
-  },
-  collapsed: {
-    width: '48px',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '12px 12px',
-  },
-  title: {
-    fontWeight: tokens.fontWeightSemibold,
-    fontSize: tokens.fontSizeBase300,
-    color: tokens.colorNeutralForeground1,
-  },
-  list: {
-    flex: 1,
-    overflowY: 'auto',
   },
   item: {
     position: 'relative',
@@ -85,9 +62,6 @@ const useStyles = makeStyles({
       color: tokens.colorPaletteRedForeground2,
       backgroundColor: tokens.colorPaletteRedBackground2,
     },
-  },
-  collapsedContent: {
-    display: 'none',
   },
   empty: {
     display: 'flex',
@@ -163,54 +137,57 @@ export const ConversationHistory: React.FC<ConversationHistoryProps> = ({
     }
   };
 
-  if (isCollapsed) {
-    return (
-      <div className={`${styles.root} ${styles.collapsed}`}>
-        <div className={styles.header}>
-          <Button appearance="subtle" icon={<ChevronRightRegular />} onClick={onToggleCollapse} title="Expand" />
+  const renderContent = () => {
+    if (loading) {
+      return <div className={styles.spinnerContainer}><Spinner size="small" /></div>;
+    }
+
+    if (conversations.length === 0) {
+      return (
+        <div className={styles.empty}>
+          <ChatRegular className={styles.iconLarge} />
+          <Text>Older conversations will appear here.</Text>
         </div>
+      );
+    }
+
+    return (
+      <div className={styles.list}>
+        {conversations.map(c => (
+          <div
+            key={c.id}
+            className={`${styles.item} ${c.id === activeConversationId ? styles.active : ''}`}
+            onClick={() => onConversationSelect(c)}
+            onMouseEnter={() => setHoveredId(c.id)}
+            onMouseLeave={() => setHoveredId(id => (id === c.id ? null : id))}
+          >
+            <Text className={styles.itemTitle}>{c.title}</Text>
+            <Text className={styles.date}>Started {formatDisplayDate(c.createdAt)} (last update {formatDisplayDate(c.updatedAt)})</Text>
+            <Button
+              appearance="subtle"
+              icon={<DeleteRegular />}
+              className={styles.deleteBtn + ' delete-btn'}
+              title="Delete"
+              style={{ opacity: hoveredId === c.id ? 1 : 0 }}
+              onClick={(e) => handleDelete(c.id, e)}
+            />
+          </div>
+        ))}
       </div>
     );
-  }
+  };
 
   return (
-    <div className={`${styles.root} ${styles.expanded}`}>
-      <div className={styles.header}>
-        <Text className={styles.title}>Conversations</Text>
-        <Button appearance="subtle" icon={<ChevronLeftRegular />} onClick={onToggleCollapse} title="Collapse" />
-      </div>
+    <Sidebar
+      title="Conversations"
+      icon={<ChatRegular />}
+      isCollapsed={isCollapsed}
+      onToggleCollapse={onToggleCollapse}
+      collapsible
+      contentPadded={false}
+    >
       {error && <MessageBar intent="error" className={styles.errorBar}>{error}</MessageBar>}
-      <div className={styles.list}>
-        {loading ? (
-          <div className={styles.spinnerContainer}><Spinner size="small" /></div>
-        ) : conversations.length === 0 ? (
-          <div className={styles.empty}>
-            <ChatRegular className={styles.iconLarge} />
-            <Text>Older conversations will appear here.</Text>
-          </div>
-        ) : (
-          conversations.map(c => (
-            <div
-              key={c.id}
-              className={`${styles.item} ${c.id === activeConversationId ? styles.active : ''}`}
-              onClick={() => onConversationSelect(c)}
-              onMouseEnter={() => setHoveredId(c.id)}
-              onMouseLeave={() => setHoveredId(id => (id === c.id ? null : id))}
-            >
-              <Text className={styles.itemTitle}>{c.title}</Text>
-              <Text className={styles.date}>Started {formatDisplayDate(c.createdAt)} (last update {formatDisplayDate(c.updatedAt)})</Text>
-              <Button
-                appearance="subtle"
-                icon={<DeleteRegular />}
-                className={styles.deleteBtn + ' delete-btn'}
-                title="Delete"
-                style={{ opacity: hoveredId === c.id ? 1 : 0 }}
-                onClick={(e) => handleDelete(c.id, e)}
-              />
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+      {renderContent()}
+    </Sidebar>
   );
 };

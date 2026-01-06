@@ -5,8 +5,9 @@
 
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const testfilepath = import.meta.url.replace('file://', '');
+const testfilepath = path.dirname(fileURLToPath(import.meta.url));
 
 test('main page has title', async ({ page }) => {
   await page.goto('/');
@@ -27,7 +28,7 @@ test('cannot upload invalid file names', async ({ page }) => {
   await page.getByRole('button', { name: 'Add Files' }).click();
   await page.getByRole('button', { name: 'Browse Files' }).click();
   await page.getByLabel('Upload CCF ledger files').setInputFiles([
-    path.join(testfilepath, '../test_files', 'invalidnameledger_1-14.committed'),
+    path.join(testfilepath, 'test_files', 'invalidnameledger_1-14.committed'),
   ]);
   await expect(page.getByRole('group', { name: 'Invalid File Sequence' })).toBeVisible();
 });
@@ -37,8 +38,8 @@ test('successfully imports ledger files', async ({ page }) => {
   await page.getByRole('button', { name: 'Add Files' }).click();
   await page.getByRole('button', { name: 'Browse Files' }).click();
   await page.getByLabel('Upload CCF ledger files').setInputFiles([
-    path.join(testfilepath, '../test_files', 'ledger_1-14.committed'),
-    path.join(testfilepath, '../test_files', 'ledger_15-3926.committed'),
+    path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
+    path.join(testfilepath, 'test_files', 'ledger_15-3926.committed'),
   ]);
   await expect(page.getByText('Total: 14 transactions')).toBeVisible();
 });

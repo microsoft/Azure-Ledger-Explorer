@@ -1032,8 +1032,13 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
 
     const trimmedQuery = sqlQuery.trim().toUpperCase();
-    if (!trimmedQuery.startsWith('SELECT') && !trimmedQuery.startsWith('WITH')) {
-      throw new Error('Only SELECT queries are allowed for security reasons');
+    // Allow SELECT, WITH (CTEs), and PRAGMA (read-only schema introspection)
+    const isAllowed = trimmedQuery.startsWith('SELECT') || 
+                      trimmedQuery.startsWith('WITH') || 
+                      trimmedQuery.startsWith('PRAGMA');
+    
+    if (!isAllowed) {
+      throw new Error('Only SELECT, WITH, and PRAGMA queries are allowed for security reasons');
     }
 
     try {

@@ -14,7 +14,8 @@ const useStyles = makeStyles({
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: 'calc(100% - 20px)',
+    height: '100%',
+    minHeight: 0,
     overflow: 'hidden',
     margin: 0,
     padding: 0,

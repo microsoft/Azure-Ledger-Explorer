@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme, webDarkTheme } from '@fluentui/react-components';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -18,8 +18,11 @@ import { WriteReceiptVerificationPage } from './pages/WriteReceiptVerificationPa
 import { MstReceiptVerificationPage } from './pages/MstReceiptVerificationPage';
 import { CoseViewerPage } from './pages/CoseViewerPage';
 import { MenuBar } from './components/MenuBar';
+import { PageTransition } from './components/PageTransition';
 import GridLayout from './components/AppLayout';
 import { ConfigPage } from './pages/ConfigPage';
+import { SplashScreen } from './components/SplashScreen';
+import { initializeDatabase, resetDatabase } from './hooks/use-ccf-data';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -32,16 +35,19 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  // Database initialization state
+  const [isDbInitialized, setIsDbInitialized] = useState(false);
+
   // Initialize dark mode from localStorage or default to false
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('ccf-visualizer-theme');
     return savedTheme === 'dark';
   });
-  
+
   // Chat state management
   const [, setHasActiveChat] = useState(false);
   const [clearChatFunction, setClearChatFunction] = useState<(() => void) | null>(null);
-  
+
   const currentTheme = isDarkMode ? webDarkTheme : webLightTheme;
 
   // Save theme preference to localStorage
@@ -53,41 +59,60 @@ function App() {
     setIsDarkMode(!isDarkMode);
   };
 
+  const handleDatabaseInitialized = useCallback(() => {
+    setIsDbInitialized(true);
+  }, []);
+
+  // Show splash screen until database is initialized
+  if (!isDbInitialized) {
+    return (
+      <FluentProvider theme={currentTheme}>
+        <SplashScreen
+          onInitialized={handleDatabaseInitialized}
+          initializeDatabase={initializeDatabase}
+          resetDatabase={resetDatabase}
+        />
+      </FluentProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <FluentProvider theme={currentTheme}>
         <Router>
           <GridLayout>
             <GridLayout.Top>
-              <MenuBar 
-                onToggleTheme={handleToggleTheme} 
+              <MenuBar
+                onToggleTheme={handleToggleTheme}
                 isDarkMode={isDarkMode}
               />
             </GridLayout.Top>
             <GridLayout.Main>
-              <Routes>
-                <Route path="/" element={<StartPage />} />
-                { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Route 
-                  path="/chat" 
-                  element={
-                    <AIPage 
-                      onChatStateChange={setHasActiveChat}
-                      onRegisterClearChat={setClearChatFunction}
-                      clearChatFunction={clearChatFunction}
-                    />
-                  } 
-                /> }
-                <Route path="/files" element={<CCFVisualizerApp />} />
-                <Route path="/tables" element={<TablesPage />} />
-                <Route path="/tables/:tableName" element={<TablesPage />} />
-                <Route path="/stats" element={<StatsPage />} />
-                <Route path="/verification" element={<VerificationPage />} />
-                <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
-                <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />
-                <Route path="/cose-viewer" element={<CoseViewerPage />} />
-                <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
-                <Route path="/config" element={<ConfigPage />} />
-              </Routes>
+              <PageTransition>
+                <Routes>
+                  <Route path="/" element={<StartPage />} />
+                  {import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Route
+                    path="/chat"
+                    element={
+                      <AIPage
+                        onChatStateChange={setHasActiveChat}
+                        onRegisterClearChat={setClearChatFunction}
+                        clearChatFunction={clearChatFunction}
+                      />
+                    }
+                  />}
+                  <Route path="/files" element={<CCFVisualizerApp />} />
+                  <Route path="/tables" element={<TablesPage />} />
+                  <Route path="/tables/:tableName" element={<TablesPage />} />
+                  <Route path="/stats" element={<StatsPage />} />
+                  <Route path="/verification" element={<VerificationPage />} />
+                  <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
+                  <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />
+                  <Route path="/cose-viewer" element={<CoseViewerPage />} />
+                  <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
+                  <Route path="/config" element={<ConfigPage />} />
+                </Routes>
+              </PageTransition>
             </GridLayout.Main>
           </GridLayout>
         </Router>

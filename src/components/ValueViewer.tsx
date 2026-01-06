@@ -27,25 +27,27 @@ const useStyles = makeStyles({
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '500px', // Fixed height to ensure proper Monaco Editor sizing
+    height: '500px',
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: tokens.borderRadiusMedium,
     overflow: 'hidden',
+    backgroundColor: tokens.colorNeutralBackground1,
+    boxShadow: tokens.shadow4,
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: tokens.spacingHorizontalM,
-    padding: tokens.spacingVerticalS,
+    padding: tokens.spacingVerticalS + ' ' + tokens.spacingHorizontalM,
     backgroundColor: tokens.colorNeutralBackground2,
     borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    flexShrink: 0, // Prevent header from shrinking
+    flexShrink: 0,
   },
   keyInfo: {
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalXS,
+    gap: tokens.spacingVerticalXXS,
   },
   controls: {
     display: 'flex',
@@ -54,13 +56,16 @@ const useStyles = makeStyles({
   },
   editorContainer: {
     flex: 1,
-    height: '100%', // Take remaining height
+    height: '100%',
     overflow: 'hidden',
   },
   keyLabel: {
-    fontFamily: 'monospace',
+    fontFamily: 'var(--font-mono)',
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground2,
+    padding: tokens.spacingVerticalXXS + ' ' + tokens.spacingHorizontalS,
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderRadius: tokens.borderRadiusSmall,
   },
 });
 

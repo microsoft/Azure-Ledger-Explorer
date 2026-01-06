@@ -49,11 +49,18 @@ const useStyles = makeStyles({
   },
   headerContent: {
     display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: '12px',
   },
   logo: {
-    fontSize: '40px',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: '18px',
     fontWeight: 600,
+    color: tokens.colorNeutralForeground1,
   },
   headerActions: {
     display: 'flex',
@@ -115,9 +122,10 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   return (
     <header className={styles.header}>
       <div className={styles.headerContent}>
-        <a className={styles.logo} href="/" title='Sage'>
-          <img height={30} src={ccfLogo} alt="Sage Logo" />
+        <a className={styles.logo} href="/" title='CCF Ledger Explorer'>
+          <img height={30} src={ccfLogo} alt="CCF Logo" />
         </a>
+        <span className={styles.title}>CCF Ledger Explorer</span>
       </div>
 
       {/* Navigation and Header Actions */}

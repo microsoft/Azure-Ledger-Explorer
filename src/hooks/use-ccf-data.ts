@@ -12,24 +12,90 @@ import { verificationService } from '../services/verification-service';
 
 // Global database instance (singleton pattern)
 let dbInstance: CCFDatabase | null = null;
+let dbInitialized = false;
 
 export type TableLatestStateSortColumn = 'sequence' | 'transactionId' | 'keyName' | 'value';
 export type TableLatestStateSortDirection = 'asc' | 'desc';
 
-export const getDatabase = async (): Promise<CCFDatabase> => {
-  if (!dbInstance) {
-    dbInstance = new CCFDatabase({
-      filename: 'ccf-ledger.db',
-      useOpfs: true,
-    });
-    try {
-      await dbInstance.initialize();
-    } catch (error) {
-      alert('Could not open local database. Please reload the page or close other windows or tabs that also use this page. ' + error);
-      throw error;
-    }
+/**
+ * Initialize the database. This should be called once at app startup.
+ * Throws if initialization fails.
+ */
+export const initializeDatabase = async (): Promise<void> => {
+  if (dbInitialized && dbInstance) {
+    return; // Already initialized
   }
-  return dbInstance;
+  
+  dbInstance = new CCFDatabase({
+    filename: 'ccf-ledger.db',
+    useOpfs: true,
+  });
+  
+  await dbInstance.initialize();
+  dbInitialized = true;
+};
+
+/**
+ * Reset the database by clearing OPFS storage.
+ * This will delete all stored data.
+ */
+export const resetDatabase = async (): Promise<void> => {
+  // Clear the current instance
+  dbInstance = null;
+  dbInitialized = false;
+  
+  // Try to delete the OPFS directory
+  try {
+    if ('storage' in navigator && 'getDirectory' in navigator.storage) {
+      const root = await navigator.storage.getDirectory();
+      // Try to remove the database files
+      try {
+        await root.removeEntry('ccf-ledger.db', { recursive: true });
+      } catch {
+        // File might not exist, ignore
+      }
+      try {
+        await root.removeEntry('ccf-ledger.db-journal', { recursive: true });
+      } catch {
+        // File might not exist, ignore
+      }
+      try {
+        await root.removeEntry('ccf-ledger.db-wal', { recursive: true });
+      } catch {
+        // File might not exist, ignore
+      }
+    }
+  } catch (error) {
+    console.error('Failed to clear OPFS storage:', error);
+    // Continue anyway - the database might still work after reinitialization
+  }
+  
+  // Also clear IndexedDB if used
+  try {
+    const databases = await indexedDB.databases();
+    for (const db of databases) {
+      if (db.name && db.name.includes('sqlite')) {
+        indexedDB.deleteDatabase(db.name);
+      }
+    }
+  } catch {
+    // IndexedDB.databases() might not be supported, ignore
+  }
+};
+
+/**
+ * Check if the database has been initialized.
+ */
+export const isDatabaseInitialized = (): boolean => {
+  return dbInitialized && dbInstance !== null;
+};
+
+export const getDatabase = async (): Promise<CCFDatabase> => {
+  if (!dbInstance || !dbInitialized) {
+    // If not initialized, do it now (for backwards compatibility)
+    await initializeDatabase();
+  }
+  return dbInstance!;
 };
 
 // Query keys for TanStack Query

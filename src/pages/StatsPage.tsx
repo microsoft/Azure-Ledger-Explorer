@@ -14,11 +14,7 @@ import {
   Spinner,
   MessageBar,
   Badge,
-  Button,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbButton,
-  BreadcrumbDivider,
+  Button
 } from '@fluentui/react-components';
 import {
   NumberSymbolRegular,
@@ -30,8 +26,7 @@ import {
   ClockRegular,
   DataUsageRegular,
   PersonRegular,
-  CalendarRegular,
-  ChevronRightRegular,
+  CalendarRegular
 } from '@fluentui/react-icons';
 import { useEnhancedStats } from '../hooks/use-ccf-data';
 
@@ -192,29 +187,6 @@ const StatsPage: React.FC = () => {
   if (isLoading) {
     return (
       <div className={classes.container}>
-        <div className={classes.header}>
-          <div className={classes.breadcrumb}>
-            <Breadcrumb>
-              <BreadcrumbItem>
-                <BreadcrumbButton onClick={() => navigate('/')}>
-                  Home
-                </BreadcrumbButton>
-              </BreadcrumbItem>
-              <BreadcrumbDivider />
-              <BreadcrumbItem>
-                <BreadcrumbButton current>
-                  Statistics
-                </BreadcrumbButton>
-              </BreadcrumbItem>
-            </Breadcrumb>
-          </div>
-          <Text size={800} weight="semibold">
-            Database Statistics
-          </Text>
-          <Text size={400} style={{ marginTop: '4px' }}>
-            Comprehensive analytics of your CCF ledger data
-          </Text>
-        </div>
         <div className={classes.loadingContainer}>
           <Spinner size="large" />
         </div>
@@ -225,26 +197,6 @@ const StatsPage: React.FC = () => {
   if (error) {
     return (
       <div className={classes.container}>
-        <div className={classes.header}>
-          <div className={classes.breadcrumb}>
-            <Breadcrumb>
-              <BreadcrumbItem>
-                <BreadcrumbButton onClick={() => navigate('/')}>
-                  Home
-                </BreadcrumbButton>
-              </BreadcrumbItem>
-              <BreadcrumbDivider />
-              <BreadcrumbItem>
-                <BreadcrumbButton current>
-                  Statistics
-                </BreadcrumbButton>
-              </BreadcrumbItem>
-            </Breadcrumb>
-          </div>
-          <Text size={800} weight="semibold">
-            Database Statistics
-          </Text>
-        </div>
         <div className={classes.content}>
           <MessageBar intent="error">
             Error loading statistics: {error.message}
@@ -257,26 +209,6 @@ const StatsPage: React.FC = () => {
   if (!stats || stats.transactionCount === 0) {
     return (
       <div className={classes.container}>
-        <div className={classes.header}>
-          <div className={classes.breadcrumb}>
-            <Breadcrumb>
-              <BreadcrumbItem>
-                <BreadcrumbButton onClick={() => navigate('/')}>
-                  Home
-                </BreadcrumbButton>
-              </BreadcrumbItem>
-              <BreadcrumbDivider />
-              <BreadcrumbItem>
-                <BreadcrumbButton current>
-                  Statistics
-                </BreadcrumbButton>
-              </BreadcrumbItem>
-            </Breadcrumb>
-          </div>
-          <Text size={800} weight="semibold">
-            Database Statistics
-          </Text>
-        </div>
         <div className={classes.emptyState}>
           <NumberSymbolRegular style={{ fontSize: '64px', marginBottom: '16px' }} />
           <Text size={600} weight="semibold">No data available</Text>
@@ -299,30 +231,6 @@ const StatsPage: React.FC = () => {
 
   return (
     <div className={classes.container}>
-      <div className={classes.header}>
-        <div className={classes.breadcrumb}>
-          <Breadcrumb>
-            <BreadcrumbItem>
-              <BreadcrumbButton onClick={() => navigate('/')}>
-                Home
-              </BreadcrumbButton>
-            </BreadcrumbItem>
-            <BreadcrumbDivider />
-            <BreadcrumbItem>
-              <BreadcrumbButton current>
-                Statistics
-              </BreadcrumbButton>
-            </BreadcrumbItem>
-          </Breadcrumb>
-        </div>
-        <Text size={800} weight="semibold">
-          Database Statistics
-        </Text>
-        <Text size={400} style={{ marginTop: '4px' }}>
-          Comprehensive analytics of your CCF ledger data
-        </Text>
-      </div>
-
       <div className={classes.content}>
         {/* Main Statistics */}
         <Text className={classes.sectionTitle}>
@@ -564,28 +472,6 @@ const StatsPage: React.FC = () => {
               }
             />
           </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <Text className={classes.sectionTitle}>
-          <ChevronRightRegular className={classes.sectionIcon} />
-          Quick Actions
-        </Text>
-        <div className={classes.actionButtons}>
-          <Button
-            appearance="primary"
-            onClick={() => navigate('/files')}
-            icon={<DocumentRegular />}
-          >
-            View Files
-          </Button>
-          <Button
-            appearance="outline"
-            onClick={() => navigate('/tables')}
-            icon={<DatabaseRegular />}
-          >
-            Browse Tables
-          </Button>
         </div>
       </div>
     </div>

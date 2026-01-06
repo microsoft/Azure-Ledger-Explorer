@@ -17,7 +17,9 @@ export interface ConversationHistoryProps {
   onConversationSelect: (conversation: SavedConversation) => void;
   onNewConversation: () => void;
   activeConversationId?: string;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
+  /** Whether the sidebar is collapsed (controlled mode) */
+  isCollapsed?: boolean;
+  /** Callback when collapse is toggled (controlled mode) */
+  onToggleCollapse?: () => void;
   refreshSignal?: number; // increment to trigger reload after save
 }

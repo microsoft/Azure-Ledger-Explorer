@@ -36,8 +36,11 @@ import {
     AccordionPanel,
 } from '@fluentui/react-components';
 import { useTableFeatures, useTableColumnSizing_unstable, type TableColumnDefinition, type TableColumnSizingOptions, type TableFeaturePlugin } from '@fluentui/react-table';
-import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular, Info16Regular } from '@fluentui/react-icons';
+import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, ChevronLeft24Regular, ChevronRight24Regular, ArrowSort24Regular, ArrowSortUp24Regular, ArrowSortDown24Regular, Info16Regular, TableStackLeftRegular } from '@fluentui/react-icons';
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
+import { Sidebar } from '../components/Sidebar';
+import { SchemaViewerDialog } from '../components/SchemaViewerDialog';
+import { getDatabaseSchema, type DatabaseSchema } from '../database/queries/schema-queries';
 import type { DialogOpenChangeData } from '@fluentui/react-components';
 import type { CCFDatabase } from '../database';
 
@@ -135,23 +138,6 @@ const useStyles = makeStyles({
         display: 'flex',
         flex: 1,
         overflow: 'hidden',
-    },
-    sidebar: {
-        width: '300px',
-        borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
-        backgroundColor: tokens.colorNeutralBackground1,
-        overflow: 'auto',
-    },
-    sidebarHeader: {
-        padding: '16px',
-        borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-        backgroundColor: tokens.colorNeutralBackground2,
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center'
-    },
-    sidebarContent: {
-        padding: '8px',
     },
     tablesList: {
         display: 'flex',
@@ -383,6 +369,9 @@ const TablesPage: React.FC = () => {
     const [sortDirection, setSortDirection] = useState<TableLatestStateSortDirection>(initialSortDirection);
     const [selectedKey, setSelectedKey] = useState<{ mapName: string; keyName: string } | null>(null);
     const [isSqlDialogOpen, setIsSqlDialogOpen] = useState(false);
+    const [isSchemaDialogOpen, setIsSchemaDialogOpen] = useState(false);
+    const [schemaInfo, setSchemaInfo] = useState<DatabaseSchema | null>(null);
+    const [isLoadingSchema, setIsLoadingSchema] = useState(false);
     const [sqlQuery, setSqlQuery] = useState('');
     const [sqlResult, setSqlResult] = useState<unknown[] | null>(null);
     const [sqlError, setSqlError] = useState<string | null>(null);
@@ -897,6 +886,24 @@ const TablesPage: React.FC = () => {
         }
     }, [database, sqlQuery]);
 
+    const openSchemaDialog = useCallback(async () => {
+        if (!database) return;
+        
+        setIsSchemaDialogOpen(true);
+        setIsLoadingSchema(true);
+        setSchemaInfo(null);
+        
+        try {
+            const schema = await getDatabaseSchema((sql) => database.executeQuery(sql));
+            setSchemaInfo(schema);
+        } catch (error) {
+            console.error('Failed to load schema:', error);
+            setSchemaInfo({ tables: [] });
+        } finally {
+            setIsLoadingSchema(false);
+        }
+    }, [database]);
+
     const renderKeyTransactionsModal = () => {
         if (!selectedKey) return null;
 
@@ -1098,110 +1105,122 @@ const TablesPage: React.FC = () => {
         <div className={classes.container}>
             <div className={classes.content}>
                 {/* Sidebar with tables list */}
-                <div className={classes.sidebar}>
-                    <div className={classes.sidebarHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text size={600} weight="semibold">
-                            <DatabaseRegular style={{ marginRight: '8px' }} />
-                            Tables
-                        </Text>
-                        <Button
-                            appearance="secondary"
-                            onClick={openSqlRunnerDialog}
-                        >
-                            Run SQL
-                        </Button>
-                    </div>
-                    <div className={classes.sidebarContent}>
-                        {tablesLoading ? (
-                            <div className={classes.loadingContainer}>
-                                <Spinner size="small" />
-                            </div>
-                        ) : tablesError ? (
-                            <MessageBar intent="error">
-                                Error loading tables: {tablesError.message}
-                            </MessageBar>
-                        ) : tables && tables.length > 0 ? (
-                            <div className={classes.tablesList}>
-                                <Accordion multiple collapsible defaultOpenItems={['public']}> 
-                                    {governanceTables.length > 0 && (
-                                        <AccordionItem value="governance">
-                                            <AccordionHeader>Governance</AccordionHeader>
-                                            <AccordionPanel>
-                                                {governanceTables.map(table => (
-                                                    <div
-                                                        key={table}
-                                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
-                                                        onClick={() => handleTableSelect(table)}
-                                                    >
-                                                        <div className={classes.tableItemContent}>
-                                                            <Tooltip content={table} relationship="label" positioning="after">
-                                                                <Text size={300} weight={table === tableName ? 'semibold' : 'regular'} className={classes.tableNameText}>
-                                                                    {table}
-                                                                </Text>
-                                                            </Tooltip>
-                                                            {renderTableInfoIcon(table)}
-                                                        </div>
+                <Sidebar
+                    title="Tables"
+                    icon={<DatabaseRegular />}
+                    collapsible={false}
+                    resizable={true}
+                    headerActions={
+                        <div className={classes.actionButtons}>
+                            <Tooltip content="View database schema" relationship="label">
+                                <Button
+                                    appearance="subtle"
+                                    size="small"
+                                    icon={<TableStackLeftRegular />}
+                                    onClick={openSchemaDialog}
+                                    disabled={!database || databaseLoading}
+                                    aria-label="View Schema"
+                                />
+                            </Tooltip>
+                            <Button
+                                appearance="secondary"
+                                size="small"
+                                onClick={openSqlRunnerDialog}
+                            >
+                                Run SQL
+                            </Button>
+                        </div>
+                    }
+                >
+                    {tablesLoading ? (
+                        <div className={classes.loadingContainer}>
+                            <Spinner size="small" />
+                        </div>
+                    ) : tablesError ? (
+                        <MessageBar intent="error">
+                            Error loading tables: {tablesError.message}
+                        </MessageBar>
+                    ) : tables && tables.length > 0 ? (
+                        <div className={classes.tablesList}>
+                            <Accordion multiple collapsible defaultOpenItems={['public']}> 
+                                {governanceTables.length > 0 && (
+                                    <AccordionItem value="governance">
+                                        <AccordionHeader>Governance</AccordionHeader>
+                                        <AccordionPanel>
+                                            {governanceTables.map(table => (
+                                                <div
+                                                    key={table}
+                                                    className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
+                                                    onClick={() => handleTableSelect(table)}
+                                                >
+                                                    <div className={classes.tableItemContent}>
+                                                        <Tooltip content={table} relationship="label" positioning="after">
+                                                            <Text size={300} weight={table === tableName ? 'semibold' : 'regular'} className={classes.tableNameText}>
+                                                                {table}
+                                                            </Text>
+                                                        </Tooltip>
+                                                        {renderTableInfoIcon(table)}
                                                     </div>
-                                                ))}
-                                            </AccordionPanel>
-                                        </AccordionItem>
-                                    )}
-                                    {internalTables.length > 0 && (
-                                        <AccordionItem value="internal">
-                                            <AccordionHeader>Internal</AccordionHeader>
-                                            <AccordionPanel>
-                                                {internalTables.map(table => (
-                                                    <div
-                                                        key={table}
-                                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
-                                                        onClick={() => handleTableSelect(table)}
-                                                    >
-                                                        <div className={classes.tableItemContent}>
-                                                            <Tooltip content={table} relationship="label" positioning="after">
-                                                                <Text size={300} weight={table === tableName ? 'semibold' : 'regular'} className={classes.tableNameText}>
-                                                                    {table}
-                                                                </Text>
-                                                            </Tooltip>
-                                                            {renderTableInfoIcon(table)}
-                                                        </div>
+                                                </div>
+                                            ))}
+                                        </AccordionPanel>
+                                    </AccordionItem>
+                                )}
+                                {internalTables.length > 0 && (
+                                    <AccordionItem value="internal">
+                                        <AccordionHeader>Internal</AccordionHeader>
+                                        <AccordionPanel>
+                                            {internalTables.map(table => (
+                                                <div
+                                                    key={table}
+                                                    className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
+                                                    onClick={() => handleTableSelect(table)}
+                                                >
+                                                    <div className={classes.tableItemContent}>
+                                                        <Tooltip content={table} relationship="label" positioning="after">
+                                                            <Text size={300} weight={table === tableName ? 'semibold' : 'regular'} className={classes.tableNameText}>
+                                                                {table}
+                                                            </Text>
+                                                        </Tooltip>
+                                                        {renderTableInfoIcon(table)}
                                                     </div>
-                                                ))}
-                                            </AccordionPanel>
-                                        </AccordionItem>
-                                    )}
-                                    {otherTables.length > 0 && (
-                                        <AccordionItem value="public">
-                                            <AccordionHeader>Public</AccordionHeader>
-                                            <AccordionPanel>
-                                                {otherTables.map(table => (
-                                                    <div
-                                                        key={table}
-                                                        className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
-                                                        onClick={() => handleTableSelect(table)}
-                                                    >
-                                                        <div className={classes.tableItemContent}>
-                                                            <Tooltip content={table} relationship="label" positioning="after">
-                                                                <Text size={300} weight={table === tableName ? 'semibold' : 'regular'} className={classes.tableNameText}>
-                                                                    {table}
-                                                                </Text>
-                                                            </Tooltip>
-                                                            {renderTableInfoIcon(table)}
-                                                        </div>
+                                                </div>
+                                            ))}
+                                        </AccordionPanel>
+                                    </AccordionItem>
+                                )}
+                                {otherTables.length > 0 && (
+                                    <AccordionItem value="public">
+                                        <AccordionHeader>Public</AccordionHeader>
+                                        <AccordionPanel>
+                                            {otherTables.map(table => (
+                                                <div
+                                                    key={table}
+                                                    className={`${classes.tableItem} ${table === tableName ? classes.tableItemActive : ''}`}
+                                                    onClick={() => handleTableSelect(table)}
+                                                >
+                                                    <div className={classes.tableItemContent}>
+                                                        <Tooltip content={table} relationship="label" positioning="after">
+                                                            <Text size={300} weight={table === tableName ? 'semibold' : 'regular'} className={classes.tableNameText}>
+                                                                {table}
+                                                            </Text>
+                                                        </Tooltip>
+                                                        {renderTableInfoIcon(table)}
                                                     </div>
-                                                ))}
-                                            </AccordionPanel>
-                                        </AccordionItem>
-                                    )}
-                                </Accordion>
-                            </div>
-                        ) : (
-                            <div className={classes.emptyState}>
-                                <DatabaseRegular style={{ fontSize: '32px', marginBottom: '8px' }} />
-                                <Text size={300}>No tables found</Text>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                                                </div>
+                                            ))}
+                                        </AccordionPanel>
+                                    </AccordionItem>
+                                )}
+                            </Accordion>
+                        </div>
+                    ) : (
+                        <div className={classes.emptyState}>
+                            <DatabaseRegular style={{ fontSize: '32px', marginBottom: '8px' }} />
+                            <Text size={300}>No tables found</Text>
+                        </div>
+                    )}
+                </Sidebar>
 
                 {/* Main content */}
                 <div className={classes.mainContent}>
@@ -1493,6 +1512,12 @@ const TablesPage: React.FC = () => {
             </div>
 
             {renderSqlRunnerDialog()}
+            <SchemaViewerDialog
+                isOpen={isSchemaDialogOpen}
+                onClose={() => setIsSchemaDialogOpen(false)}
+                schemaInfo={schemaInfo}
+                isLoading={isLoadingSchema}
+            />
             {renderKeyTransactionsModal()}
         </div>
     );
