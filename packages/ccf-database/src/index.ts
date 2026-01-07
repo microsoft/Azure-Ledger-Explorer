@@ -35,5 +35,23 @@ export {
   type DatabaseSchema,
 } from './queries/schema-queries';
 
-// Re-export types that consumers might need from ledger-parser
-export type { Transaction, LedgerKeyValue } from '@ccf/ledger-parser';
+/**
+ * Database Transaction type (app-specific, different from the parsed Transaction type)
+ */
+export interface DatabaseTransaction {
+  id: number;
+  fileId: number;
+  fileName: string;
+  sequenceNumber: number;
+  version: number;
+  flags: number;
+  size: number;
+  entryType: number;
+  txVersion: number;
+  txView: number;
+  maxConflictVersion: number;
+  txId: string;
+  writeCount: number;
+  deleteCount: number;
+  fileSize: number;
+}

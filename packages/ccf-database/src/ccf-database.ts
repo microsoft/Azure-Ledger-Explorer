@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { DatabaseWorkerClient } from './worker/worker-client';
+import { DatabaseWorkerClient } from './worker/database-worker-client';
 import {
   FileRepository,
   TransactionRepository,
