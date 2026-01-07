@@ -353,7 +353,7 @@ export const useClearAllData = () => {
   return useMutation({
     mutationFn: async () => {
       const db = await getDatabase();
-      await db.stats.clearAllData();
+      await db.clearAllData();
       
       // Clear verification progress since data is cleared
       verificationService.clearSavedProgress();

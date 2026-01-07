@@ -153,6 +153,53 @@ export function dropAllTables(db: SQLiteDB, logger?: { log: (msg: string) => voi
 }
 
 /**
+ * Clear all data from tables (preserves schema).
+ * Dynamically discovers all user tables, so no updates needed when migrations add new tables.
+ */
+export function clearAllTables(db: SQLiteDB, logger?: { log: (msg: string) => void }): void {
+  logger?.log('Clearing all table data...');
+
+  // Get all user-created tables (excluding sqlite internals and schema_meta)
+  const stmt = db.prepare(`
+    SELECT name FROM sqlite_master 
+    WHERE type = 'table' 
+      AND name NOT LIKE 'sqlite_%'
+      AND name != 'schema_meta'
+    ORDER BY name
+  `);
+
+  const tables: string[] = [];
+  while (stmt.step()) {
+    const row = stmt.get({}) as { name: string };
+    tables.push(row.name);
+  }
+  stmt.finalize();
+
+  if (tables.length === 0) {
+    logger?.log('No tables to clear');
+    return;
+  }
+
+  // Disable foreign keys temporarily to allow deletion in any order
+  db.exec('PRAGMA foreign_keys = OFF');
+
+  try {
+    for (const table of tables) {
+      db.exec(`DELETE FROM "${table}"`);
+      logger?.log(`Cleared table: ${table}`);
+    }
+
+    // Reset autoincrement counters
+    db.exec('DELETE FROM sqlite_sequence');
+  } finally {
+    // Re-enable foreign keys
+    db.exec('PRAGMA foreign_keys = ON');
+  }
+
+  logger?.log('All table data cleared');
+}
+
+/**
  * Verify that all required tables exist.
  */
 export function verifyTables(db: SQLiteDB): boolean {

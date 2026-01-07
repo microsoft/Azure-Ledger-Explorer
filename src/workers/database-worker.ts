@@ -6,7 +6,7 @@
 
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import { runMigrations, dropAllTables, verifyTables } from '../database/migrations';
+import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../database/migrations';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../database/decode-cbor-tables';
 
@@ -381,6 +381,13 @@ self.onmessage = async (event: MessageEvent) => {
         db.close();
         result = { success: true };
         break;
+
+      case 'clearAllData': {
+        // Clear all data from tables (preserves schema)
+        clearAllTables(db, { log });
+        result = { success: true };
+        break;
+      }
 
       case 'deleteDatabase': {
         // Delete the OPFS database file completely

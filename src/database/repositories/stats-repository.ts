@@ -187,41 +187,4 @@ export class StatsRepository extends BaseRepository {
       return false;
     }
   }
-
-  /**
-   * Clear all data from tables (preserves schema)
-   * Dynamically discovers all user tables, so no updates needed when migrations add new tables.
-   */
-  async clearAllData(): Promise<void> {
-    // Get all user-created tables (excluding sqlite internals and schema_meta)
-    const tablesResult = await this.exec(`
-      SELECT name FROM sqlite_master 
-      WHERE type = 'table' 
-        AND name NOT LIKE 'sqlite_%'
-        AND name != 'schema_meta'
-      ORDER BY name
-    `);
-
-    const tables = tablesResult.map(row => row.name as string);
-    
-    if (tables.length === 0) return;
-
-    // Disable foreign keys temporarily to allow deletion in any order
-    const statements: Array<{ sql: string }> = [
-      { sql: 'PRAGMA foreign_keys = OFF' },
-    ];
-
-    // Delete from all discovered tables
-    for (const table of tables) {
-      statements.push({ sql: `DELETE FROM "${table}"` });
-    }
-
-    // Reset autoincrement counters
-    statements.push({ sql: 'DELETE FROM sqlite_sequence' });
-    
-    // Re-enable foreign keys
-    statements.push({ sql: 'PRAGMA foreign_keys = ON' });
-
-    await this.execBatch(statements);
-  }
 }

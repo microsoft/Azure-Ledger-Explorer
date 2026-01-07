@@ -141,6 +141,16 @@ export class CCFDatabase {
   }
 
   /**
+   * Clear all data from tables while preserving schema.
+   * Use this to reset the database without deleting the file.
+   */
+  async clearAllData(): Promise<void> {
+    if (!this.client) throw new Error('Database not initialized');
+    console.log('[CCFDatabase] Clearing all data from tables');
+    await this.client.clearAllData();
+  }
+
+  /**
    * Close the database connection.
    */
   async close(): Promise<void> {

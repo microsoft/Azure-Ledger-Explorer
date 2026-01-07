@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'deleteDatabase';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -147,6 +147,14 @@ export class DatabaseWorkerClient {
    */
   async deleteDatabase(): Promise<void> {
     await this.sendMessage('deleteDatabase', {});
+  }
+
+  /**
+   * Clear all data from tables while preserving schema
+   * Use this to reset the database without deleting the file
+   */
+  async clearAllData(): Promise<void> {
+    await this.sendMessage('clearAllData', {});
   }
 
   /**
