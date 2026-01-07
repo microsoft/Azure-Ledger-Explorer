@@ -6,7 +6,7 @@
 
 
 import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '../utils/merkle-tree';
-import { CCFDatabase } from '../database';
+import { CCFDatabase } from '@ccf/database';
 import type { 
   WorkerInMessage, 
   WorkerOutMessage,

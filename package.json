@@ -12,22 +12,24 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run build:parser && vite",
-    "build": "npm run build:parser && tsc -b && vite build",
+    "dev": "npm run build:packages && vite",
+    "build": "npm run build:packages && tsc -b && vite build",
+    "build:packages": "npm run build -w @ccf/ledger-parser && npm run build -w @ccf/database",
     "build:parser": "npm run build -w @ccf/ledger-parser",
+    "build:database": "npm run build -w @ccf/database",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
     "test:parser": "npm run test -w @ccf/ledger-parser"
   },
   "dependencies": {
+    "@ccf/database": "*",
     "@ccf/ledger-parser": "*",
     "@azure-rest/confidential-ledger": "1.1.2-beta.3",
     "@azure/storage-file-share": "^12.27.0",
     "@fluentui/react-components": "^9.68.0",
     "@fluentui/react-icons": "^2.0.305",
     "@monaco-editor/react": "^4.7.0",
-    "@sqlite.org/sqlite-wasm": "^3.50.1-build1",
     "@tanstack/react-query": "^5.81.5",
     "@types/jsrsasign": "^10.5.15",
     "buffer": "^6.0.3",

@@ -5,7 +5,7 @@
 
 
 
-import type { CCFDatabase } from '../database';
+import type { CCFDatabase } from '@ccf/database';
 import type { WriteReceiptVerificationResult } from '../types/write-receipt-types';
 
 export interface LedgerComparisonResult {

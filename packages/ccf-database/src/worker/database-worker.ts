@@ -6,15 +6,16 @@
 
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../database/migrations';
+import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
-import { shouldDecodeCborValue } from '../database/decode-cbor-tables';
+import { shouldDecodeCborValue } from '../decode-cbor-tables';
 
 const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
 // Initialize the SQLite worker
 const initializeSQLite = async () => {
+  let db: SQLiteDB | undefined;
   try {
     log('Loading and initializing SQLite3 module...');
 
@@ -26,8 +27,6 @@ const initializeSQLite = async () => {
     log('Running SQLite3 version', sqlite3.version.libVersion);
 
     // Try to create database with OPFS, fall back to transient if not available
-    let db: SQLiteDB;
-
     if ('opfs' in sqlite3) {
       // try opening the database and fall back to readonly mode if SQLITE_BUSY error is thrown, then fall back to transient if that fails
       try {

@@ -22,7 +22,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import type { CCFDatabase } from '../database';
+import type { CCFDatabase } from '@ccf/database';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import { getDatabase } from '../hooks/use-ccf-data';

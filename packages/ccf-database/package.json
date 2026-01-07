@@ -1,0 +1,46 @@
+{
+  "name": "@ccf/database",
+  "version": "1.0.0",
+  "description": "SQLite database layer for CCF Ledger Explorer with OPFS persistence",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./worker": {
+      "import": "./dist/worker/database-worker.js",
+      "types": "./dist/worker/database-worker.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@ccf/ledger-parser": "*",
+    "@sqlite.org/sqlite-wasm": "^3.50.1-build1"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "~5.8.3",
+    "vitest": "^4.0.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/CCF-Ledger-Explorer.git",
+    "directory": "packages/ccf-database"
+  }
+}

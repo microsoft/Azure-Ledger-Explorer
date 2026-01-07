@@ -6,7 +6,7 @@
 
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CCFDatabase } from '../database';
+import { CCFDatabase } from '@ccf/database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
 

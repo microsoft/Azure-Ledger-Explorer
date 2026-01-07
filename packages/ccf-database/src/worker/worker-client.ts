@@ -37,9 +37,10 @@ export class DatabaseWorkerClient {
   private readyPromise: Promise<void>;
 
   constructor() {
-    // Create the database worker (path relative to this file's new location)
+    // Create the database worker (path relative to this file's location in the package)
+    // Use .js extension since this will be bundled by the consumer's bundler
     this.worker = new Worker(
-      new URL('../../workers/database-worker.ts', import.meta.url),
+      new URL('./database-worker.js', import.meta.url),
       { type: 'module' }
     );
 
