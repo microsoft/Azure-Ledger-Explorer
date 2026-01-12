@@ -4,35 +4,12 @@
  */
 
 import { BaseRepository } from './base-repository';
+import type { TableKeyValue, KeyTransaction } from '../types/repository-types';
+import type { TableLatestStateSortColumn, TableLatestStateSortDirection } from '../types/query-types';
 import {
   buildTableLatestStateCountQuery,
   buildTableLatestStateQuery,
-  type TableLatestStateSortColumn,
-  type TableLatestStateSortDirection,
 } from '../queries/table-latest-state-queries';
-
-/**
- * Key-value entry in a CCF table
- */
-export interface TableKeyValue {
-  keyName: string;
-  value: Uint8Array | null;
-  version: number;
-  transactionId: number;
-  transactionIdentifier?: string | null;
-  isDeleted: boolean;
-}
-
-/**
- * Key transaction history entry
- */
-export interface KeyTransaction {
-  transactionId: number;
-  version: number;
-  operationType: 'write' | 'delete';
-  value: Uint8Array | null;
-  fileName: string;
-}
 
 /**
  * Repository for key-value (CCF table) operations

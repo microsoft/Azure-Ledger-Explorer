@@ -5,10 +5,11 @@
 
 // Main database class
 export { CCFDatabase } from './ccf-database';
-export type { DatabaseConfig } from './ccf-database';
 
-// Re-export repository types for consumer use
+export type { DatabaseConfig, DatabaseTransaction } from './types/database-types';
+
 export type {
+  ExecFn, ExecBatchFn,
   LedgerFile,
   TransactionRecord,
   SearchResult,
@@ -16,42 +17,25 @@ export type {
   KeyTransaction,
   DatabaseStats,
   EnhancedStats,
-  DatabaseSettings,
-} from './ccf-database';
+  DatabaseSettings
+} from './types/repository-types';
 
 export type {
   TableLatestStateSortColumn,
   TableLatestStateSortDirection,
-} from './queries/table-latest-state-queries';
+  SchemaColumn,
+  TableSchema,
+  DatabaseSchema,
+} from './types/query-types';
 
-// Schema query utilities
+export type {
+  Migration
+} from './types/migration-types';
+
+// Schema query utilities (functions only - types come from ./types)
 export {
   getDatabaseSchema,
   GET_ALL_TABLES_SQL,
   getTableInfoSQL,
   getTableIndexesSQL,
-  type SchemaColumn,
-  type TableSchema,
-  type DatabaseSchema,
 } from './queries/schema-queries';
-
-/**
- * Database Transaction type (app-specific, different from the parsed Transaction type)
- */
-export interface DatabaseTransaction {
-  id: number;
-  fileId: number;
-  fileName: string;
-  sequenceNumber: number;
-  version: number;
-  flags: number;
-  size: number;
-  entryType: number;
-  txVersion: number;
-  txView: number;
-  maxConflictVersion: number;
-  txId: string;
-  writeCount: number;
-  deleteCount: number;
-  fileSize: number;
-}

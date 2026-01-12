@@ -4,36 +4,12 @@
  */
 
 import { DatabaseWorkerClient } from './worker/database-worker-client';
-import {
-  FileRepository,
-  TransactionRepository,
-  KVRepository,
-  StatsRepository,
-  type ExecFn,
-  type ExecBatchFn,
-} from './repositories';
-
-// Re-export types for backward compatibility
-export type {
-  LedgerFile,
-  TransactionRecord,
-  SearchResult,
-  TableKeyValue,
-  KeyTransaction,
-  DatabaseStats,
-  EnhancedStats,
-  DatabaseSettings,
-} from './repositories';
-
-export type {
-  TableLatestStateSortColumn,
-  TableLatestStateSortDirection,
-} from './queries/table-latest-state-queries';
-
-export interface DatabaseConfig {
-  filename: string;
-  useOpfs?: boolean;
-}
+import { FileRepository } from './repositories/file-repository';
+import { TransactionRepository } from './repositories/transaction-repository';
+import { KVRepository } from './repositories/kv-repository';
+import { StatsRepository } from './repositories/stats-repository';
+import type { DatabaseConfig } from './types/database-types'
+import type { ExecFn, ExecBatchFn } from './types/repository-types';
 
 /**
  * CCFDatabase - Main database facade

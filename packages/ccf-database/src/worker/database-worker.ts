@@ -6,9 +6,9 @@
 
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations';
+import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations/migrations';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
-import { shouldDecodeCborValue } from '../decode-cbor-tables';
+import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 
 const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);

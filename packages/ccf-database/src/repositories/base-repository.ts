@@ -3,15 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-/**
- * Type for the exec function used by repositories
- */
-export type ExecFn = (sql: string, bind?: unknown[]) => Promise<Record<string, unknown>[]>;
-
-/**
- * Type for batch execution
- */
-export type ExecBatchFn = (statements: Array<{ sql: string; bind?: unknown[] }>) => Promise<void>;
+import type { ExecFn, ExecBatchFn } from '../types/repository-types';
 
 /**
  * Base repository class with shared utilities.

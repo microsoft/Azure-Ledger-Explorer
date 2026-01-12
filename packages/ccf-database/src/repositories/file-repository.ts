@@ -4,17 +4,7 @@
  */
 
 import { BaseRepository } from './base-repository';
-
-/**
- * Ledger file record returned from the database
- */
-export interface LedgerFile {
-  id: number;
-  filename: string;
-  fileSize: number;
-  createdAt: string;
-  updatedAt: string;
-}
+import type { LedgerFile } from '../types/repository-types';
 
 /**
  * Repository for ledger file operations

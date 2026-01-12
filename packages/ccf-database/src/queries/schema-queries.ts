@@ -3,6 +3,8 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
+import type { DatabaseSchema } from '../types/query-types';
+
 /**
  * Schema introspection queries for the SQLite database.
  * These queries use sqlite_master for broad compatibility across SQLite versions.
@@ -37,37 +39,6 @@ export const getTableIndexesSQL = (tableName: string): string => `
   FROM sqlite_master 
   WHERE type='index' AND tbl_name='${tableName}' AND name NOT LIKE 'sqlite_%'
 `;
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-/**
- * Column information from PRAGMA table_info
- */
-export interface SchemaColumn {
-  name: string;
-  type: string;
-  notnull: boolean;
-  pk: boolean;
-  dflt_value: string | null;
-}
-
-/**
- * Table schema information
- */
-export interface TableSchema {
-  name: string;
-  columns: SchemaColumn[];
-  indexes: string[];
-}
-
-/**
- * Complete database schema
- */
-export interface DatabaseSchema {
-  tables: TableSchema[];
-}
 
 // ============================================================================
 // QUERY FUNCTIONS

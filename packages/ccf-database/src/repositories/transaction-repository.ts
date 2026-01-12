@@ -5,46 +5,13 @@
 
 import { BaseRepository } from './base-repository';
 import type { LedgerKeyValue } from '@ccf/ledger-parser';
+import type { TransactionRecord, SearchResult } from '../types/repository-types';
 import {
   buildAllTransactionsCountQuery,
   buildAllTransactionsListQuery,
   buildFileTransactionsCountQuery,
   buildFileTransactionsListQuery,
 } from '../queries/transaction-list-queries';
-
-/**
- * Transaction record from the database
- */
-export interface TransactionRecord {
-  id: number;
-  fileId: number;
-  fileName: string;
-  version: number;
-  flags: number;
-  size: number;
-  entryType: number;
-  txVersion: number;
-  maxConflictVersion: number;
-  txId?: string;
-  txView?: number;
-  writeCount?: number;
-  deleteCount?: number;
-  mapName?: string;
-  fileSize?: number;
-}
-
-/**
- * Search result for key/value searches
- */
-export interface SearchResult {
-  transactionId: number;
-  mapName: string;
-  keyName: string;
-  hasValue: boolean;
-  version: number;
-  matchType?: 'key' | 'value';
-  matchedText?: string;
-}
 
 /**
  * Repository for transaction operations

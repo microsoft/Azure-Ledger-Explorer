@@ -5,15 +5,7 @@
 
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { migration as migration001 } from './001_initial';
-
-/**
- * Migration interface - each migration file must export this structure
- */
-export interface Migration {
-  version: number;
-  name: string;
-  statements: string[];
-}
+import type { Migration } from '../types/migration-types';
 
 /**
  * All migrations in order. Add new migrations to this array.

@@ -4,42 +4,7 @@
  */
 
 import { BaseRepository } from './base-repository';
-
-/**
- * Basic database statistics
- */
-export interface DatabaseStats {
-  fileCount: number;
-  transactionCount: number;
-  writeCount: number;
-  deleteCount: number;
-}
-
-/**
- * Enhanced database statistics with additional metrics
- */
-export interface EnhancedStats extends DatabaseStats {
-  userWriteCount: number;
-  tableCount: number;
-  uniqueKeyCount: number;
-  averageTransactionSize: number;
-  largestTransactionSize: number;
-  smallestTransactionSize: number;
-  totalDataSize: number;
-  oldestTransaction: Date | null;
-  newestTransaction: Date | null;
-}
-
-/**
- * Database settings information
- */
-export interface DatabaseSettings {
-  journalMode: string;
-  cacheSize: number;
-  tempStore: string;
-  mmapSize: number;
-  pageSize: number;
-}
+import type { DatabaseStats, EnhancedStats, DatabaseSettings } from '../types/repository-types';
 
 /**
  * Repository for database statistics and management operations

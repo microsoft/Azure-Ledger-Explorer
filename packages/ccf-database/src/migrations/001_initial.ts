@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { Migration } from './index';
+import type { Migration } from '../types/migration-types';
 
 /**
  * Initial schema migration - creates all core tables and indexes.
