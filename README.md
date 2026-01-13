@@ -113,8 +113,9 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 
 - **Frontend**: React 19 + TypeScript + Vite
 - **UI Framework**: FluentUI React components
-- **Database**: sql.js with OPFS VFS for persistent browser storage
+- **Database**: sql.js with OPFS VFS for persistent browser storage (in `packages/ccf-database` workspace)
 - **State Management**: TanStack Query for server state and caching
-- **Parser**: Custom CCF ledger parser (ported from C#)
+- **Parser**: Custom CCF ledger parser in `packages/ledger-parser` workspace
 - **AI Integration**: OpenAI API for natural language processing
 - **Cloud Storage**: Azure File Share integration
+

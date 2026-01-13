@@ -19,7 +19,7 @@ export const useLedgerFiles = () => {
     queryKey: queryKeys.ledgerFiles,
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getLedgerFiles();
+      return db.files.getLedgerFiles();
     },
   });
 };
@@ -31,7 +31,7 @@ export const useUploadLedgerFile = () => {
   return useMutation({
     mutationFn: async (file: File) => {
       const db = await getDatabase();
-      return db.insertLedgerFile(file.name, file.size);
+      return db.files.insertLedgerFile(file.name, file.size);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
@@ -308,12 +308,27 @@ src/
 ├── components/          # Reusable UI components
 ├── pages/              # Page-level components
 ├── hooks/              # Custom React hooks
-├── database/           # Database layer
 ├── parser/             # CCF parsing logic
 ├── services/           # External service integrations
 ├── types/              # TypeScript type definitions
 ├── utils/              # Utility functions
+├── workers/            # Web Workers (verification, write-receipt)
 └── assets/             # Static assets
+
+packages/
+├── ccf-database/       # Database layer (separate workspace)
+│   ├── src/
+│   │   ├── ccf-database.ts      # Main facade class
+│   │   ├── index.ts             # Public API exports
+│   │   ├── repositories/        # Domain repositories
+│   │   ├── queries/             # SQL query builders
+│   │   ├── migrations/          # Schema migrations
+│   │   ├── types/               # Type definitions
+│   │   ├── utilities/           # Database utilities
+│   │   └── worker/              # Database worker
+│   ├── package.json
+│   └── tsconfig.json
+└── ledger-parser/      # Ledger parser (separate workspace)
 ```
 
 ### 2. File Naming Conventions
@@ -350,10 +365,12 @@ export { formatBytes, formatHex } from './formatting';
 
 ### 1. Database Access Pattern
 
-**Always use the singleton database pattern**
+**Always use the singleton database pattern from `@ccf/database`**
 
 ```typescript
 // ✅ Correct database access
+import { CCFDatabase } from '@ccf/database';
+
 const getDatabase = async (): Promise<CCFDatabase> => {
   if (!dbInstance) {
     dbInstance = new CCFDatabase({
@@ -370,34 +387,59 @@ export const useLedgerFiles = () => {
     queryKey: queryKeys.ledgerFiles,
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getLedgerFiles();
+      return db.files.getLedgerFiles();
     },
   });
 };
 ```
 
+**Use repository methods for data access**
+```typescript
+// ✅ Access data through repositories
+const db = await getDatabase();
+
+// File operations
+await db.files.getLedgerFiles();
+await db.files.insertLedgerFile(filename, fileSize);
+
+// Transaction operations
+await db.transactions.getTransactions(fileId, limit, offset);
+await db.transactions.insertTransaction(fileId, transaction);
+
+// KV operations
+await db.kv.getTransactionWrites(transactionId);
+await db.kv.getCCFTables();
+
+// Stats operations
+await db.stats.getStats();
+await db.stats.clearAllData();
+```
+
 ### 2. SQL Query Safety
 
-**All user-facing SQL queries MUST be validated**
+**Use repository methods instead of raw SQL**
 
 ```typescript
-// ✅ Safe SQL execution
-async executeQuery(sqlQuery: string): Promise<unknown[]> {
-  if (!this.db) throw new Error('Database not initialized');
+// ✅ Safe data access via repositories
+const db = await getDatabase();
+const transactions = await db.transactions.searchTransactions(searchTerm);
+const writes = await db.kv.getTransactionWrites(transactionId);
 
-  // Validate the query is a SELECT statement only
-  const trimmedQuery = sqlQuery.trim().toUpperCase();
-  if (!trimmedQuery.startsWith('SELECT') && !trimmedQuery.startsWith('WITH')) {
-    throw new Error('Only SELECT queries are allowed for security reasons');
-  }
+// ❌ Don't execute raw SQL directly
+// Raw SQL should only be used within repository implementations
+```
 
-  try {
-    const result = this.db.exec(sqlQuery);
-    return this.formatQueryResult(result);
-  } catch (error) {
-    console.error('SQL execution error:', error);
-    throw error;
-  }
+**Repository implementations use parameterized queries**
+```typescript
+// ✅ Safe SQL in repository (internal use only)
+async getTransactions(fileId: number, limit: number, offset: number) {
+  const sql = `
+    SELECT * FROM transactions
+    WHERE file_id = ?
+    ORDER BY version
+    LIMIT ? OFFSET ?
+  `;
+  return this.exec(sql, [fileId, limit, offset]);
 }
 ```
 
@@ -545,7 +587,7 @@ export const useTransactions = (fileId: number, limit = 100, offset = 0) => {
     queryKey: [...queryKeys.transactions(fileId), limit, offset],
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getTransactions(fileId, limit, offset);
+      return db.transactions.getTransactions(fileId, limit, offset);
     },
     enabled: fileId > 0,
   });

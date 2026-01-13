@@ -144,18 +144,20 @@ export const useDropDatabase = () => { /* ... */ };
 
 ### 4. Data Layer
 
-#### CCF Database (`src/database/ccf-database.ts`)
+#### CCF Database (`packages/ccf-database/`)
 
-- **SQLite Integration**: Full SQL database in the browser
+The database layer is now a separate workspace package:
+- **CCFDatabase Facade**: Main entry point that provides access to repositories
+- **Repository Pattern**: Domain-specific repositories (FileRepository, TransactionRepository, KVRepository, StatsRepository)
+- **Web Worker**: Non-blocking database operations via DatabaseWorkerClient
 - **OPFS Persistence**: Durable storage using Origin Private File System
-- **Schema Management**: Automatic table creation and indexing
-- **Query Safety**: SQL injection protection and query validation
+- **Schema Migrations**: Versioned schema management system
 
 #### Storage Technologies
 
-- **sql.js**: WebAssembly SQLite implementation
-- **OPFS**: Modern browser persistent storage API
-- **Fallback Strategy**: In-memory storage for unsupported browsers
+- **sql.js**: WebAssembly SQLite implementation running in a Web Worker
+- **OPFS**: Modern browser persistent storage API with Access Handle Pool VFS
+- **Fallback Strategy**: Automatic fallback to in-memory storage for unsupported browsers
 
 ## Data Flow Architecture
 
