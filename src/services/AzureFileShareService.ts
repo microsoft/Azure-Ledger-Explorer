@@ -7,6 +7,12 @@ import {ShareClient } from '@azure/storage-file-share';
 import type {LedgerFileInfo } from '../utils/ledger-validation';
 import {parseLedgerFilename, validateLedgerSequence } from '../utils/ledger-validation';
 
+export interface DownloadProgress {
+  currentFile: number;
+  totalFiles: number;
+  currentFilename: string;
+}
+
 export class AzureFileShareService {
   private shareClient: ShareClient | null = null;
 
@@ -57,7 +63,10 @@ export class AzureFileShareService {
     }
   }
 
-  async downloadLedgerFiles(ledgerFile: LedgerFileInfo): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
+  async downloadLedgerFiles(
+    ledgerFile: LedgerFileInfo,
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
     if (!this.shareClient) {
       throw new Error('File share client not initialized');
     }
@@ -70,11 +79,20 @@ export class AzureFileShareService {
         }
         // Filter for files to download from storage
         const ledgerFileToDownloadFromStorage = ledgerFileListFromStorage.filter(file => file.endNo<=ledgerFile.endNo);
+        const totalFiles = ledgerFileToDownloadFromStorage.length;
         const directoryClient = this.shareClient.getDirectoryClient("ledger")
         const files: File[] = [];
         const filesDownloaded: LedgerFileInfo[] = [];
+        let currentFile = 0;
         for (const downloadFile of ledgerFileToDownloadFromStorage) 
         {
+            currentFile++;
+            onProgress?.({
+                currentFile,
+                totalFiles,
+                currentFilename: downloadFile.filename,
+            });
+            
             filesDownloaded.push(downloadFile);
             const fileClient = directoryClient.getFileClient(downloadFile.filename);
             const downloadResponse = await fileClient.download(0);

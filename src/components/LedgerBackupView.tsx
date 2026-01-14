@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { AzureFileShareService } from '../services/AzureFileShareService';
+import { AzureFileShareService, type DownloadProgress } from '../services/AzureFileShareService';
 import {parseLedgerFilename, type LedgerFileInfo} from '../utils/ledger-validation';
 import {
   makeStyles,
@@ -113,6 +113,7 @@ export const LedgerBackupView: React.FC = () => {
     const [, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [pendingFileToVisualize, setPendingFileToVisualize] = useState<LedgerFileInfo | null>(null);
+    const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
     const fileShareService = React.useMemo(() => new AzureFileShareService(), []);
     const { handleFiles} = useFileDrop(); 
 
@@ -160,6 +161,7 @@ export const LedgerBackupView: React.FC = () => {
 
     const performVisualize = async (fileToVisualize: LedgerFileInfo, mode: ImportMode) => {
         setIsDownloading(true);
+        setDownloadProgress(null);
         setSelectedFileToVisualize(fileToVisualize);
         
         // Only clear existing data if user chose replace mode
@@ -167,7 +169,10 @@ export const LedgerBackupView: React.FC = () => {
             await clearAllDataMutation.mutateAsync();
         }
         
-        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
+        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(
+            fileToVisualize,
+            (progress) => setDownloadProgress(progress)
+        );
         if (downloadedFiles.length > 0) {
             handleFiles(downloadedFiles);
             setFiles([]);
@@ -176,6 +181,7 @@ export const LedgerBackupView: React.FC = () => {
             console.error('No files downloaded');
         }
         setIsDownloading(false);
+        setDownloadProgress(null);
     };
 
     const handleConfirmImport = async (mode: ImportMode) => {
@@ -257,7 +263,16 @@ export const LedgerBackupView: React.FC = () => {
                         disabled={isDownloading}
                         onClick={() => handleVisualizeClick(file)}
                         >
-                        {isDownloading ? <Spinner size="tiny" id = {file.filename} /> : 'Visualize Ledger Files'}
+                        {isDownloading && downloadProgress ? (
+                            <>
+                                <Spinner size="tiny" />
+                                &nbsp;Downloading {downloadProgress.currentFile} of {downloadProgress.totalFiles}
+                            </>
+                        ) : isDownloading ? (
+                            <Spinner size="tiny" />
+                        ) : (
+                            'Visualize Ledger Files'
+                        )}
                         </Button>
                     </TableCell>
                     </TableRow>

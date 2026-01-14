@@ -6,6 +6,12 @@
 import type { LedgerFileInfo } from '../utils/ledger-validation';
 import { parseLedgerFilename, validateLedgerSequence } from '../utils/ledger-validation';
 
+export interface DownloadProgress {
+  currentFile: number;
+  totalFiles: number;
+  currentFilename: string;
+}
+
 // NGINX directory listing response interfaces
 interface NginxFileEntry {
   name: string;
@@ -184,7 +190,10 @@ export class MstFilesService {
     return sortedFilteredFiles;
   }
 
-  async downloadLedgerFiles(upToFile: LedgerFileInfo): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
+  async downloadLedgerFiles(
+    upToFile: LedgerFileInfo,
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
     if (!this.mstClient) {
       throw new Error('File share client not initialized');
     }
@@ -196,9 +205,18 @@ export class MstFilesService {
       }
       // Filter for files to download from storage
       const ledgerFileToDownloadFromStorage = ledgerFileListFromStorage.filter(file => file.endNo <= upToFile.endNo);
+      const totalFiles = ledgerFileToDownloadFromStorage.length;
       const files: File[] = [];
       const filesDownloaded: LedgerFileInfo[] = [];
+      let currentFile = 0;
       for (const downloadFile of ledgerFileToDownloadFromStorage) {
+        currentFile++;
+        onProgress?.({
+          currentFile,
+          totalFiles,
+          currentFilename: downloadFile.filename,
+        });
+        
         filesDownloaded.push(downloadFile);
         const downloadResponse = await this.mstClient.downloadFile(downloadFile.filename);
         const blob = await downloadResponse.blobBody;
@@ -218,7 +236,9 @@ export class MstFilesService {
     }
   }
 
-  async downloadAllLedgerFiles(): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
+  async downloadAllLedgerFiles(
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
     if (!this.mstClient) {
       throw new Error('File share client not initialized');
     }
@@ -228,9 +248,18 @@ export class MstFilesService {
       if (ledgerFileListFromStorage.length === 0) {
         throw new Error('No ledger files found in the file share');
       }
+      const totalFiles = ledgerFileListFromStorage.length;
       const files: File[] = [];
       const filesDownloaded: LedgerFileInfo[] = [];
+      let currentFile = 0;
       for (const downloadFile of ledgerFileListFromStorage) {
+        currentFile++;
+        onProgress?.({
+          currentFile,
+          totalFiles,
+          currentFilename: downloadFile.filename,
+        });
+        
         filesDownloaded.push(downloadFile);
         const downloadResponse = await this.mstClient.downloadFile(downloadFile.filename);
         const blob = await downloadResponse.blobBody;

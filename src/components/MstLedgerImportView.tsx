@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 /* eslint-disable react-refresh/only-export-components */
-import { MstFilesService } from '../services/MstFilesService';
+import { MstFilesService, type DownloadProgress } from '../services/MstFilesService';
 import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
 import {
     makeStyles,
@@ -136,6 +136,7 @@ export const MstLedgerImportView: React.FC = () => {
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [pendingFileToVisualize, setPendingFileToVisualize] = useState<LedgerFileInfo | null>(null);
+    const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
     const fileShareService = React.useMemo(() => new MstFilesService(), []);
     const { handleFiles } = useFileDrop();
 
@@ -183,13 +184,17 @@ export const MstLedgerImportView: React.FC = () => {
 
     const performVisualize = async (fileToVisualize: LedgerFileInfo, mode: ImportMode) => {
         setIsDownloading(true);
+        setDownloadProgress(null);
         
         // Only clear existing data if user chose replace mode
         if (mode === 'replace') {
             await clearAllDataMutation.mutateAsync();
         }
         
-        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
+        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(
+            fileToVisualize,
+            (progress) => setDownloadProgress(progress)
+        );
         if (downloadedFiles.length > 0) {
             handleFiles(downloadedFiles);
 
@@ -204,6 +209,7 @@ export const MstLedgerImportView: React.FC = () => {
             console.error('No files downloaded');
         }
         setIsDownloading(false);
+        setDownloadProgress(null);
     };
 
     const handleConfirmImport = async (mode: ImportMode) => {
@@ -286,7 +292,16 @@ export const MstLedgerImportView: React.FC = () => {
                                                 disabled={isDownloading}
                                                 onClick={() => handleVisualizeClick(file)}
                                             >
-                                                {isDownloading ? <Spinner size="tiny" id={file.filename} /> : 'Import (including previous)'}
+                                                {isDownloading && downloadProgress ? (
+                                                    <>
+                                                        <Spinner size="tiny" />
+                                                        &nbsp;Downloading {downloadProgress.currentFile} of {downloadProgress.totalFiles}
+                                                    </>
+                                                ) : isDownloading ? (
+                                                    <Spinner size="tiny" />
+                                                ) : (
+                                                    'Import (including previous)'
+                                                )}
                                             </Button>
                                         </Tooltip>
                                     </TableCell>
