@@ -31,7 +31,7 @@ import {
   CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
-import { ReplaceDataConfirmDialog } from './ReplaceDataConfirmDialog';
+import { ImportModeDialog, type ImportMode } from './ReplaceDataConfirmDialog';
 
 const useStyles = makeStyles({
   fileSequenceInfo: {
@@ -149,21 +149,23 @@ export const LedgerBackupView: React.FC = () => {
 
     const handleVisualizeClick = (file: LedgerFileInfo) => {
         if (hasExistingData) {
-            // Show confirmation dialog before clearing existing data
+            // Show import mode dialog to let user choose append or replace
             setPendingFileToVisualize(file);
             setShowConfirmDialog(true);
         } else {
             // No existing data, proceed directly
-            performVisualize(file);
+            performVisualize(file, 'replace');
         }
     };
 
-    const performVisualize = async (fileToVisualize: LedgerFileInfo) => {
+    const performVisualize = async (fileToVisualize: LedgerFileInfo, mode: ImportMode) => {
         setIsDownloading(true);
         setSelectedFileToVisualize(fileToVisualize);
         
-        // Clear existing data before importing new files
-        await clearAllDataMutation.mutateAsync();
+        // Only clear existing data if user chose replace mode
+        if (mode === 'replace') {
+            await clearAllDataMutation.mutateAsync();
+        }
         
         const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
         if (downloadedFiles.length > 0) {
@@ -176,10 +178,10 @@ export const LedgerBackupView: React.FC = () => {
         setIsDownloading(false);
     };
 
-    const handleConfirmReplace = async () => {
+    const handleConfirmImport = async (mode: ImportMode) => {
         setShowConfirmDialog(false);
         if (pendingFileToVisualize) {
-            await performVisualize(pendingFileToVisualize);
+            await performVisualize(pendingFileToVisualize, mode);
             setPendingFileToVisualize(null);
         }
     };
@@ -319,12 +321,12 @@ export const LedgerBackupView: React.FC = () => {
             </div>
         )}
 
-        <ReplaceDataConfirmDialog
+        <ImportModeDialog
             open={showConfirmDialog}
             onOpenChange={setShowConfirmDialog}
             existingFileCount={existingLedgerFiles?.length || 0}
             sourceName="Azure Ledger backup"
-            onConfirm={handleConfirmReplace}
+            onConfirm={handleConfirmImport}
             onCancel={handleCancelReplace}
         />
         </div>
