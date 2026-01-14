@@ -30,10 +30,11 @@ import {
   DocumentRegular,
   CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
-import { useFileDrop , useClearAllData } from '../hooks/use-ccf-data';
+import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
+import { ReplaceDataConfirmDialog } from './ReplaceDataConfirmDialog';
 
 const useStyles = makeStyles({
-        fileSequenceInfo: {
+  fileSequenceInfo: {
     backgroundColor: tokens.colorNeutralBackground3,
     padding: '12px',
     borderRadius: '6px',
@@ -102,6 +103,7 @@ const useStyles = makeStyles({
 export const LedgerBackupView: React.FC = () => {
     const styles = useStyles();
     const clearAllDataMutation = useClearAllData();
+    const { data: existingLedgerFiles } = useLedgerFiles();
     const [sasToken, setSasToken] = useState<string>('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -109,8 +111,12 @@ export const LedgerBackupView: React.FC = () => {
     const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
     const [, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [pendingFileToVisualize, setPendingFileToVisualize] = useState<LedgerFileInfo | null>(null);
     const fileShareService = React.useMemo(() => new AzureFileShareService(), []);
     const { handleFiles} = useFileDrop(); 
+
+    const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
 
     const verifyAccess = async () => {
     if (!sasToken) {
@@ -129,7 +135,6 @@ export const LedgerBackupView: React.FC = () => {
 
     try 
     {
-        await clearAllDataMutation.mutateAsync();
         await fileShareService.initialize(sasToken);
         const ledgerFiles = await fileShareService.listLedgerFiles();
         setFiles(ledgerFiles);
@@ -142,19 +147,46 @@ export const LedgerBackupView: React.FC = () => {
     }
     };
 
-    const handleVisualizeFileSelect = async (fileToVisualize: LedgerFileInfo) => {
-    setSelectedFileToVisualize(fileToVisualize);
-    const { files: downloadedFiles, filesDownloaded }  = await fileShareService.downloadLedgerFiles(fileToVisualize);
-    if (downloadedFiles.length > 0) 
-    {
-        handleFiles(downloadedFiles);
-        setFiles([]);
-        setDownloadedFiles(filesDownloaded);
-    } 
-    else 
-    {
-        console.error('No files downloaded');
-    }
+    const handleVisualizeClick = (file: LedgerFileInfo) => {
+        if (hasExistingData) {
+            // Show confirmation dialog before clearing existing data
+            setPendingFileToVisualize(file);
+            setShowConfirmDialog(true);
+        } else {
+            // No existing data, proceed directly
+            performVisualize(file);
+        }
+    };
+
+    const performVisualize = async (fileToVisualize: LedgerFileInfo) => {
+        setIsDownloading(true);
+        setSelectedFileToVisualize(fileToVisualize);
+        
+        // Clear existing data before importing new files
+        await clearAllDataMutation.mutateAsync();
+        
+        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
+        if (downloadedFiles.length > 0) {
+            handleFiles(downloadedFiles);
+            setFiles([]);
+            setDownloadedFiles(filesDownloaded);
+        } else {
+            console.error('No files downloaded');
+        }
+        setIsDownloading(false);
+    };
+
+    const handleConfirmReplace = async () => {
+        setShowConfirmDialog(false);
+        if (pendingFileToVisualize) {
+            await performVisualize(pendingFileToVisualize);
+            setPendingFileToVisualize(null);
+        }
+    };
+
+    const handleCancelReplace = () => {
+        setShowConfirmDialog(false);
+        setPendingFileToVisualize(null);
     };
 
     return (
@@ -221,10 +253,7 @@ export const LedgerBackupView: React.FC = () => {
                         <Button
                         appearance="primary"
                         disabled={isDownloading}
-                        onClick={() => {
-                            setIsDownloading(true);
-                            handleVisualizeFileSelect(file);
-                        }}
+                        onClick={() => handleVisualizeClick(file)}
                         >
                         {isDownloading ? <Spinner size="tiny" id = {file.filename} /> : 'Visualize Ledger Files'}
                         </Button>
@@ -289,6 +318,15 @@ export const LedgerBackupView: React.FC = () => {
             )}
             </div>
         )}
+
+        <ReplaceDataConfirmDialog
+            open={showConfirmDialog}
+            onOpenChange={setShowConfirmDialog}
+            existingFileCount={existingLedgerFiles?.length || 0}
+            sourceName="Azure Ledger backup"
+            onConfirm={handleConfirmReplace}
+            onCancel={handleCancelReplace}
+        />
         </div>
     );
 };

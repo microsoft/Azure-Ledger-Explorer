@@ -32,8 +32,9 @@ import {
     DocumentRegular,
     CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
-import { useFileDrop, useClearAllData } from '../hooks/use-ccf-data';
+import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
 import { setLedgerDomain as storeLedgerDomain } from '../utils/ledger-domain-storage';
+import { ReplaceDataConfirmDialog } from './ReplaceDataConfirmDialog';
 
 
 const useStyles = makeStyles({
@@ -126,14 +127,19 @@ export const useDownloadMstFiles = () => {
 export const MstLedgerImportView: React.FC = () => {
     const styles = useStyles();
     const clearAllDataMutation = useClearAllData();
+    const { data: existingLedgerFiles } = useLedgerFiles();
     const [ledgerDomain, setLedgerDomain] = useState<string>('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [verificationError, setVerificationError] = useState<string | null>(null);
     const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
+    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [pendingFileToVisualize, setPendingFileToVisualize] = useState<LedgerFileInfo | null>(null);
     const fileShareService = React.useMemo(() => new MstFilesService(), []);
     const { handleFiles } = useFileDrop();
+
+    const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
 
     const verifyAccess = async () => {
         const domainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
@@ -152,7 +158,6 @@ export const MstLedgerImportView: React.FC = () => {
         setIsDownloading(false);
 
         try {
-            await clearAllDataMutation.mutateAsync();
             await fileShareService.initialize(ledgerDomain);
             const ledgerFiles = await fileShareService.listLedgerFiles();
             setFiles(ledgerFiles);
@@ -165,7 +170,23 @@ export const MstLedgerImportView: React.FC = () => {
         }
     };
 
-    const handleVisualizeFileSelect = async (fileToVisualize: LedgerFileInfo) => {
+    const handleVisualizeClick = (file: LedgerFileInfo) => {
+        if (hasExistingData) {
+            // Show confirmation dialog before clearing existing data
+            setPendingFileToVisualize(file);
+            setShowConfirmDialog(true);
+        } else {
+            // No existing data, proceed directly
+            performVisualize(file);
+        }
+    };
+
+    const performVisualize = async (fileToVisualize: LedgerFileInfo) => {
+        setIsDownloading(true);
+        
+        // Clear existing data before importing new files
+        await clearAllDataMutation.mutateAsync();
+        
         const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(fileToVisualize);
         if (downloadedFiles.length > 0) {
             handleFiles(downloadedFiles);
@@ -180,6 +201,20 @@ export const MstLedgerImportView: React.FC = () => {
         else {
             console.error('No files downloaded');
         }
+        setIsDownloading(false);
+    };
+
+    const handleConfirmReplace = async () => {
+        setShowConfirmDialog(false);
+        if (pendingFileToVisualize) {
+            await performVisualize(pendingFileToVisualize);
+            setPendingFileToVisualize(null);
+        }
+    };
+
+    const handleCancelReplace = () => {
+        setShowConfirmDialog(false);
+        setPendingFileToVisualize(null);
     };
 
     return (
@@ -247,10 +282,7 @@ export const MstLedgerImportView: React.FC = () => {
                                             <Button
                                                 appearance="primary"
                                                 disabled={isDownloading}
-                                                onClick={() => {
-                                                    setIsDownloading(true);
-                                                    handleVisualizeFileSelect(file);
-                                                }}
+                                                onClick={() => handleVisualizeClick(file)}
                                             >
                                                 {isDownloading ? <Spinner size="tiny" id={file.filename} /> : 'Import (including previous)'}
                                             </Button>
@@ -316,6 +348,15 @@ export const MstLedgerImportView: React.FC = () => {
                     )}
                 </div>
             )}
+
+            <ReplaceDataConfirmDialog
+                open={showConfirmDialog}
+                onOpenChange={setShowConfirmDialog}
+                existingFileCount={existingLedgerFiles?.length || 0}
+                sourceName="Signing Transparency"
+                onConfirm={handleConfirmReplace}
+                onCancel={handleCancelReplace}
+            />
         </div>
     );
 };
