@@ -6,6 +6,7 @@
 
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useSyncExternalStore } from 'react';
 import { CCFDatabase } from '../database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
@@ -397,40 +398,119 @@ export const useDropDatabase = () => {
 };
 
 /**
+ * Progress information for file uploads
+ */
+export interface FileUploadProgress {
+  currentFileIndex: number;
+  totalFiles: number;
+  currentFileName: string;
+  /** All filenames in the upload queue */
+  allFiles: string[];
+  /** Set of filenames that have been successfully processed */
+  completedFiles: Set<string>;
+  /** The filename currently being processed */
+  processingFile: string | null;
+}
+
+// Shared upload progress state (module-level singleton)
+let sharedUploadProgress: FileUploadProgress | null = null;
+const uploadProgressListeners = new Set<() => void>();
+
+function setSharedUploadProgress(progress: FileUploadProgress | null) {
+  sharedUploadProgress = progress;
+  // Notify all listeners (all components using useFileDrop)
+  uploadProgressListeners.forEach(listener => listener());
+}
+
+function subscribeToUploadProgress(listener: () => void) {
+  uploadProgressListeners.add(listener);
+  return () => uploadProgressListeners.delete(listener);
+}
+
+function getUploadProgressSnapshot() {
+  return sharedUploadProgress;
+}
+
+/**
  * Custom hook to handle file drop functionality
+ * Uses shared state so upload progress is visible across all components
  */
 export const useFileDrop = () => {
   const uploadMutation = useUploadLedgerFile();
+  
+  // Subscribe to shared upload progress state
+  const uploadProgress = useSyncExternalStore(
+    subscribeToUploadProgress,
+    getUploadProgressSnapshot,
+    getUploadProgressSnapshot
+  );
 
-  const handleFiles = async (files: FileList | File[]) => {
-    const fileArray = Array.from(files);
+  const handleFiles = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(f => f.size > 0);
+    const totalFiles = fileArray.length;
+    const allFiles = fileArray.map(f => f.name);
+    const completedFiles = new Set<string>();
     
-    for (const file of fileArray) {
-      // Check if file appears to be a ledger file
-      if (file.size > 0) {
-        try {
-          await uploadMutation.mutateAsync(file);
-        } catch (error) {
-          console.error(`Failed to process file ${file.name}:`, error);
-          // Re-throw to stop processing more files if there's an error
-          throw error;
-        }
-      } else {
-        console.warn(`Skipping empty file: ${file.name}`);
+    // Show all files immediately in the pending state
+    if (totalFiles > 0) {
+      setSharedUploadProgress({
+        currentFileIndex: 0,
+        totalFiles,
+        currentFileName: '',
+        allFiles,
+        completedFiles: new Set(),
+        processingFile: null,
+      });
+    }
+    
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      try {
+        // Update progress before processing
+        setSharedUploadProgress({
+          currentFileIndex: i + 1,
+          totalFiles,
+          currentFileName: file.name,
+          allFiles,
+          completedFiles: new Set(completedFiles),
+          processingFile: file.name,
+        });
+        
+        await uploadMutation.mutateAsync(file);
+        
+        // Mark as completed
+        completedFiles.add(file.name);
+        setSharedUploadProgress({
+          currentFileIndex: i + 1,
+          totalFiles,
+          currentFileName: file.name,
+          allFiles,
+          completedFiles: new Set(completedFiles),
+          processingFile: null,
+        });
+      } catch (error) {
+        console.error(`Failed to process file ${file.name}:`, error);
+        // Clear progress on error
+        setSharedUploadProgress(null);
+        // Re-throw to stop processing more files if there's an error
+        throw error;
       }
     }
-  };
+    
+    // Clear progress when all done
+    setSharedUploadProgress(null);
+  }, [uploadMutation]);
 
-  const handleDrop = (event: React.DragEvent<HTMLElement>) => {
+  const handleDrop = useCallback((event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
     if (event.dataTransfer.files) {
       handleFiles(event.dataTransfer.files);
     }
-  };
+  }, [handleFiles]);
 
-  const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
-  };
+  }, []);
 
   return {
     handleDrop,
@@ -438,6 +518,7 @@ export const useFileDrop = () => {
     handleFiles,
     isUploading: uploadMutation.isPending,
     uploadError: uploadMutation.error,
+    uploadProgress,
   };
 };
 

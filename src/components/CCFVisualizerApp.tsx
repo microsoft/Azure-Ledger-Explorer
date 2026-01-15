@@ -25,6 +25,8 @@ import {
   ChevronRight24Regular,
   DocumentAdd24Regular,
   DocumentRegular,
+  CheckmarkCircle12Regular,
+  Clock12Regular,
 } from '@fluentui/react-icons';
 import {
   useStats,
@@ -32,7 +34,7 @@ import {
   useLedgerFiles,
   useFileTransactions,
   useFileTransactionsCount,
-  useStorageQuota
+  useStorageQuota,
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from './AddFilesWizard';
 import { LedgerVisualization } from './LedgerVisualization';
@@ -161,6 +163,22 @@ const useStyles = makeStyles({
   badge: {
     marginLeft: '8px',
   },
+  processingIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    marginLeft: '8px',
+  },
+  completedBadge: {
+    color: tokens.colorPaletteGreenForeground1,
+  },
+  pendingBadge: {
+    color: tokens.colorNeutralForeground4,
+  },
+  pendingFileName: {
+    color: tokens.colorNeutralForeground3,
+    fontStyle: 'italic',
+  },
 });
 
 export const CCFVisualizerApp: React.FC = () => {
@@ -174,7 +192,7 @@ export const CCFVisualizerApp: React.FC = () => {
 
   const { data: stats } = useStats();
   const { data: ledgerFiles } = useLedgerFiles();
-  const { isUploading, uploadError } = useFileDrop();
+  const { isUploading, uploadError, uploadProgress } = useFileDrop();
   const [showUploadDialog, setShowUploadDialog] = React.useState(false);
   const { data: storageInfo } = useStorageQuota();
 
@@ -249,6 +267,23 @@ export const CCFVisualizerApp: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Helper function to get file processing status
+  const getFileProcessingStatus = (filename: string): 'processing' | 'completed' | 'pending' | null => {
+    if (!uploadProgress) return null;
+    if (uploadProgress.processingFile === filename) return 'processing';
+    if (uploadProgress.completedFiles.has(filename)) return 'completed';
+    // File is in the queue but not yet processed
+    if (uploadProgress.allFiles.includes(filename)) return 'pending';
+    return null;
+  };
+
+  // Get pending files that aren't yet in the database
+  const getPendingFiles = (): string[] => {
+    if (!uploadProgress) return [];
+    const existingFilenames = new Set(ledgerFiles?.map(f => f.filename) || []);
+    return uploadProgress.allFiles.filter(name => !existingFilenames.has(name));
+  };
+
   // Show upload screen if no data
   if (!hasData) {
     return (
@@ -290,40 +325,86 @@ export const CCFVisualizerApp: React.FC = () => {
     );
   }
 
-  const renderSideBar = () => (
-    <Sidebar icon={<DocumentRegular />} title="Ledger Files" resizable collapsible>
-      {ledgerFiles && ledgerFiles.length > 0 ? (
-        <Tree aria-label="Ledger Files">
-          {ledgerFiles.map((file) => (
-            <TreeItem
-              key={file.id}
-              itemType="leaf"
-              className={styles.treeItem}
-              style={{
-                backgroundColor: selectedFileId === file.id ? tokens.colorNeutralBackground3 : 'transparent'
-              }}
-            >
-              <TreeItemLayout
-                iconBefore={<Document24Regular />}
-                onClick={() => handleFileSelect(file.id)}
-              >
-                <div className={styles.fileTreeItem}>
-                  <div className={styles.fileNameContainer}>{file.filename}</div>
-                  <Badge appearance="outline" size="small" className={styles.badge}>
-                    {formatBytes(file.fileSize)}
-                  </Badge>
-                </div>
-              </TreeItemLayout>
-            </TreeItem>
-          ))}
-        </Tree>
-      ) : (
-        <div className={styles.emptyState}>
-          <Body1>No files uploaded</Body1>
-        </div>
-      )}
-    </Sidebar>
-  );
+  const renderSideBar = () => {
+    const pendingFiles = getPendingFiles();
+    const hasFiles = (ledgerFiles && ledgerFiles.length > 0) || pendingFiles.length > 0;
+    
+    return (
+      <Sidebar icon={<DocumentRegular />} title="Ledger Files" resizable collapsible>
+        {hasFiles ? (
+          <Tree aria-label="Ledger Files">
+            {/* Existing database files */}
+            {ledgerFiles?.map((file) => {
+              const processingStatus = getFileProcessingStatus(file.filename);
+              return (
+                <TreeItem
+                  key={file.id}
+                  itemType="leaf"
+                  className={styles.treeItem}
+                  style={{
+                    backgroundColor: selectedFileId === file.id ? tokens.colorNeutralBackground3 : 'transparent'
+                  }}
+                >
+                  <TreeItemLayout
+                    iconBefore={<Document24Regular />}
+                    onClick={() => handleFileSelect(file.id)}
+                  >
+                    <div className={styles.fileTreeItem}>
+                      <div className={styles.fileNameContainer}>{file.filename}</div>
+                      <div className={styles.processingIndicator}>
+                        {processingStatus === 'processing' && (
+                          <Spinner size="extra-tiny" />
+                        )}
+                        {processingStatus === 'completed' && (
+                          <CheckmarkCircle12Regular className={styles.completedBadge} />
+                        )}
+                        <Badge appearance="outline" size="small" className={styles.badge}>
+                          {formatBytes(file.fileSize)}
+                        </Badge>
+                      </div>
+                    </div>
+                  </TreeItemLayout>
+                </TreeItem>
+              );
+            })}
+            {/* Pending files not yet in database */}
+            {pendingFiles.map((filename) => {
+              const processingStatus = getFileProcessingStatus(filename);
+              return (
+                <TreeItem
+                  key={`pending-${filename}`}
+                  itemType="leaf"
+                  className={styles.treeItem}
+                >
+                  <TreeItemLayout
+                    iconBefore={<Document24Regular />}
+                  >
+                    <div className={styles.fileTreeItem}>
+                      <div className={`${styles.fileNameContainer} ${styles.pendingFileName}`}>
+                        {filename}
+                      </div>
+                      <div className={styles.processingIndicator}>
+                        {processingStatus === 'processing' && (
+                          <Spinner size="extra-tiny" />
+                        )}
+                        {processingStatus === 'pending' && (
+                          <Clock12Regular className={styles.pendingBadge} />
+                        )}
+                      </div>
+                    </div>
+                  </TreeItemLayout>
+                </TreeItem>
+              );
+            })}
+          </Tree>
+        ) : (
+          <div className={styles.emptyState}>
+            <Body1>No files uploaded</Body1>
+          </div>
+        )}
+      </Sidebar>
+    );
+  };
 
   const renderTransactionContent = () => {
     if (transactionsLoading) {
