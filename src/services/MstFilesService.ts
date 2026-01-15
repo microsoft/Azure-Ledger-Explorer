@@ -4,7 +4,7 @@
  */
 
 import type { LedgerFileInfo } from '../utils/ledger-validation';
-import { parseLedgerFilename, validateLedgerSequence } from '../utils/ledger-validation';
+import { parseLedgerFilename } from '../utils/ledger-validation';
 
 export interface DownloadProgress {
   currentFile: number;
@@ -161,35 +161,61 @@ export class MstFilesService {
         });
       }
     }
-    const validation = validateLedgerSequence([], files);
-    const sortedFilteredFiles: LedgerFileInfo[] = validation.sortedFiles;
-    if (!validation.isValid) {
-      console.warn(`Ledger files validation failed:`, validation.errors);
-
-      // skip overlapping ranges, 
-      // usually file starts with the same start number but ends with different end number
-      const indexesToRemove = [];
-      for (let i = 1; i < sortedFilteredFiles.length; i++) {
-        const prevFile = sortedFilteredFiles[i - 1];
-        const currFile = sortedFilteredFiles[i];
-        if (currFile.startNo === prevFile.startNo && currFile.endNo >= prevFile.endNo) {
-          console.warn(`Overlapping range. Skipping ${prevFile.filename}`);
-          indexesToRemove.push(i - 1);
-        } else if (currFile.startNo >= prevFile.startNo && currFile.endNo <= prevFile.endNo) {
-          console.warn(`Overlapping range. Skipping ${currFile.filename}`);
-          indexesToRemove.push(i);
-        }
-      }
-
-      // remove duplicates from the end to avoid index shifting
-      for (let i = indexesToRemove.length - 1; i >= 0; i--) {
-        const index = indexesToRemove[i];
-        sortedFilteredFiles.splice(index, 1);
-      }
-    }
-    return sortedFilteredFiles;
+    
+    // Sort by start number and return all files (including duplicates - let UI handle selection)
+    return files
+      .filter(f => f.isValid)
+      .sort((a, b) => a.startNo - b.startNo);
   }
 
+  /**
+   * Download specific ledger files by filename
+   */
+  async downloadSelectedFiles(
+    filenames: string[],
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
+    if (!this.mstClient) {
+      throw new Error('File share client not initialized');
+    }
+
+    try {
+      const files: File[] = [];
+      const filesDownloaded: LedgerFileInfo[] = [];
+      const totalFiles = filenames.length;
+      let currentFile = 0;
+
+      for (const filename of filenames) {
+        currentFile++;
+        onProgress?.({
+          currentFile,
+          totalFiles,
+          currentFilename: filename,
+        });
+
+        const fileInfo = parseLedgerFilename(filename);
+        filesDownloaded.push(fileInfo);
+
+        const downloadResponse = await this.mstClient.downloadFile(filename);
+        const blob = await downloadResponse.blobBody;
+        if (!blob) {
+          console.error(`Failed to download file: ${filename}`);
+          continue;
+        }
+        const file = await this.blobToFile(blob, filename);
+        files.push(file);
+      }
+
+      return { files, filesDownloaded };
+    } catch (error) {
+      console.error('Failed to download files', error);
+      throw new Error('Failed to download files');
+    }
+  }
+
+  /**
+   * @deprecated Use downloadSelectedFiles instead for explicit file selection
+   */
   async downloadLedgerFiles(
     upToFile: LedgerFileInfo,
     onProgress?: (progress: DownloadProgress) => void

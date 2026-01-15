@@ -3,9 +3,9 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AzureFileShareService, type DownloadProgress } from '../services/AzureFileShareService';
-import {parseLedgerFilename, type LedgerFileInfo} from '../utils/ledger-validation';
+import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
 import {
   makeStyles,
   Button,
@@ -13,42 +13,68 @@ import {
   Caption1,
   Input,
   Field,
-  Table,
-  TableHeader,
-  TableRow,
-  TableHeaderCell,
-  TableBody,
-  TableCell,
-  TableCellLayout,
   Spinner,
   Card,
   CardHeader,
+  MessageBar,
+  MessageBarBody,
   tokens,
 } from '@fluentui/react-components';
 import {
   StorageRegular,
-  DocumentRegular,
   CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
-import { ImportModeDialog, type ImportMode } from './ReplaceDataConfirmDialog';
+import { type ImportMode } from './ReplaceDataConfirmDialog';
+import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
 
 const useStyles = makeStyles({
+  container: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '24px',
+    width: '100%',
+    maxWidth: '800px',
+    margin: '0 auto',
+  },
+  header: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginBottom: '24px',
+  },
+  headerIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+    opacity: 0.7,
+  },
+  connectionForm: {
+    width: '100%',
+    maxWidth: '500px',
+    marginBottom: '24px',
+  },
+  selectorContainer: {
+    width: '100%',
+    marginTop: '16px',
+  },
   fileSequenceInfo: {
     backgroundColor: tokens.colorNeutralBackground3,
     padding: '12px',
     borderRadius: '6px',
     marginBottom: '16px',
+    width: '100%',
   },
   sequenceText: {
     fontFamily: 'monospace',
     fontSize: '12px',
     color: tokens.colorNeutralForeground2,
   },
-    recentFiles: {
+  recentFiles: {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
+    width: '100%',
   },
   fileCard: {
     cursor: 'pointer',
@@ -64,7 +90,7 @@ const useStyles = makeStyles({
     gap: '12px',
     padding: '16px',
   },
-    fileIcon: {
+  fileIcon: {
     fontSize: '32px',
     color: tokens.colorBrandBackground,
   },
@@ -78,55 +104,41 @@ const useStyles = makeStyles({
     fontWeight: '600',
     color: tokens.colorNeutralForeground1,
   },
-  emptyState: {
-    textAlign: 'center',
-    padding: '24px',
-  },
-  hidden: {
-    display: 'none',
-  },
-  emptyTabContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textAlign: 'center',
-    color: tokens.colorNeutralForeground3,
-  },
-  comingSoonIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-    opacity: 0.5,
+  progressContainer: {
+    width: '100%',
+    marginTop: '16px',
   },
 });
 
 export const LedgerBackupView: React.FC = () => {
-    const styles = useStyles();
-    const clearAllDataMutation = useClearAllData();
-    const { data: existingLedgerFiles } = useLedgerFiles();
-    const [sasToken, setSasToken] = useState<string>('');
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [verificationError, setVerificationError] = useState<string | null>(null);
-    const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
-    const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
-    const [, setSelectedFileToVisualize] = useState<LedgerFileInfo | null>(null);
-    const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-    const [pendingFileToVisualize, setPendingFileToVisualize] = useState<LedgerFileInfo | null>(null);
-    const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
-    const fileShareService = React.useMemo(() => new AzureFileShareService(), []);
-    const { handleFiles} = useFileDrop(); 
+  const styles = useStyles();
+  const clearAllDataMutation = useClearAllData();
+  const { data: existingLedgerFiles } = useLedgerFiles();
+  const [sasToken, setSasToken] = useState<string>('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [ledgerFiles, setFiles] = useState<LedgerFileInfo[]>([]);
+  const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const fileShareService = React.useMemo(() => new AzureFileShareService(), []);
+  const { handleFiles } = useFileDrop();
 
-    const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
+  const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
 
-    const verifyAccess = async () => {
+  // Convert LedgerFileInfo to ChunkFileInfo for the selector
+  const chunkFiles: ChunkFileInfo[] = useMemo(() => {
+    return ledgerFiles.map(file => ({
+      ...file,
+      id: file.filename, // Use filename as unique ID
+    }));
+  }, [ledgerFiles]);
+
+  const verifyAccess = async () => {
     if (!sasToken) {
-        setVerificationError('Please enter a SAS token');
-        setFiles([]);
-        setIsVerifying(false);
-        setIsDownloading(false);
-        console.warn('SAS token is empty');
-        return;
+      setVerificationError('Please enter a SAS token');
+      setFiles([]);
+      return;
     }
 
     setIsVerifying(true);
@@ -134,216 +146,167 @@ export const LedgerBackupView: React.FC = () => {
     setDownloadedFiles([]);
     setIsDownloading(false);
 
-    try 
-    {
-        await fileShareService.initialize(sasToken);
-        const ledgerFiles = await fileShareService.listLedgerFiles();
-        setFiles(ledgerFiles);
-        setVerificationError(null);
+    try {
+      await fileShareService.initialize(sasToken);
+      const files = await fileShareService.listLedgerFiles();
+      setFiles(files);
+      setVerificationError(null);
     } catch (error) {
-        setVerificationError(error instanceof Error ? error.message : 'Failed to verify access');
-        setFiles([]);
+      setVerificationError(error instanceof Error ? error.message : 'Failed to verify access');
+      setFiles([]);
     } finally {
-        setIsVerifying(false);
+      setIsVerifying(false);
     }
-    };
+  };
 
-    const handleVisualizeClick = (file: LedgerFileInfo) => {
-        if (hasExistingData) {
-            // Show import mode dialog to let user choose append or replace
-            setPendingFileToVisualize(file);
-            setShowConfirmDialog(true);
-        } else {
-            // No existing data, proceed directly
-            performVisualize(file, 'replace');
-        }
-    };
+  const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+    const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
+    await performImport(selectedFiles, mode);
+  };
 
-    const performVisualize = async (fileToVisualize: LedgerFileInfo, mode: ImportMode) => {
-        setIsDownloading(true);
-        setDownloadProgress(null);
-        setSelectedFileToVisualize(fileToVisualize);
-        
-        // Only clear existing data if user chose replace mode
-        if (mode === 'replace') {
-            await clearAllDataMutation.mutateAsync();
-        }
-        
-        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadLedgerFiles(
-            fileToVisualize,
-            (progress) => setDownloadProgress(progress)
-        );
-        if (downloadedFiles.length > 0) {
-            handleFiles(downloadedFiles);
-            setFiles([]);
-            setDownloadedFiles(filesDownloaded);
-        } else {
-            console.error('No files downloaded');
-        }
-        setIsDownloading(false);
-        setDownloadProgress(null);
-    };
+  const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode) => {
+    setIsDownloading(true);
+    setDownloadProgress(null);
 
-    const handleConfirmImport = async (mode: ImportMode) => {
-        setShowConfirmDialog(false);
-        if (pendingFileToVisualize) {
-            await performVisualize(pendingFileToVisualize, mode);
-            setPendingFileToVisualize(null);
-        }
-    };
+    // Only clear existing data if user chose replace mode
+    if (mode === 'replace') {
+      await clearAllDataMutation.mutateAsync();
+    }
 
-    const handleCancelReplace = () => {
-        setShowConfirmDialog(false);
-        setPendingFileToVisualize(null);
-    };
+    const filenames = selectedFiles.map(f => f.filename);
+    const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
+      filenames,
+      (progress) => setDownloadProgress(progress)
+    );
 
-    return (
-        <div className={styles.emptyTabContent}>
-        <div className={styles.comingSoonIcon}>
-            <StorageRegular />
+    if (downloadedFiles.length > 0) {
+      handleFiles(downloadedFiles);
+      setFiles([]);
+      setDownloadedFiles(filesDownloaded);
+    } else {
+      console.error('No files downloaded');
+    }
+
+    setIsDownloading(false);
+    setDownloadProgress(null);
+  };
+
+  return (
+    <div className={styles.container}>
+      {/* Header */}
+      <div className={styles.header}>
+        <div className={styles.headerIcon}>
+          <StorageRegular />
         </div>
         <Text size={500} weight="semibold">
-            Load From Back Up
+          Load From Azure Backup
         </Text>
-        <div style={{ width: '100%', maxWidth: '400px', margin: '20px 0' }}>
-            <Field
-            label="SAS Token"
-            validationMessage={verificationError}
-            validationState={verificationError ? "error" : "none"}
-            >
-            <Input
-                type="url"
-                value={sasToken}
-                onChange={(_, data) => setSasToken(data.value)}
-                placeholder="Enter your SAS token"
-                style={{ width: '100%' }}
-            />
-            </Field>
-            <Button
-            appearance="primary"
-            onClick={verifyAccess}
-            disabled={isVerifying}
-            style={{ marginTop: '10px' }}
-            >
-            {isVerifying ? <Spinner size="tiny" /> : 'Get Ledger Files'}
-            </Button>
+        <Caption1>Import ledger chunks from an Azure File Share backup</Caption1>
+      </div>
+
+      {/* Connection Form */}
+      <div className={styles.connectionForm}>
+        <Field
+          label="SAS Token"
+          validationMessage={verificationError}
+          validationState={verificationError ? "error" : "none"}
+        >
+          <Input
+            type="url"
+            value={sasToken}
+            onChange={(_, data) => setSasToken(data.value)}
+            placeholder="Enter your SAS token"
+            style={{ width: '100%' }}
+          />
+        </Field>
+        <Button
+          appearance="primary"
+          onClick={verifyAccess}
+          disabled={isVerifying}
+          style={{ marginTop: '10px' }}
+        >
+          {isVerifying ? <Spinner size="tiny" /> : 'Connect & List Files'}
+        </Button>
+      </div>
+
+      {/* Download Progress */}
+      {isDownloading && downloadProgress && (
+        <div className={styles.progressContainer}>
+          <MessageBar intent="info">
+            <MessageBarBody>
+              <Spinner size="tiny" style={{ marginRight: 8 }} />
+              Downloading {downloadProgress.currentFile} of {downloadProgress.totalFiles}: {downloadProgress.currentFilename}
+            </MessageBarBody>
+          </MessageBar>
         </div>
-        {/* Create Table to List all the ledger files present in the backup based on the SAS token provided */}
-        {ledgerFiles.length > 0 && (
-            <div
-            style={{
-                width: "100%",
-                maxHeight: "500px",
-                overflowY: "auto",
-                overflowX: "auto",
-                marginTop: "20px",
-            }}
-            >
-            <Table style={{ width: "100%", tableLayout: "auto" }}>
-                <TableHeader>
-                <TableRow>
-                    <TableHeaderCell style={{ whiteSpace: "nowrap" }}>Ledger File Name</TableHeaderCell>
-                    <TableHeaderCell style={{ whiteSpace: "nowrap" }}></TableHeaderCell>
-                </TableRow>
-                </TableHeader>
-                <TableBody>
-                {ledgerFiles.map((file) => (
-                    <TableRow
-                    key={file.filename}
-                    style={{ cursor: "pointer" }}
-                    >
-                    <TableCell>
-                        <TableCellLayout media={<DocumentRegular />}>
-                        {file.filename}
-                        </TableCellLayout>
-                    </TableCell>
-                    <TableCell>
-                        <Button
-                        appearance="primary"
-                        disabled={isDownloading}
-                        onClick={() => handleVisualizeClick(file)}
-                        >
-                        {isDownloading && downloadProgress ? (
-                            <>
-                                <Spinner size="tiny" />
-                                &nbsp;Downloading {downloadProgress.currentFile} of {downloadProgress.totalFiles}
-                            </>
-                        ) : isDownloading ? (
-                            <Spinner size="tiny" />
-                        ) : (
-                            'Visualize Ledger Files'
-                        )}
-                        </Button>
-                    </TableCell>
-                    </TableRow>
-                ))}
-                </TableBody>
-            </Table>
-            </div>
-        )}
-        {/* Print File Sequence Info */}
-        { downloadedLedgerFiles && downloadedLedgerFiles.length > 0 && (
-            <div className={styles.fileSequenceInfo}>
+      )}
+
+      {/* Chunk Selector */}
+      {chunkFiles.length > 0 && !isDownloading && (
+        <div className={styles.selectorContainer}>
+          <ChunkSelector
+            files={chunkFiles}
+            onImport={handleImportClick}
+            isImporting={isDownloading}
+            importButtonLabel="Import"
+            showOverwriteOption={hasExistingData}
+            defaultOverwrite={false}
+          />
+        </div>
+      )}
+
+      {/* Downloaded Files Summary */}
+      {downloadedLedgerFiles && downloadedLedgerFiles.length > 0 && (
+        <>
+          <div className={styles.fileSequenceInfo}>
             <Text size={300} weight="semibold" style={{ marginBottom: '8px' }}>
-                Current Sequence:
+              Imported Sequence:
             </Text>
             <div className={styles.sequenceText}>
-                {downloadedLedgerFiles
+              {downloadedLedgerFiles
                 .map(file => parseLedgerFilename(file.filename))
                 .filter(info => info.isValid)
                 .sort((a, b) => a.startNo - b.startNo)
                 .map(info => `${info.startNo}-${info.endNo}`)
                 .join(' → ')}
             </div>
-            </div>
-        )}
-        {/* Recently Uploaded Files */}
-        {downloadedLedgerFiles && downloadedLedgerFiles.length > 0 && (
-            <div className={styles.recentFiles}>
+          </div>
+
+          <div className={styles.recentFiles}>
             <Text size={600} weight="semibold">
-                Ledger Files ({downloadedLedgerFiles.length}) - Sequential Order
+              Imported Files ({downloadedLedgerFiles.length})
             </Text>
 
             {downloadedLedgerFiles
-                .map(file => (parseLedgerFilename(file.filename)))
-                .filter(file => file.isValid)
-                .sort((a, b) => a.startNo - b.startNo)
-                .slice(0, 10)
-                .map((file) => (
+              .map(file => parseLedgerFilename(file.filename))
+              .filter(file => file.isValid)
+              .sort((a, b) => a.startNo - b.startNo)
+              .slice(0, 10)
+              .map((file) => (
                 <Card key={file.filename} className={styles.fileCard}>
-                    <CardHeader
+                  <CardHeader
                     header={
-                        <div className={styles.fileCardContent}>
+                      <div className={styles.fileCardContent}>
                         <CheckmarkCircle24Regular className={styles.fileIcon} />
                         <div className={styles.fileInfo}>
-                            <Text className={styles.fileName}>
+                          <Text className={styles.fileName}>
                             {file.filename}
-                            </Text>
+                          </Text>
                         </div>
-                        </div>
+                      </div>
                     }
-                    />
+                  />
                 </Card>
-                ))}
-            
-            {ledgerFiles.length > 10 && (
-                <div className={styles.emptyState}>
-                <Caption1>
-                    + {ledgerFiles.length - 10} more files (showing first 10 in sequential order)
-                </Caption1>
-                </div>
-            )}
-            </div>
-        )}
+              ))}
 
-        <ImportModeDialog
-            open={showConfirmDialog}
-            onOpenChange={setShowConfirmDialog}
-            existingFileCount={existingLedgerFiles?.length || 0}
-            sourceName="Azure Ledger backup"
-            onConfirm={handleConfirmImport}
-            onCancel={handleCancelReplace}
-        />
-        </div>
-    );
+            {downloadedLedgerFiles.length > 10 && (
+              <Caption1 style={{ textAlign: 'center', padding: '8px' }}>
+                + {downloadedLedgerFiles.length - 10} more files
+              </Caption1>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
