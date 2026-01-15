@@ -6,15 +6,16 @@
 
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import { createTables, dropAllTables, verifyTables } from '../database/worker/schema';
+import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations/migrations';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
-import { shouldDecodeCborValue } from '../database/decode-cbor-tables';
+import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 
 const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
 // Initialize the SQLite worker
 const initializeSQLite = async () => {
+  let db: SQLiteDB | undefined;
   try {
     log('Loading and initializing SQLite3 module...');
 
@@ -26,8 +27,6 @@ const initializeSQLite = async () => {
     log('Running SQLite3 version', sqlite3.version.libVersion);
 
     // Try to create database with OPFS, fall back to transient if not available
-    let db: SQLiteDB;
-
     if ('opfs' in sqlite3) {
       // try opening the database and fall back to readonly mode if SQLITE_BUSY error is thrown, then fall back to transient if that fails
       try {
@@ -52,8 +51,8 @@ const initializeSQLite = async () => {
       log('OPFS is not available, created transient database', db.filename);
     }
 
-    // Create tables if they don't exist
-    createTables(db, { log });
+    // Run migrations (creates tables if they don't exist)
+    runMigrations(db, { log });
 
     return db;
   } catch (err) {
@@ -71,84 +70,25 @@ const initializeSQLite = async () => {
   }
 };
 
-// Create database schema
 // Helper to execute SQL and return results as an array of objects
-type SQLiteStatement = ReturnType<SQLiteDB['prepare']>;
-
-class StatementCache {
-  private readonly maxStatements: number;
-  private readonly map = new Map<string, SQLiteStatement>();
-
-  constructor(options: { maxStatements: number }) {
-    this.maxStatements = options.maxStatements;
-  }
-
-  get(db: SQLiteDB, sql: string): SQLiteStatement {
-    const existing = this.map.get(sql);
-    if (existing) {
-      // Refresh LRU ordering
-      this.map.delete(sql);
-      this.map.set(sql, existing);
-      return existing;
-    }
-
-    const stmt = db.prepare(sql);
-    this.map.set(sql, stmt);
-
-    // Evict oldest if over capacity
-    if (this.map.size > this.maxStatements) {
-      const oldestKey = this.map.keys().next().value as string | undefined;
-      if (oldestKey !== undefined) {
-        const oldestStmt = this.map.get(oldestKey);
-        this.map.delete(oldestKey);
-        try {
-          oldestStmt?.finalize();
-        } catch {
-          // ignore finalize errors during eviction
-        }
-      }
-    }
-
-    return stmt;
-  }
-
-  clear(): void {
-    for (const stmt of this.map.values()) {
-      try {
-        stmt.finalize();
-      } catch {
-        // ignore
-      }
-    }
-    this.map.clear();
-  }
-}
-
-const statementCache = new StatementCache({ maxStatements: 64 });
-
 const execSQL = (db: SQLiteDB, sql: string, bind?: unknown[]): unknown[] => {
   const results: unknown[] = [];
 
   try {
-    // Use cached prepare/step/get pattern for object results
-    const stmt = statementCache.get(db, sql);
-    if (bind && bind.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      stmt.bind(bind as any);
-    }
+    const stmt = db.prepare(sql);
+    
+    try {
+      if (bind && bind.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        stmt.bind(bind as any);
+      }
 
-    while (stmt.step()) {
-      const row = stmt.get({});
-      results.push(row);
-    }
-
-    // Reset so this statement can be reused from cache.
-    stmt.reset();
-    // Some sqlite-wasm builds provide clearBindings(). Call if available.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const anyStmt = stmt as any;
-    if (typeof anyStmt.clearBindings === 'function') {
-      anyStmt.clearBindings();
+      while (stmt.step()) {
+        const row = stmt.get({});
+        results.push(row);
+      }
+    } finally {
+      stmt.finalize();
     }
   } catch (err) {
     error('SQL execution failed:', sql, 'Error:', err);
@@ -437,17 +377,22 @@ self.onmessage = async (event: MessageEvent) => {
       }
 
       case 'close':
-        statementCache.clear();
         db.close();
         result = { success: true };
         break;
+
+      case 'clearAllData': {
+        // Clear all data from tables (preserves schema)
+        clearAllTables(db, { log });
+        result = { success: true };
+        break;
+      }
 
       case 'deleteDatabase': {
         // Delete the OPFS database file completely
         try {
           // First close the current database connection
           if (db) {
-            statementCache.clear();
             db.close();
           }
 
@@ -487,8 +432,8 @@ self.onmessage = async (event: MessageEvent) => {
             log('No existing tables to drop (this is fine):', dropErr);
           }
 
-          // Create tables in the new database
-          createTables(db, { log });
+          // Run migrations in the new database
+          runMigrations(db, { log });
 
           result = { success: true };
         } catch (deleteErr) {

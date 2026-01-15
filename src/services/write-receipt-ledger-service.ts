@@ -5,7 +5,7 @@
 
 
 
-import type { CCFDatabase } from '../database';
+import type { CCFDatabase } from '@ccf/database';
 import type { WriteReceiptVerificationResult } from '../types/write-receipt-types';
 
 export interface LedgerComparisonResult {
@@ -88,8 +88,8 @@ export class WriteReceiptLedgerService {
     txDigest: Uint8Array;
   } | null> {
     try {
-      // Use the new public API method
-      return await this.db.getTransactionByDigest(digestBytes);
+      // Use the repository API method
+      return await this.db.transactions.getByDigest(digestBytes);
     } catch (error) {
       console.error('Error finding transaction by digest:', error);
       return null;
@@ -133,15 +133,15 @@ export class WriteReceiptLedgerService {
     deleteCount: number;
   } | null> {
     try {
-      const transaction = await this.db.getTransactionById(transactionId);
+      const transaction = await this.db.transactions.getById(transactionId);
       if (!transaction) return null;
 
       return {
         version: transaction.version,
         txVersion: transaction.txVersion,
         entryType: transaction.entryType,
-        writeCount: transaction.writeCount,
-        deleteCount: transaction.deleteCount
+        writeCount: transaction.writeCount ?? 0,
+        deleteCount: transaction.deleteCount ?? 0
       };
     } catch (error) {
       console.error('Error getting transaction details:', error);

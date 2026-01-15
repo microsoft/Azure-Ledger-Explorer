@@ -22,7 +22,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-import type { CCFDatabase } from '../database';
+import type { CCFDatabase } from '@ccf/database';
 import { useConfig } from '../pages/ConfigPage';
 import { useVerification } from '../hooks/use-verification';
 import { getDatabase } from '../hooks/use-ccf-data';
@@ -478,9 +478,9 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   useEffect(() => {
     if (database) {
-      database.getAllTransactionsCount().then(count => {
+      database.transactions.getAllCount().then((count: number) => {
         setAllTransactionsCount(count);
-      }).catch(error => {
+      }).catch((error: Error) => {
         console.error('Failed to get transaction count:', error);
         setAllTransactionsCount(0);
       });

@@ -3,8 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-export type TableLatestStateSortColumn = 'sequence' | 'transactionId' | 'keyName' | 'value';
-export type TableLatestStateSortDirection = 'asc' | 'desc';
+import type { TableLatestStateSortColumn, TableLatestStateSortDirection } from '../types/query-types';
 
 function likePattern(query: string): string {
   return `%${query.trim()}%`;

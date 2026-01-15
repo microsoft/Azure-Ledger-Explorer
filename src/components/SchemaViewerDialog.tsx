@@ -19,7 +19,7 @@ import {
     DialogActions,
 } from '@fluentui/react-components';
 import { DatabaseRegular, TableStackLeftRegular, LightbulbRegular } from '@fluentui/react-icons';
-import type { DatabaseSchema } from '../database/queries/schema-queries';
+import type { DatabaseSchema } from '@ccf/database';
 
 // ============================================================================
 // STYLES

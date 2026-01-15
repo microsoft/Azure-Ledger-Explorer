@@ -84,8 +84,8 @@ export type TransactionRow = {
   entryType: number;
   txVersion: number;
   maxConflictVersion: number;
-  writeCount: number;
-  deleteCount: number;
+  writeCount?: number;
+  deleteCount?: number;
   mapName?: string;
 };
 
@@ -133,21 +133,21 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
     }),
     createTableColumn<TransactionRow>({
       columnId: 'operations',
-      compare: (a, b) => (a.writeCount + a.deleteCount) - (b.writeCount + b.deleteCount),
+      compare: (a, b) => ((a.writeCount ?? 0) + (a.deleteCount ?? 0)) - ((b.writeCount ?? 0) + (b.deleteCount ?? 0)),
       renderHeaderCell: () => <span className={styles.headerCell}>Operations</span>,
       renderCell: (item) => (
         <div className={styles.operationsContainer}>
-          {item.writeCount > 0 && (
+          {(item.writeCount ?? 0) > 0 && (
             <Badge appearance="filled" color="success" size="small" className={styles.operationBadge}>
               {item.writeCount}W
             </Badge>
           )}
-          {item.deleteCount > 0 && (
+          {(item.deleteCount ?? 0) > 0 && (
             <Badge appearance="filled" color="danger" size="small" className={styles.operationBadge}>
               {item.deleteCount}D
             </Badge>
           )}
-          {item.writeCount === 0 && item.deleteCount === 0 && (
+          {(item.writeCount ?? 0) === 0 && (item.deleteCount ?? 0) === 0 && (
             <Badge appearance="tint" color="subtle" size="small" className={styles.operationBadge}>
               Private
             </Badge>

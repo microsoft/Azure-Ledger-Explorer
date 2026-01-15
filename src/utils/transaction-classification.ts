@@ -28,8 +28,8 @@ export type TransactionQueryResult = {
   entryType: number;
   txVersion: number;
   maxConflictVersion: number;
-  writeCount: number;
-  deleteCount: number;
+  writeCount?: number;
+  deleteCount?: number;
   mapName?: string;
 };
 
@@ -65,7 +65,7 @@ export function classifyTransaction(transaction: TransactionQueryResult): Transa
 
   // No public-domain writes/deletes recorded: likely private-domain only.
   // Private-domain contents are encrypted, so we can't decode KV operations here.
-  if (transaction.writeCount === 0 && transaction.deleteCount === 0) {
+  if ((transaction.writeCount ?? 0) === 0 && (transaction.deleteCount ?? 0) === 0) {
     return 'userPrivate';
   }
 

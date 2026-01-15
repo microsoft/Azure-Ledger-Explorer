@@ -3,23 +3,18 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-// Re-export parser types for convenience
-export type {
-  Transaction,
-  TransactionHeader,
-  GcmHeader,
-  PublicDomain,
-  LedgerKeyValue,
-  LedgerConstants,
-} from '@ccf/ledger-parser';
+/**
+ * Configuration for CCFDatabase initialization
+ */
+export interface DatabaseConfig {
+  filename: string;
+  useOpfs?: boolean;
+}
 
-export {
-  EntryType,
-  LEDGER_CONSTANTS,
-  entryTypeHelpers,
-} from '@ccf/ledger-parser';
-
-// Database Transaction type (app-specific, different from the parsed Transaction type)
+/**
+ * Database Transaction type (app-specific, different from the parsed Transaction type)
+ * Represents a transaction record as returned from the database with file context.
+ */
 export interface DatabaseTransaction {
   id: number;
   fileId: number;
