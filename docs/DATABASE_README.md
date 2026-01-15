@@ -8,20 +8,30 @@ The persistence layer provides a robust, browser-based database solution for sto
 
 ### Core Components
 
-#### 1. CCFDatabase Class (`src/database/ccf-database.ts`)
-The main database abstraction that provides:
-- **SQLite Integration**: Uses sql.js for in-browser SQL database
+#### 1. CCFDatabase Class (`packages/ccf-database/src/ccf-database.ts`)
+The main database facade that provides:
+- **Repository Access**: Provides access to domain-specific repositories (files, transactions, kv, stats)
+- **SQLite Integration**: Uses sql.js via Web Worker for non-blocking in-browser SQL database
 - **OPFS Persistence**: Leverages Origin Private File System for persistent storage
-- **Schema Management**: Automatic table creation and migration
-- **Query Interface**: Safe SQL execution with security controls
+- **Schema Management**: Automatic table creation and migration support
+- **Query Interface**: Safe SQL execution with security controls through repositories
 
-#### 2. Database Configuration
+#### 2. Database Configuration (`packages/ccf-database/src/types/database-types.ts`)
 ```typescript
 interface DatabaseConfig {
   filename: string;    // Database filename in OPFS
   useOpfs?: boolean;   // Enable persistent storage
 }
 ```
+
+#### 3. Repository Pattern (`packages/ccf-database/src/repositories/`)
+The database uses a repository pattern to organize domain-specific data access:
+- **FileRepository**: Ledger file metadata operations
+- **TransactionRepository**: Transaction CRUD and search operations
+- **KVRepository**: Key-value table and write/delete operations
+- **StatsRepository**: Database statistics and management operations
+
+Each repository extends `BaseRepository` and accepts typed `ExecFn` and `ExecBatchFn` functions for database access.
 
 ### Database Schema
 
@@ -92,6 +102,7 @@ CREATE INDEX idx_kv_deletes_map_key ON kv_deletes(map_name, key_name);
 ## Storage Technologies
 
 ### 1. SQL.js Integration
+- **Web Worker Execution**: Database operations run in a Web Worker to prevent blocking the main thread
 - **In-Memory Database**: Fast operations with full SQL support
 - **Export/Import**: Serialize database to binary format
 - **Cross-Platform**: Works in all modern browsers
@@ -99,20 +110,24 @@ CREATE INDEX idx_kv_deletes_map_key ON kv_deletes(map_name, key_name);
 
 ### 2. OPFS (Origin Private File System)
 - **Persistent Storage**: Data survives browser restarts
-- **High Performance**: Native file system access
+- **High Performance**: Native file system access via Access Handle Pool VFS
 - **Large Capacity**: Can handle multi-gigabyte databases
 - **Privacy**: Data stays local to the user's browser
 
+### 3. Web Worker Architecture (`packages/ccf-database/src/worker/`)
+- **DatabaseWorkerClient**: Main thread client for communicating with the worker
+- **database-worker.ts**: Worker implementation handling SQL.js initialization and query execution
+- **Non-blocking**: All database operations are asynchronous and don't block UI
+- **Message-based Communication**: Type-safe message passing between main thread and worker
+
 ### 3. Fallback Strategy
 ```typescript
-// Graceful degradation for unsupported browsers
-if (this.config.useOpfs && navigator.storage && navigator.storage.getDirectory) {
-  // Use OPFS for persistence
-  await this.loadFromOpfs();
-} else {
-  // Use in-memory database
-  this.db = new this.sql.Database();
-}
+// Graceful degradation handled by sql.js OPFS VFS
+// If OPFS is not available, falls back to in-memory storage
+const config: DatabaseConfig = {
+  filename: 'ccf-ledger.db',
+  useOpfs: true, // Will use OPFS if available, otherwise in-memory
+};
 ```
 
 ## Key Features
@@ -138,57 +153,49 @@ if (this.config.useOpfs && navigator.storage && navigator.storage.getDirectory) 
 
 #### Database Lifecycle
 ```typescript
-// Initialize database
+// Initialize database (creates worker and repositories)
 await database.initialize();
-
-// Save to persistent storage
-await database.save();
 
 // Close and cleanup
 await database.close();
 ```
 
-#### Data Insertion
+#### Repository Access
+The database provides access to domain-specific repositories:
 ```typescript
-// Insert ledger file
-const fileId = await database.insertLedgerFile(filename, fileSize);
+// Access file repository
+const files = await database.files.getLedgerFiles();
+const fileId = await database.files.insertLedgerFile(filename, fileSize);
 
-// Insert single transaction
-const txId = await database.insertTransaction(fileId, transaction);
+// Access transaction repository
+const transactions = await database.transactions.getTransactions(fileId, limit, offset);
+const txId = await database.transactions.insertTransaction(fileId, transaction);
+await database.transactions.insertTransactionsBatch(fileId, transactions);
 
-// Batch insert transactions (memory optimized)
-await database.insertTransactionsBatch(fileId, transactions);
+// Access KV repository
+const writes = await database.kv.getTransactionWrites(transactionId);
+const deletes = await database.kv.getTransactionDeletes(transactionId);
+const tables = await database.kv.getCCFTables();
+const latestState = await database.kv.getTableLatestState(tableName, sortColumn, sortDirection);
+
+// Access stats repository
+const stats = await database.stats.getStats();
+const enhancedStats = await database.stats.getEnhancedStats();
+await database.stats.clearAllData();
 ```
 
-#### Data Retrieval
+#### Combined Operations
 ```typescript
-// Get ledger files
-const files = await database.getLedgerFiles();
+// Insert ledger file with transaction data (high-level operation)
+const result = await database.insertLedgerFileWithData(
+  filename,
+  fileSize,
+  transactions
+);
+// Returns: { fileId, transactionCount }
 
-// Get transactions with pagination
-const transactions = await database.getTransactions(fileId, limit, offset);
-
-// Get transaction details
-const writes = await database.getTransactionWrites(transactionId);
-const deletes = await database.getTransactionDeletes(transactionId);
-```
-
-#### Analytics and Statistics
-```typescript
-// Basic statistics
-const stats = await database.getStats();
-
-// Enhanced analytics
-const enhancedStats = await database.getEnhancedStats();
-
-// CCF table analysis
-const tables = await database.getCCFTables();
-```
-
-### Safe Query Execution
-```typescript
-// Execute user queries safely (SELECT only)
-const results = await database.executeQuery(sqlQuery);
+// Clear all data
+await database.clearAllData();
 ```
 
 ## Performance Optimization
@@ -210,21 +217,29 @@ const results = await database.executeQuery(sqlQuery);
 
 ## Data Migration and Backup
 
+### Schema Migrations (`packages/ccf-database/src/migrations/`)
+The database supports versioned schema migrations:
+```typescript
+// Migrations are defined in separate files (e.g., 001_initial.ts)
+export const migration001: Migration = {
+  version: 1,
+  name: 'Initial schema',
+  up: (db: SqlJsDatabase) => {
+    // Create tables and indexes
+  },
+};
+
+// Migrations run automatically on initialization
+await database.initialize(); // Applies pending migrations
+```
+
 ### Export Functionality
 ```typescript
-// Export entire database
-const binaryData = database.export();
+// Export entire database (via worker)
+const binaryData = await database.export();
 
 // Save to file
 const blob = new Blob([binaryData], { type: 'application/octet-stream' });
-```
-
-### Import Functionality
-```typescript
-// Import from binary data
-const database = new CCFDatabase(config);
-await database.initialize();
-await database.import(binaryData);
 ```
 
 ### Reset Operations
@@ -232,8 +247,9 @@ await database.import(binaryData);
 // Clear all data (keep schema)
 await database.clearAllData();
 
-// Complete database reset
-await database.dropDatabase();
+// Complete database reset (handled by worker)
+await database.close();
+await resetDatabase(); // Helper in src/hooks/use-ccf-data.ts
 ```
 
 ## Error Handling and Recovery
@@ -250,9 +266,12 @@ await database.dropDatabase();
 
 ## Integration with React Query
 
-The database layer integrates seamlessly with TanStack Query:
+The database layer integrates seamlessly with TanStack Query through the `@ccf/database` package:
 
 ```typescript
+// Import the database from the package
+import { CCFDatabase } from '@ccf/database';
+
 // Query keys for efficient caching
 export const queryKeys = {
   ledgerFiles: ['ledgerFiles'] as const,
@@ -266,7 +285,7 @@ export const useLedgerFiles = () => {
     queryKey: queryKeys.ledgerFiles,
     queryFn: async () => {
       const db = await getDatabase();
-      return db.getLedgerFiles();
+      return db.files.getLedgerFiles();
     },
   });
 };
@@ -291,16 +310,17 @@ const hasSqlJs = typeof WebAssembly !== 'undefined';
 ## Future Enhancements
 
 ### Planned Features
-- **Database Versioning**: Schema migration support
+- **Enhanced Migration System**: More sophisticated schema versioning and rollback support
+- **Multiple Storage Backends**: Support for alternative storage mechanisms beyond OPFS
 - **Compression**: Database compression for storage efficiency
 - **Encryption**: Optional client-side encryption
 - **Synchronization**: Multi-tab synchronization support
 
 ### Performance Improvements
-- **Web Workers**: Background processing for large imports
-- **Streaming**: Streaming database operations
-- **IndexedDB Fallback**: Alternative storage for older browsers
+- **Query Optimization**: Advanced query plan optimization in repositories
+- **Streaming**: Streaming database operations for very large datasets
+- **Caching**: Additional caching layers for frequently accessed data
 
 ---
 
-**⚠️ IMPORTANT**: When modifying the database schema or persistence layer, always ensure backward compatibility and test thoroughly across different browsers. Database migrations should be carefully planned and tested. Keep this documentation updated with any schema changes or new features.
+**⚠️ IMPORTANT**: When modifying the database schema or persistence layer, always ensure backward compatibility and test thoroughly across different browsers. Database migrations should be carefully planned and tested. The database code is now in the `packages/ccf-database` workspace - keep this documentation updated with any schema changes or new features.
