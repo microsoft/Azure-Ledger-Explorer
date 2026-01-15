@@ -36,12 +36,12 @@ import localFilesHelp from '../assets/help/local-files.md?raw';
 const useStyles = makeStyles({
   wizardDialog: {
     minWidth: '900px',
-    maxWidth: '1200px',
-    width: '90vw',
-    height: '80vh',
+    maxWidth: '95vw',
+    width: '95vw',
+    height: '85vh',
     '@media (max-width: 1024px)': {
       minWidth: '700px',
-      width: '95vw',
+      width: '98vw',
     },
     '@media (max-width: 768px)': {
       minWidth: '400px',

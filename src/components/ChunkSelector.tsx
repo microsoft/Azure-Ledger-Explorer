@@ -62,6 +62,13 @@ const useStyles = makeStyles({
   chunkRowSelected: {
     backgroundColor: tokens.colorNeutralBackground1Selected,
   },
+  chunkRowAlreadyLoaded: {
+    backgroundColor: tokens.colorPaletteGreenBackground1,
+    opacity: 0.8,
+  },
+  alreadyLoadedBadge: {
+    marginLeft: 'auto',
+  },
   chunkInfo: {
     display: 'flex',
     alignItems: 'center',
@@ -127,6 +134,20 @@ const useStyles = makeStyles({
     fontSize: '12px',
     color: tokens.colorNeutralForeground2,
   },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  existingDataInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
+    backgroundColor: tokens.colorPaletteGreenBackground1,
+    borderRadius: '6px',
+    marginBottom: '8px',
+  },
 });
 
 /**
@@ -188,6 +209,10 @@ export interface ChunkSelectorProps {
   showOverwriteOption?: boolean;
   /** Default value for overwrite option */
   defaultOverwrite?: boolean;
+  /** Set of range keys that are already loaded in the database */
+  existingRanges?: Set<string>;
+  /** Callback to clear the database */
+  onClearDatabase?: () => Promise<void>;
 }
 
 /**
@@ -201,9 +226,12 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   importButtonLabel = 'Import',
   showOverwriteOption = false,
   defaultOverwrite = false,
+  existingRanges = new Set(),
+  onClearDatabase,
 }) => {
   const styles = useStyles();
   const [overwriteExisting, setOverwriteExisting] = useState(defaultOverwrite);
+  const [isClearing, setIsClearing] = useState(false);
 
   // Group files by sequence range and detect duplicates
   const { chunkGroups, gaps } = useMemo(() => {
@@ -440,6 +468,17 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     onImport(selectedFiles, overwriteExisting);
   }, [getSelectedFiles, onImport, overwriteExisting]);
 
+  // Handle clear database
+  const handleClearDatabase = useCallback(async () => {
+    if (!onClearDatabase) return;
+    setIsClearing(true);
+    try {
+      await onClearDatabase();
+    } finally {
+      setIsClearing(false);
+    }
+  }, [onClearDatabase]);
+
   // Format file size
   const formatSize = (bytes?: number): string => {
     if (bytes === undefined) return '';
@@ -464,11 +503,12 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   const renderChunkGroup = (group: ChunkGroup) => {
     const isChecked = selection.checkedRanges.has(group.rangeKey);
     const selectedId = selection.selectedVersions.get(group.rangeKey);
+    const isAlreadyLoaded = existingRanges.has(group.rangeKey);
 
     return (
       <div key={group.rangeKey}>
         <div
-          className={`${styles.chunkRow} ${isChecked ? styles.chunkRowSelected : ''}`}
+          className={`${styles.chunkRow} ${isChecked ? styles.chunkRowSelected : ''} ${isAlreadyLoaded ? styles.chunkRowAlreadyLoaded : ''}`}
         >
           <Checkbox
             checked={isChecked}
@@ -482,6 +522,11 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
             {group.isDuplicate && (
               <Badge appearance="tint" color="warning" size="small">
                 {group.files.length} versions
+              </Badge>
+            )}
+            {isAlreadyLoaded && (
+              <Badge appearance="tint" color="success" size="small" className={styles.alreadyLoadedBadge}>
+                Already loaded
               </Badge>
             )}
           </div>
@@ -548,8 +593,31 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   const selectedCount = selection.checkedRanges.size;
   const canImport = selectedCount > 0 && validation.state !== 'error';
 
+  const existingCount = existingRanges.size;
+
   return (
     <div className={styles.container}>
+      {/* Existing data info bar */}
+      {existingCount > 0 && (
+        <div className={styles.existingDataInfo}>
+          <CheckmarkCircle16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
+          <Text size={200}>
+            {existingCount} chunk(s) already loaded in database
+          </Text>
+          {onClearDatabase && (
+            <Button
+              size="small"
+              appearance="subtle"
+              onClick={handleClearDatabase}
+              disabled={isClearing || isImporting}
+              style={{ marginLeft: 'auto' }}
+            >
+              {isClearing ? 'Clearing...' : 'Clear Database'}
+            </Button>
+          )}
+        </div>
+      )}
+
       {/* Header with count */}
       <div className={styles.header}>
         <Text weight="semibold">Available Chunks ({chunkGroups.length})</Text>

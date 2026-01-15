@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   makeStyles,
   Button,
@@ -139,6 +139,24 @@ export const FileUploadArea: React.FC = () => {
   const clearAllDataMutation = useClearAllData();
 
   const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
+
+  // Compute set of already-loaded range keys
+  const existingRanges = useMemo(() => {
+    if (!existingLedgerFiles) return new Set<string>();
+    const ranges = new Set<string>();
+    for (const file of existingLedgerFiles) {
+      const parsed = parseLedgerFilename(file.filename);
+      if (parsed.isValid) {
+        ranges.add(`${parsed.startNo}-${parsed.endNo}`);
+      }
+    }
+    return ranges;
+  }, [existingLedgerFiles]);
+
+  // Handle clear database
+  const handleClearDatabase = useCallback(async () => {
+    await clearAllDataMutation.mutateAsync();
+  }, [clearAllDataMutation]);
 
   const handleClick = () => {
     fileInputRef.current?.click();
@@ -346,6 +364,8 @@ export const FileUploadArea: React.FC = () => {
             importButtonLabel="Import Selected"
             showOverwriteOption={hasExistingData}
             defaultOverwrite={false}
+            existingRanges={existingRanges}
+            onClearDatabase={handleClearDatabase}
           />
           
           <Button

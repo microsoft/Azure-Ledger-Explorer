@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 /* eslint-disable react-refresh/only-export-components */
 import { MstFilesService, type DownloadProgress } from '../services/MstFilesService';
 import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
@@ -37,7 +37,6 @@ const useStyles = makeStyles({
         alignItems: 'center',
         padding: '24px',
         width: '100%',
-        maxWidth: '800px',
         margin: '0 auto',
     },
     header: {
@@ -154,6 +153,24 @@ export const MstLedgerImportView: React.FC = () => {
             id: file.filename, // Use filename as unique ID
         }));
     }, [ledgerFiles]);
+
+    // Compute set of already-loaded range keys
+    const existingRanges = useMemo(() => {
+        if (!existingLedgerFiles) return new Set<string>();
+        const ranges = new Set<string>();
+        for (const file of existingLedgerFiles) {
+            const parsed = parseLedgerFilename(file.filename);
+            if (parsed.isValid) {
+                ranges.add(`${parsed.startNo}-${parsed.endNo}`);
+            }
+        }
+        return ranges;
+    }, [existingLedgerFiles]);
+
+    // Handle clear database
+    const handleClearDatabase = useCallback(async () => {
+        await clearAllDataMutation.mutateAsync();
+    }, [clearAllDataMutation]);
 
     const verifyAccess = async () => {
         const domainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
@@ -278,6 +295,8 @@ export const MstLedgerImportView: React.FC = () => {
                         importButtonLabel="Import"
                         showOverwriteOption={hasExistingData}
                         defaultOverwrite={false}
+                        existingRanges={existingRanges}
+                        onClearDatabase={handleClearDatabase}
                     />
                 </div>
             )}
