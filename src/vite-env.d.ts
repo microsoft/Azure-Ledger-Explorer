@@ -4,6 +4,7 @@
  */
 
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 // Vite environment variables
 interface ImportMetaEnv {
@@ -23,4 +24,24 @@ declare module '*.svg' {
 declare module '*.md?raw' {
   const content: string;
   export default content;
+}
+
+// PWA virtual modules
+declare module 'virtual:pwa-register/react' {
+  import type { Ref } from 'react';
+
+  export interface RegisterSWOptions {
+    immediate?: boolean;
+    onNeedRefresh?: () => void;
+    onOfflineReady?: () => void;
+    onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void;
+    onRegisteredSW?: (swUrl: string, registration: ServiceWorkerRegistration | undefined) => void;
+    onRegisterError?: (error: Error) => void;
+  }
+
+  export function useRegisterSW(options?: RegisterSWOptions): {
+    needRefresh: [boolean, (value: boolean) => void];
+    offlineReady: [boolean, (value: boolean) => void];
+    updateServiceWorker: (reloadPage?: boolean) => Promise<void>;
+  };
 }

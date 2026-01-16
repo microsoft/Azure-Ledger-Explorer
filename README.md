@@ -9,6 +9,7 @@ A TypeScript/React application for exploring and analyzing CCF (Confidential Con
 - **Sage AI Assistant**: Natural language querying using OpenAI integration with automatic SQL generation
 - **Azure Integration**: Direct import from Azure File Shares using SAS tokens
 - **Persistent Storage**: Client-side SQLite database using sql.js with OPFS VFS
+- **Progressive Web App**: Install to your device, work offline, and get automatic updates
 - **Modern UI**: Built with FluentUI React components and responsive design
 - **State Management**: Efficient data handling with TanStack Query and optimistic updates
 

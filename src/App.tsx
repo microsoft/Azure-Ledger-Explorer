@@ -22,6 +22,7 @@ import { PageTransition } from './components/PageTransition';
 import GridLayout from './components/AppLayout';
 import { ConfigPage } from './pages/ConfigPage';
 import { SplashScreen } from './components/SplashScreen';
+import { PWAPrompt } from './components/PWAPrompt';
 import { initializeDatabase, resetDatabase } from './hooks/use-ccf-data';
 
 // Create a client
@@ -115,6 +116,7 @@ function App() {
               </PageTransition>
             </GridLayout.Main>
           </GridLayout>
+          <PWAPrompt />
         </Router>
       </FluentProvider>
     </QueryClientProvider>
