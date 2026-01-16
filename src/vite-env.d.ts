@@ -28,8 +28,6 @@ declare module '*.md?raw' {
 
 // PWA virtual modules
 declare module 'virtual:pwa-register/react' {
-  import type { Ref } from 'react';
-
   export interface RegisterSWOptions {
     immediate?: boolean;
     onNeedRefresh?: () => void;

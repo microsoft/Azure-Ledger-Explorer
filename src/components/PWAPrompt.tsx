@@ -21,9 +21,7 @@ export function PWAPrompt() {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegisteredSW(swUrl, registration) {
-      console.log('Service Worker registered:', swUrl);
-      
+    onRegisteredSW(_swUrl, registration) {
       // Check for updates every hour
       if (registration) {
         setInterval(() => {
@@ -38,7 +36,7 @@ export function PWAPrompt() {
 
   useEffect(() => {
     if (offlineReady) {
-      console.log('App ready to work offline');
+      // App is ready to work offline
     }
   }, [offlineReady]);
 
