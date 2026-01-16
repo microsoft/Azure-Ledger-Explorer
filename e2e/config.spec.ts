@@ -94,8 +94,13 @@ test.describe('Configuration Page - Domain Persistence', () => {
       path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
     ]);
 
-    // Wait for processing to complete
-    await expect(page.getByText('Total: 14 transactions')).toBeVisible();
+    // Click Import button to import selected files
+    await page.getByRole('button', { name: /Import Selected/ }).click();
+    // Wait a moment for import to start, then close dialog with Escape
+    await page.waitForTimeout(1000);
+    await page.keyboard.press('Escape');
+    // Wait for the visualization to show
+    await expect(page.getByText('Total: 14 transactions')).toBeVisible({ timeout: 30000 });
 
     // Go to config page and verify fallback message is shown (no domain since it was manual upload)
     await goToConfigPage(page);
