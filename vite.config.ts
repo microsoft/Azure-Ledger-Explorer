@@ -62,7 +62,7 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/.*\.blob\.core\.windows\.net\/.*/i,
+            urlPattern: /^https:\/\/[^/]+\.blob\.core\.windows\.net\//i,
             handler: 'NetworkOnly',
             options: {
               cacheName: 'azure-blob-cache'
