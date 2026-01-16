@@ -3,16 +3,13 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   makeStyles,
   Button,
   Text,
   Caption1,
   Spinner,
-  Card,
-  CardHeader,
-  CardPreview,
   MessageBar,
   MessageBarBody,
   MessageBarTitle,
@@ -21,20 +18,13 @@ import {
 import {
   CloudArrowUp24Regular,
   DocumentAdd24Regular,
-  CheckmarkCircle24Regular,
-  CheckmarkCircle20Filled,
-  DismissCircle20Filled,
-  Info20Regular,
 } from '@fluentui/react-icons';
-import { useFileDrop, useLedgerFiles } from '../hooks/use-ccf-data';
+import { useFileDrop, useLedgerFiles, useClearAllData } from '../hooks/use-ccf-data';
 import { 
-  validateLedgerSequence, 
   parseLedgerFilename, 
-  formatFileSize, 
-  formatDate,
-  type LedgerFileInfo,
-  type ValidationResult 
 } from '../utils/ledger-validation';
+import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { type ImportMode } from './ReplaceDataConfirmDialog';
 
 const useStyles = makeStyles({
   container: {
@@ -107,65 +97,11 @@ const useStyles = makeStyles({
   hiddenInput: {
     display: 'none',
   },
-  recentFiles: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  },
-  fileCard: {
-    background: 'white',
-    border: '1px solid rgba(0,0,0,0.06)',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    '&:hover': {
-      transform: 'translateY(-3px)',
-      boxShadow: '0 6px 20px rgba(0,0,0,0.1)',
-    },
-  },
-  fileCardContent: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '16px',
-  },
-  fileIcon: {
-    fontSize: '32px',
-    color: tokens.colorBrandBackground,
-  },
-  fileInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-  },
-  fileName: {
-    fontWeight: '600',
-    color: tokens.colorNeutralForeground1,
-  },
-  fileDetails: {
-    color: tokens.colorNeutralForeground3,
-  },
-  uploadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: tokens.colorNeutralBackground1Pressed,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '8px',
-  },
   uploadingContent: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     gap: '12px',
-  },
-  errorCard: {
-    border: `1px solid ${tokens.colorPaletteRedBorder2}`,
   },
   emptyState: {
     textAlign: 'center',
@@ -174,109 +110,61 @@ const useStyles = makeStyles({
   relativePosition: {
     position: 'relative',
   },
-  errorText: {
-    color: tokens.colorPaletteRedForeground1,
-  },
   emptySubtext: {
     color: tokens.colorNeutralForeground3,
   },
   validationError: {
     marginBottom: '16px',
   },
-  validationWarning: {
-    marginBottom: '16px',
-  },
-  fileSequenceInfo: {
-    backgroundColor: tokens.colorNeutralBackground3,
-    padding: '12px',
-    borderRadius: '6px',
-    marginBottom: '16px',
-  },
-  sequenceText: {
-    fontFamily: 'monospace',
-    fontSize: '12px',
-    color: tokens.colorNeutralForeground2,
-  },
-  fileSelectionFeedback: {
-    backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    borderRadius: '8px',
-    padding: '16px',
-    marginBottom: '16px',
-  },
-  feedbackHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '12px',
-    paddingBottom: '12px',
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-  },
-  feedbackStats: {
-    display: 'flex',
-    gap: '16px',
-    fontSize: '12px',
-  },
-  statItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  statIcon: {
-    fontSize: '16px',
-  },
-  newFileIcon: {
-    color: tokens.colorPaletteGreenForeground1,
-  },
-  skippedFileIcon: {
-    color: tokens.colorNeutralForeground3,
-  },
-  fileList: {
+  chunkSelectorWrapper: {
+    marginTop: '16px',
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    maxHeight: '200px',
-    overflow: 'auto',
-  },
-  fileItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px',
-    borderRadius: '4px',
-    backgroundColor: tokens.colorNeutralBackground1,
-    fontSize: '12px',
-  },
-  fileItemSkipped: {
-    opacity: 0.6,
+    minHeight: 0,
   },
 });
 
 export const FileUploadArea: React.FC = () => {
   const styles = useStyles();
-  const localFileUpload = false; // Enable local file upload
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
-  const [selectedFilesInfo, setSelectedFilesInfo] = useState<{
-    newFiles: LedgerFileInfo[];
-    skippedFiles: LedgerFileInfo[];
-    totalSelected: number;
-  } | null>(null);
-  const [uploadCompleted, setUploadCompleted] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [chunkFiles, setChunkFiles] = useState<ChunkFileInfo[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   
-  const { handleDragOver, handleFiles, isUploading, uploadError } = useFileDrop();
-  const { data: ledgerFiles, refetch: refetchFiles } = useLedgerFiles();
+  const { handleDragOver, handleFiles } = useFileDrop();
+  const { data: existingLedgerFiles } = useLedgerFiles();
+  const clearAllDataMutation = useClearAllData();
+
+  const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
+
+  // Compute set of already-loaded range keys
+  const existingRanges = useMemo(() => {
+    if (!existingLedgerFiles) return new Set<string>();
+    const ranges = new Set<string>();
+    for (const file of existingLedgerFiles) {
+      const parsed = parseLedgerFilename(file.filename);
+      if (parsed.isValid) {
+        ranges.add(`${parsed.startNo}-${parsed.endNo}`);
+      }
+    }
+    return ranges;
+  }, [existingLedgerFiles]);
+
+  // Handle clear database
+  const handleClearDatabase = useCallback(async () => {
+    await clearAllDataMutation.mutateAsync();
+  }, [clearAllDataMutation]);
 
   const handleClick = () => {
     fileInputRef.current?.click();
   };
 
-  const validateAndHandleFiles = (files: FileList | File[]) => {
+  // Convert selected files to ChunkFileInfo for the ChunkSelector
+  const processSelectedFiles = useCallback((files: FileList | File[]) => {
     const fileArray = Array.from(files);
-    
-    // Reset upload completed state when selecting new files
-    setUploadCompleted(false);
     
     // Filter for .committed files only
     const committedFiles = fileArray.filter(file => file.name.endsWith('.committed'));
@@ -287,74 +175,41 @@ export const FileUploadArea: React.FC = () => {
     }
     
     if (committedFiles.length === 0) {
-      setValidationResult({
-        isValid: false,
-        errors: ['No valid .committed files found. Please select files with .committed extension.'],
-        sortedFiles: [],
-        missingRanges: [],
-      });
-      setSelectedFilesInfo(null);
+      setImportError('No valid .committed files found. Please select files with .committed extension.');
       return;
     }
-    
-    // Get existing file info
-    const existingFileInfos: LedgerFileInfo[] = ledgerFiles?.map(file => 
-      parseLedgerFilename(file.filename)
-    ).filter(info => info.isValid) || [];
-    
-    // Parse selected files
-    const selectedFileInfos = committedFiles.map(file => parseLedgerFilename(file.name));
-    
-    // Check for invalid filenames FIRST (before duplicate detection)
-    const invalidFiles = selectedFileInfos.filter(info => !info.isValid);
-    if (invalidFiles.length > 0) {
-      // Show validation error for invalid filenames
-      const validation = validateLedgerSequence(committedFiles, existingFileInfos);
-      setValidationResult(validation);
-      setSelectedFilesInfo(null);
+
+    // Parse and convert to ChunkFileInfo
+    const chunks: ChunkFileInfo[] = committedFiles
+      .map(file => {
+        const parsed = parseLedgerFilename(file.name);
+        if (!parsed.isValid) return null;
+        return {
+          id: file.name,
+          filename: file.name,
+          startNo: parsed.startNo,
+          endNo: parsed.endNo,
+          isValid: true,
+          size: file.size,
+          lastModified: new Date(file.lastModified),
+        } as ChunkFileInfo;
+      })
+      .filter((chunk): chunk is ChunkFileInfo => chunk !== null);
+
+    if (chunks.length === 0) {
+      setImportError('No valid ledger files found. Files must be named like ledger_1-18.committed');
       return;
     }
-    
-    // Categorize files: new vs already imported (only valid files at this point)
-    const existingFilenames = new Set(existingFileInfos.map(f => f.filename));
-    const newFiles = selectedFileInfos.filter(info => !existingFilenames.has(info.filename));
-    const skippedFiles = selectedFileInfos.filter(info => existingFilenames.has(info.filename));
-    
-    // Set file selection feedback
-    setSelectedFilesInfo({
-      newFiles,
-      skippedFiles,
-      totalSelected: committedFiles.length,
-    });
-    
-    // If we have new files to import or if all files are duplicates (skipped), don't show error
-    if (newFiles.length > 0 || skippedFiles.length === committedFiles.length) {
-      // Clear any validation errors since we're handling duplicates gracefully
-      setValidationResult(null);
-      
-      // Only process new files (skip duplicates)
-      const newFilesArray = committedFiles.filter(file => 
-        newFiles.some(info => info.filename === file.name)
-      );
-      
-      if (newFilesArray.length > 0) {
-        handleFiles(newFilesArray);
-      }
-    } else {
-      // Validate the sequence only if we have issues beyond duplicates
-      const validation = validateLedgerSequence(committedFiles, existingFileInfos);
-      setValidationResult(validation);
-      
-      if (validation.isValid) {
-        handleFiles(committedFiles);
-      }
-    }
-  };
+
+    // Clear previous state
+    setImportError(null);
+    setPendingFiles(committedFiles);
+    setChunkFiles(chunks);
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      validateAndHandleFiles(event.target.files);
-      // Reset the input so the same file can be selected again
+      processSelectedFiles(event.target.files);
       event.target.value = '';
     }
   };
@@ -366,7 +221,6 @@ export const FileUploadArea: React.FC = () => {
 
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    // Only set drag inactive if we're leaving the drop zone entirely
     if (!event.currentTarget.contains(event.relatedTarget as Node)) {
       setIsDragActive(false);
     }
@@ -376,22 +230,52 @@ export const FileUploadArea: React.FC = () => {
     setIsDragActive(false);
     event.preventDefault();
     const files = Array.from(event.dataTransfer.files);
-    validateAndHandleFiles(files);
+    processSelectedFiles(files);
   };
 
-  React.useEffect(() => {
-    if (!isUploading && selectedFilesInfo && !uploadCompleted) {
-      // Mark upload as completed
-      setUploadCompleted(true);
-      refetchFiles();
+  // Perform the import of selected files
+  const doImport = useCallback(async (selectedFiles: ChunkFileInfo[], allPendingFiles: File[], mode: ImportMode) => {
+    if (selectedFiles.length === 0) return;
+
+    setIsImporting(true);
+    setImportError(null);
+
+    try {
+      if (mode === 'replace') {
+        await clearAllDataMutation.mutateAsync();
+      }
+
+      // Build selected filenames
+      const selectedFilenames = new Set(selectedFiles.map(f => f.filename));
+
+      // Filter pending files to only include selected ones
+      const filesToImport = allPendingFiles.filter(f => selectedFilenames.has(f.name));
       
-      // Don't auto-clear feedback - let it stay visible for user review
-      // Only clear if user starts a new upload
-    } else if (isUploading) {
-      // Reset uploadCompleted when starting new upload
-      setUploadCompleted(false);
+      if (filesToImport.length > 0) {
+        await handleFiles(filesToImport);
+      }
+
+      // Clear state after successful import
+      setPendingFiles([]);
+      setChunkFiles([]);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : 'Failed to import files');
+    } finally {
+      setIsImporting(false);
     }
-  }, [isUploading, refetchFiles, selectedFilesInfo, uploadCompleted]);
+  }, [clearAllDataMutation, handleFiles]);
+
+  // Called from ChunkSelector's onImport - uses overwrite preference from ChunkSelector
+  const handleImportRequest = useCallback((selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+    const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
+    doImport(selectedFiles, pendingFiles, mode);
+  }, [doImport, pendingFiles]);
+
+  const handleClearSelection = () => {
+    setPendingFiles([]);
+    setChunkFiles([]);
+    setImportError(null);
+  };
 
   return (
     <div className={styles.container}>
@@ -405,210 +289,102 @@ export const FileUploadArea: React.FC = () => {
         onDragLeave={handleDragLeave}
       >
         <div className={styles.relativePosition}>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept=".committed"
-          onChange={handleFileChange}
-          className={styles.hiddenInput}
-          aria-label="Upload CCF ledger files"
-        />
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".committed"
+            onChange={handleFileChange}
+            className={styles.hiddenInput}
+            aria-label="Upload CCF ledger files"
+          />
 
-        {!isUploading ? (
-          <div style={{ textAlign: 'center' }}>
-            <CloudArrowUp24Regular 
-              className={`${styles.dropZoneIcon} ${isDragActive ? styles.dropZoneIconActive : ''}`}
-              style={{
-                opacity: isDragActive ? 1 : 0.7,
-                transform: isDragActive ? 'scale(1.1)' : 'scale(1)',
-              }}
-            />
-            <div className={styles.dropZoneContent}>
-              <Text size={500} weight="semibold" style={{ color: '#0078D4' }}>
-                {isDragActive ? 'Release to upload' : 'Drop files here'}
-              </Text>
-              <Text size={200} className={styles.dividerText}>
-                — or —
-              </Text>
-              <Button 
-                appearance="primary" 
-                size="large" 
-                icon={<DocumentAdd24Regular />}
+          {!isImporting ? (
+            <div style={{ textAlign: 'center' }}>
+              <CloudArrowUp24Regular 
+                className={`${styles.dropZoneIcon} ${isDragActive ? styles.dropZoneIconActive : ''}`}
                 style={{
-                  background: 'linear-gradient(135deg, #0078D4, #005a9e)',
-                  boxShadow: '0 4px 12px rgba(0,120,212,0.3)',
+                  opacity: isDragActive ? 1 : 0.7,
+                  transform: isDragActive ? 'scale(1.1)' : 'scale(1)',
                 }}
-              >
-                Browse Files
-              </Button>
-              <Caption1 className={styles.fileFormatHint}>
-                .committed files only • Format: ledger_1-18.committed
+              />
+              <div className={styles.dropZoneContent}>
+                <Text size={500} weight="semibold" style={{ color: '#0078D4' }}>
+                  {isDragActive ? 'Release to upload' : 'Drop files here'}
+                </Text>
+                <Text size={200} className={styles.dividerText}>
+                  — or —
+                </Text>
+                <Button 
+                  appearance="primary" 
+                  size="large" 
+                  icon={<DocumentAdd24Regular />}
+                  style={{
+                    background: 'linear-gradient(135deg, #0078D4, #005a9e)',
+                    boxShadow: '0 4px 12px rgba(0,120,212,0.3)',
+                  }}
+                >
+                  Browse Files
+                </Button>
+                <Caption1 className={styles.fileFormatHint}>
+                  .committed files only • Format: ledger_1-18.committed
+                </Caption1>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.uploadingContent}>
+              <Spinner size="large" />
+              <Text size={500} weight="semibold">
+                Processing ledger files...
+              </Text>
+              <Caption1>
+                Parsing transactions and storing to database
               </Caption1>
             </div>
-          </div>
-        ) : (
-          <div className={styles.uploadingContent}>
-            <Spinner size="large" />
-            <Text size={500} weight="semibold">
-              Processing ledger files...
-            </Text>
-            <Caption1>
-              Parsing transactions and storing to database
-            </Caption1>
-          </div>
-        )}
+          )}
         </div>
       </div>
 
-      {/* Validation Errors */}
-      {validationResult && !validationResult.isValid && (
+      {/* Error Message */}
+      {importError && (
         <MessageBar intent="error" className={styles.validationError}>
           <MessageBarBody>
-            <MessageBarTitle>Invalid File Sequence</MessageBarTitle>
-            {validationResult.errors.map((error, index) => (
-              <div key={index}>• {error}</div>
-            ))}
+            <MessageBarTitle>Import Error</MessageBarTitle>
+            {importError}
           </MessageBarBody>
         </MessageBar>
       )}
 
-      {/* File Selection Feedback */}
-      {selectedFilesInfo && selectedFilesInfo.totalSelected > 0 && (
-        <div className={styles.fileSelectionFeedback}>
-          <div className={styles.feedbackHeader}>
-            <Text size={400} weight="semibold">
-              Selected Files ({selectedFilesInfo.totalSelected})
-            </Text>
-            <div className={styles.feedbackStats}>
-              {selectedFilesInfo.newFiles.length > 0 && (
-                <div className={styles.statItem}>
-                  <CheckmarkCircle20Filled className={`${styles.statIcon} ${styles.newFileIcon}`} />
-                  <Text size={200}>{selectedFilesInfo.newFiles.length} to import</Text>
-                </div>
-              )}
-              {selectedFilesInfo.skippedFiles.length > 0 && (
-                <div className={styles.statItem}>
-                  <Info20Regular className={`${styles.statIcon} ${styles.skippedFileIcon}`} />
-                  <Text size={200}>{selectedFilesInfo.skippedFiles.length} already imported</Text>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className={styles.fileList}>
-            {selectedFilesInfo.newFiles.map((file, index) => (
-              <div key={`new-${index}`} className={styles.fileItem}>
-                <CheckmarkCircle20Filled className={`${styles.statIcon} ${styles.newFileIcon}`} />
-                <Text size={200} style={{ flex: 1 }}>{file.filename}</Text>
-                <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>
-                  {file.startNo}-{file.endNo}
-                </Text>
-              </div>
-            ))}
-            {selectedFilesInfo.skippedFiles.map((file, index) => (
-              <div key={`skipped-${index}`} className={`${styles.fileItem} ${styles.fileItemSkipped}`}>
-                <DismissCircle20Filled className={`${styles.statIcon} ${styles.skippedFileIcon}`} />
-                <Text size={200} style={{ flex: 1 }}>{file.filename}</Text>
-                <Text size={100} style={{ color: tokens.colorNeutralForeground3 }}>
-                  Already imported
-                </Text>
-              </div>
-            ))}
-          </div>
+      {/* Chunk Selector */}
+      {chunkFiles.length > 0 && (
+        <div className={styles.chunkSelectorWrapper}>
+          <ChunkSelector
+            files={chunkFiles}
+            onImport={handleImportRequest}
+            isImporting={isImporting}
+            importButtonLabel="Import Selected"
+            showOverwriteOption={hasExistingData}
+            defaultOverwrite={false}
+            existingRanges={existingRanges}
+            onClearDatabase={handleClearDatabase}
+          />
           
-          {/* Show success message after upload completes */}
-          {uploadCompleted && selectedFilesInfo.newFiles.length > 0 && (
-            <MessageBar intent="success" style={{ marginTop: '12px' }}>
-              <MessageBarBody>
-                <MessageBarTitle>Upload Complete!</MessageBarTitle>
-                Successfully imported {selectedFilesInfo.newFiles.length} file(s). 
-                You can close this dialog or upload more files.
-              </MessageBarBody>
-            </MessageBar>
-          )}
-        </div>
-      )}
-
-      {/* File Sequence Info */}
-      {localFileUpload &&  ledgerFiles && ledgerFiles.length > 0 && (
-        <div className={styles.fileSequenceInfo}>
-          <Text size={300} weight="semibold" style={{ marginBottom: '8px' }}>
-            Current Sequence:
-          </Text>
-          <div className={styles.sequenceText}>
-            {ledgerFiles
-              .map(file => parseLedgerFilename(file.filename))
-              .filter(info => info.isValid)
-              .sort((a, b) => a.startNo - b.startNo)
-              .map(info => `${info.startNo}-${info.endNo}`)
-              .join(' → ')}
-          </div>
-        </div>
-      )}
-
-      {/* Upload Error */}
-      {uploadError && (
-        <Card className={`${styles.fileCard} ${styles.errorCard}`}>
-          <CardPreview>
-            <div className={styles.fileCardContent}>
-              <Text className={`${styles.fileName} ${styles.errorText}`}>
-                Upload Error
-              </Text>
-              <Caption1 className={styles.fileDetails}>
-                {uploadError.message}
-              </Caption1>
-            </div>
-          </CardPreview>
-        </Card>
-      )}
-
-      {/* Recently Uploaded Files */}
-      {localFileUpload && ledgerFiles && ledgerFiles.length > 0 && (
-        <div className={styles.recentFiles}>
-          <Text size={600} weight="semibold">
-            Ledger Files ({ledgerFiles.length}) - Sequential Order
-          </Text>
-          
-          {ledgerFiles
-            .map(file => ({ ...file, ...parseLedgerFilename(file.filename) }))
-            .filter(file => file.isValid)
-            .sort((a, b) => a.startNo - b.startNo)
-            .slice(0, 10)
-            .map((file) => (
-              <Card key={file.id} className={styles.fileCard}>
-                <CardHeader
-                  header={
-                    <div className={styles.fileCardContent}>
-                      <CheckmarkCircle24Regular className={styles.fileIcon} />
-                      <div className={styles.fileInfo}>
-                        <Text className={styles.fileName}>
-                          {file.filename}
-                        </Text>
-                        <Caption1 className={styles.fileDetails}>
-                          Range: {file.startNo}-{file.endNo} • {formatFileSize(file.fileSize)} • {formatDate(file.createdAt)}
-                        </Caption1>
-                      </div>
-                    </div>
-                  }
-                />
-              </Card>
-            ))}
-          
-          {ledgerFiles.length > 10 && (
-            <div className={styles.emptyState}>
-              <Caption1>
-                + {ledgerFiles.length - 10} more files (showing first 10 in sequential order)
-              </Caption1>
-            </div>
-          )}
+          <Button
+            appearance="secondary"
+            onClick={handleClearSelection}
+            disabled={isImporting}
+            style={{ marginTop: '8px' }}
+          >
+            Clear Selection
+          </Button>
         </div>
       )}
 
       {/* Empty State */}
-      {!ledgerFiles || (ledgerFiles.length === 0 && !isUploading) && (
+      {chunkFiles.length === 0 && !isImporting && (
         <div className={styles.emptyState}>
           <Caption1 className={styles.emptySubtext}>
-            No ledger files uploaded yet. Start by uploading CCF ledger .committed files in sequential order starting from ledger_1-X.committed.
+            Select CCF ledger .committed files to preview and import.
           </Caption1>
         </div>
       )}

@@ -5,7 +5,13 @@
 
 import {ShareClient } from '@azure/storage-file-share';
 import type {LedgerFileInfo } from '../utils/ledger-validation';
-import {parseLedgerFilename, validateLedgerSequence } from '../utils/ledger-validation';
+import {parseLedgerFilename } from '../utils/ledger-validation';
+
+export interface DownloadProgress {
+  currentFile: number;
+  totalFiles: number;
+  currentFilename: string;
+}
 
 export class AzureFileShareService {
   private shareClient: ShareClient | null = null;
@@ -42,14 +48,10 @@ export class AzureFileShareService {
 
       }
 
-    const validation = validateLedgerSequence([], files);
-    if (validation.isValid) {
-      return validation.sortedFiles;
-    }
-    else
-    {
-        return [];
-    }
+      // Sort by start number and return (don't filter out duplicates/gaps here)
+      return files
+        .filter(f => f.isValid)
+        .sort((a, b) => a.startNo - b.startNo);
 
     } catch (error) {
       console.error('No Directory named ledger present in the File share', error);
@@ -57,7 +59,60 @@ export class AzureFileShareService {
     }
   }
 
-  async downloadLedgerFiles(ledgerFile: LedgerFileInfo): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
+  /**
+   * Download specific ledger files by filename
+   */
+  async downloadSelectedFiles(
+    filenames: string[],
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
+    if (!this.shareClient) {
+      throw new Error('File share client not initialized');
+    }
+
+    try {
+      const directoryClient = this.shareClient.getDirectoryClient("ledger");
+      const files: File[] = [];
+      const filesDownloaded: LedgerFileInfo[] = [];
+      const totalFiles = filenames.length;
+      let currentFile = 0;
+
+      for (const filename of filenames) {
+        currentFile++;
+        onProgress?.({
+          currentFile,
+          totalFiles,
+          currentFilename: filename,
+        });
+
+        const fileInfo = parseLedgerFilename(filename);
+        filesDownloaded.push(fileInfo);
+
+        const fileClient = directoryClient.getFileClient(filename);
+        const downloadResponse = await fileClient.download(0);
+        const blob = await downloadResponse.blobBody;
+        if (!blob) {
+          console.error(`Failed to download file: ${filename}`);
+          continue;
+        }
+        const file = await this.blobToFile(blob, filename);
+        files.push(file);
+      }
+
+      return { files, filesDownloaded };
+    } catch (error) {
+      console.error('Failed to download files from File share', error);
+      throw new Error('Failed to download files from File share');
+    }
+  }
+
+  /**
+   * @deprecated Use downloadSelectedFiles instead for explicit file selection
+   */
+  async downloadLedgerFiles(
+    ledgerFile: LedgerFileInfo,
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<{ files: File[]; filesDownloaded: LedgerFileInfo[]; }> {
     if (!this.shareClient) {
       throw new Error('File share client not initialized');
     }
@@ -70,24 +125,8 @@ export class AzureFileShareService {
         }
         // Filter for files to download from storage
         const ledgerFileToDownloadFromStorage = ledgerFileListFromStorage.filter(file => file.endNo<=ledgerFile.endNo);
-        const directoryClient = this.shareClient.getDirectoryClient("ledger")
-        const files: File[] = [];
-        const filesDownloaded: LedgerFileInfo[] = [];
-        for (const downloadFile of ledgerFileToDownloadFromStorage) 
-        {
-            filesDownloaded.push(downloadFile);
-            const fileClient = directoryClient.getFileClient(downloadFile.filename);
-            const downloadResponse = await fileClient.download(0);
-            const blob = await downloadResponse.blobBody;
-            if (!blob) {
-                console.error(`Failed to download file: ${downloadFile.filename}`);
-                continue; // Skip if blob is null
-            }
-            const file = await this.blobToFile(blob, downloadFile.filename);
-            files.push(file);
-
-        }
-        return { files, filesDownloaded };
+        const filenames = ledgerFileToDownloadFromStorage.map(f => f.filename);
+        return this.downloadSelectedFiles(filenames, onProgress);
     }
 
     catch (error) {
