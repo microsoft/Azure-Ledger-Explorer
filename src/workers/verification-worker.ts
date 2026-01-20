@@ -200,6 +200,8 @@ class VerificationWorker {
           verifiedCount++;
         } else {
           failedCount++;
+          // Stop early on first failure - no point continuing if ledger integrity is compromised
+          break;
         }
       }
 
