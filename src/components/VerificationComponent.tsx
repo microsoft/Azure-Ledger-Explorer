@@ -474,10 +474,19 @@ export const VerificationComponent: React.FC = () => {
       )}
 
       {/* Success Display */}
-      {progress?.status === 'completed' && !error && (
+      {progress?.status === 'completed' && !error && (progress.failedChunks ?? 0) === 0 && (
         <MessageBar intent="success">
           <MessageBarBody>
             ✅ Verification complete! All {progress.totalChunks} chunks passed integrity checks.
+          </MessageBarBody>
+        </MessageBar>
+      )}
+
+      {/* Partial Success Display (some failures) */}
+      {progress?.status === 'completed' && !error && (progress.failedChunks ?? 0) > 0 && (
+        <MessageBar intent="warning">
+          <MessageBarBody>
+            ⚠️ Verification complete with issues: {progress.verifiedChunks} of {progress.totalChunks} chunks passed, {progress.failedChunks} failed.
           </MessageBarBody>
         </MessageBar>
       )}

@@ -13,6 +13,9 @@ export interface VerificationProgress {
   startTime: number;
   errorMessage?: string;
   failedChunk?: string;
+  // Completion stats
+  verifiedChunks?: number;
+  failedChunks?: number;
   // Legacy fields for backwards compatibility (mapped from chunk progress)
   currentTransaction: number;
   totalTransactions: number;

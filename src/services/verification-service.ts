@@ -11,7 +11,7 @@ import type {
   VerificationTransaction,
   ChunkVerificationResult,
 } from '../types/verification-types';
-import { CCFDatabase } from '@ccf/database';
+import type { CCFDatabase } from '@ccf/database';
 import { getDatabase } from '../hooks/use-ccf-data';
 
 export interface VerificationServiceEvents {
@@ -20,6 +20,7 @@ export interface VerificationServiceEvents {
   onCompleted: (data: { success: boolean; totalChunks: number; verifiedChunks: number; failedChunks: number }) => void;
   onError: (data: { message: string }) => void;
   onStopped: () => void;
+  onVerificationCleared: () => void;
 }
 
 export interface SavedProgress {
@@ -61,6 +62,12 @@ export class VerificationService {
     if (!this.database) {
       this.database = await getDatabase();
     }
+
+    // Clear all existing verification results before starting fresh
+    await this.database.files.clearAllVerificationResults();
+    
+    // Notify that verification results were cleared (so UI can update)
+    this.events.onVerificationCleared?.();
 
     // Check for saved progress
     const savedProgress = this.getSavedProgress();

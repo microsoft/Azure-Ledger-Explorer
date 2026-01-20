@@ -55,9 +55,14 @@ export function useVerification(): UseVerificationResult {
         queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       },
       
-      onCompleted: () => {
+      onCompleted: (data) => {
         setIsRunning(false);
-        setProgress(prev => prev ? { ...prev, status: 'completed' } : null);
+        setProgress(prev => prev ? { 
+          ...prev, 
+          status: 'completed',
+          verifiedChunks: data.verifiedChunks,
+          failedChunks: data.failedChunks
+        } : null);
         setError(null);
         // Final invalidation to ensure UI is up to date
         queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
@@ -73,6 +78,11 @@ export function useVerification(): UseVerificationResult {
       onStopped: () => {
         setIsRunning(false);
         setProgress(prev => prev ? { ...prev, status: 'stopped' } : null);
+      },
+      
+      onVerificationCleared: () => {
+        // Immediately invalidate ledger files query so UI shows all files as unverified
+        queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       }
     };
 

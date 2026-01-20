@@ -60,6 +60,17 @@ export class FileRepository extends BaseRepository {
   }
 
   /**
+   * Clear all verification results for all files.
+   * Sets verified to NULL, clears verified_at and verification_error.
+   */
+  async clearAllVerificationResults(): Promise<void> {
+    await this.exec(
+      `UPDATE ledger_files 
+       SET verified = NULL, verified_at = NULL, verification_error = NULL`
+    );
+  }
+
+  /**
    * Get all ledger files sorted by sequence number extracted from filename.
    */
   async getAll(): Promise<LedgerFile[]> {
