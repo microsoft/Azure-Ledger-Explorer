@@ -322,7 +322,7 @@ export const VerificationComponent: React.FC = () => {
   }, [progress, isRunning]);
 
   const getChunkCardClass = (file: LedgerFile, index: number): string => {
-    let baseClass = styles.chunkCard;
+    const baseClass = styles.chunkCard;
     if (isRunning && index === currentChunkIndex) {
       return `${baseClass} ${styles.chunkCardActive}`;
     }

@@ -343,6 +343,12 @@ export const CCFVisualizerApp: React.FC = () => {
             Add Files
           </Button>
         </div>
+
+        {/* Add Files Dialog - also needed for empty state */}
+        <AddFilesWizard
+          open={showUploadDialog}
+          onOpenChange={setShowUploadDialog}
+        />
       </div>
     );
   }

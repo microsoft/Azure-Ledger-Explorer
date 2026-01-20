@@ -21,17 +21,9 @@ export interface VerificationProgress {
   totalTransactions: number;
 }
 
-export interface SimpleVerificationState {
-  lastProcessedChunk: number;
-  totalChunks: number;
-  startTime: number;
-  status: 'running' | 'paused' | 'stopped';
-}
-
 export interface VerificationConfig {
   progressReportInterval: number; // Not used in chunk-based verification, kept for compatibility
   resumeFromChunk?: number; // Chunk index to resume from
-  resumeFromTransaction?: number; // Legacy, not used
 }
 
 /**
