@@ -8,95 +8,6 @@ import { Buffer } from "buffer";
 
 /** CBOR values can be primitives, arrays, maps, or binary data */
 type CborValue = unknown;
-
-/**
- * Extracts the Merkle root from CCF signature data (COSE Sign1 structure).
- * Uses manual binary scanning to avoid cbor2 BigInt issues.
- * 
- * @param cbor - The CBOR-encoded COSE Sign1 signature data
- * @returns The root as a Uint8Array, or undefined if not found
- */
-export function extractSignatureRoot(cbor: Uint8Array): Uint8Array | undefined {
-    try {
-        // Look for the "root" string in the binary data
-        // In CBOR, a text string "root" (4 chars) is encoded as: 0x64 'r' 'o' 'o' 't'
-        // (0x64 = 0x60 + 4, where 0x60 is the base for text strings and 4 is the length)
-        const rootMarker = new Uint8Array([0x64, 0x72, 0x6f, 0x6f, 0x74]); // "root" as CBOR text string
-        
-        // Find the marker in the data
-        let markerIndex = -1;
-        for (let i = 0; i < cbor.length - rootMarker.length; i++) {
-            let found = true;
-            for (let j = 0; j < rootMarker.length; j++) {
-                if (cbor[i + j] !== rootMarker[j]) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                markerIndex = i;
-                break;
-            }
-        }
-        
-        if (markerIndex === -1) {
-            return undefined;
-        }
-        
-        // The value follows immediately after the key
-        const valueStart = markerIndex + rootMarker.length;
-        const valueTypeByte = cbor[valueStart];
-        
-        // Check if it's a byte string (major type 2: 0x40-0x57 for lengths 0-23, 0x58 for 1-byte length, 0x59 for 2-byte length)
-        if (valueTypeByte >= 0x40 && valueTypeByte <= 0x57) {
-            // Short byte string (length encoded in type byte)
-            const length = valueTypeByte - 0x40;
-            return cbor.slice(valueStart + 1, valueStart + 1 + length);
-        } else if (valueTypeByte === 0x58) {
-            // Byte string with 1-byte length
-            const length = cbor[valueStart + 1];
-            return cbor.slice(valueStart + 2, valueStart + 2 + length);
-        } else if (valueTypeByte === 0x59) {
-            // Byte string with 2-byte length
-            const length = (cbor[valueStart + 1] << 8) | cbor[valueStart + 2];
-            return cbor.slice(valueStart + 3, valueStart + 3 + length);
-        }
-        
-        // If not a byte string, check for text string (hex encoded root)
-        if (valueTypeByte >= 0x60 && valueTypeByte <= 0x77) {
-            // Short text string
-            const length = valueTypeByte - 0x60;
-            const hexStr = new TextDecoder().decode(cbor.slice(valueStart + 1, valueStart + 1 + length));
-            return hexStringToUint8Array(hexStr);
-        } else if (valueTypeByte === 0x78) {
-            // Text string with 1-byte length
-            const length = cbor[valueStart + 1];
-            const hexStr = new TextDecoder().decode(cbor.slice(valueStart + 2, valueStart + 2 + length));
-            return hexStringToUint8Array(hexStr);
-        } else if (valueTypeByte === 0x79) {
-            // Text string with 2-byte length
-            const length = (cbor[valueStart + 1] << 8) | cbor[valueStart + 2];
-            const hexStr = new TextDecoder().decode(cbor.slice(valueStart + 3, valueStart + 3 + length));
-            return hexStringToUint8Array(hexStr);
-        }
-        
-        return undefined;
-    } catch (error) {
-        console.warn('Failed to extract signature root:', error);
-        return undefined;
-    }
-}
-
-/**
- * Converts a hex string to Uint8Array
- */
-function hexStringToUint8Array(hex: string): Uint8Array {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < bytes.length; i++) {
-        bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-    }
-    return bytes;
-}
 /** CBOR map keys are typically strings or numbers */
 type CborKey = string | number;
 
@@ -113,30 +24,8 @@ type CborKey = string | number;
  * console.log(readable);
  * ```
  */
-/**
- * JSON replacer function that handles BigInt values by converting them to numbers or strings
- */
-function bigIntReplacer(_key: string, value: unknown): unknown {
-    if (typeof value === 'bigint') {
-        // Convert to number if within safe integer range, otherwise to string
-        if (value >= Number.MIN_SAFE_INTEGER && value <= Number.MAX_SAFE_INTEGER) {
-            return Number(value);
-        }
-        return value.toString();
-    }
-    return value;
-}
-
 export function cborArrayToText(cbor: Uint8Array): string {
-    let decoded: { tag?: number; contents?: unknown[] } | unknown[];
-    try {
-        decoded = decode(cbor) as { tag?: number; contents?: unknown[] } | unknown[];
-    } catch (decodeError) {
-        // If decode fails (e.g., BigInt issues), fall back to diagnose
-        console.warn('CBOR decode failed, using diagnose fallback:', decodeError);
-        const diagnosed = diagnose(cbor, { pretty: true });
-        return typeof diagnosed === 'string' ? diagnosed : String(diagnosed);
-    }
+    const decoded = decode(cbor) as { tag?: number; contents?: unknown[] } | unknown[];
     
     const output: Record<string, unknown> = {};
     let parts: unknown[] = [];
@@ -146,7 +35,7 @@ export function cborArrayToText(cbor: Uint8Array): string {
         parts = decoded;
     } else {
         const diagnosed = prettyPrintDecodedCbor(decoded as Uint8Array);
-        return typeof diagnosed === 'string' ? diagnosed : JSON.stringify(diagnosed, bigIntReplacer, 2);
+        return typeof diagnosed === 'string' ? diagnosed : JSON.stringify(diagnosed, null, 2);
     }
 
     if (parts.length === 4) {
@@ -156,7 +45,7 @@ export function cborArrayToText(cbor: Uint8Array): string {
         output['signature'] = uint8ArrayToHexString(parts[3] as Uint8Array);
     }
 
-    return JSON.stringify(output, bigIntReplacer, 2);
+    return JSON.stringify(output, null, 2);
 }
 
 // https://www.iana.org/assignments/cose/cose.xhtml
@@ -382,12 +271,6 @@ function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): Cbor
         return prettyPrintCborMap(idxOrKey ?? null, value as Map<CborKey, CborValue>);
     } else if (Array.isArray(value)) {
         return value.map((item, idx) => prettyPrintArbitraryCborVal(item, idxOrKey != null ? `${idxOrKey}.${idx}` : idx));
-    } else if (typeof value === 'bigint') {
-        // Convert BigInt to number if safe, otherwise to string to allow JSON serialization
-        if (value >= Number.MIN_SAFE_INTEGER && value <= Number.MAX_SAFE_INTEGER) {
-            return Number(value);
-        }
-        return value.toString();
     } else {
         return value;
     }

@@ -7,7 +7,7 @@
 export { LedgerChunkV2 } from './ledger-chunk';
 
 // CBOR utilities
-export { cborArrayToText, extractSignatureRoot, uint8ArrayToHexString, uint8ArrayToB64String } from './cbor-utils';
+export { cborArrayToText, uint8ArrayToHexString, uint8ArrayToB64String } from './cbor-utils';
 
 // Merkle tree utilities
 export { 
