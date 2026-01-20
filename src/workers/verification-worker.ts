@@ -6,21 +6,32 @@
 
 
 import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '../utils/merkle-tree';
-import { CCFDatabase } from '@ccf/database';
 import type { 
   WorkerInMessage, 
   WorkerOutMessage,
-  VerificationConfig
+  VerificationConfig,
+  VerificationTransaction
 } from '../types/verification-types';
 
-// Database instance in worker context
-let database: CCFDatabase | null = null;
-
+/**
+ * Verification Worker
+ * 
+ * This worker performs Merkle tree verification of ledger transactions.
+ * Instead of directly accessing the database (which would cause OPFS lock conflicts),
+ * it requests data from the main thread which uses the existing database connection.
+ */
 class VerificationWorker {
   private isRunning = false;
   private isPaused = false;
   private shouldStop = false;
   private merkleTree: MerkleTree = new MerkleTree();
+  
+  // Request tracking for async data fetching from main thread
+  private requestId = 0;
+  private pendingRequests = new Map<number, {
+    resolve: (data: unknown) => void;
+    reject: (error: Error) => void;
+  }>();
 
   constructor() {
     self.onmessage = this.handleMessage.bind(this);
@@ -42,7 +53,37 @@ class VerificationWorker {
       case 'resume':
         this.resume();
         break;
+      case 'totalCountResponse':
+        this.handleResponse(message.requestId, message.count);
+        break;
+      case 'transactionsResponse':
+        this.handleResponse(message.requestId, message.transactions);
+        break;
     }
+  }
+
+  private handleResponse(requestId: number, data: unknown): void {
+    const pending = this.pendingRequests.get(requestId);
+    if (pending) {
+      pending.resolve(data);
+      this.pendingRequests.delete(requestId);
+    }
+  }
+
+  private async requestTotalCount(): Promise<number> {
+    const id = ++this.requestId;
+    return new Promise((resolve, reject) => {
+      this.pendingRequests.set(id, { resolve: resolve as (data: unknown) => void, reject });
+      this.postMessage({ type: 'requestTotalCount', requestId: id });
+    });
+  }
+
+  private async requestTransactions(start: number, limit: number): Promise<VerificationTransaction[]> {
+    const id = ++this.requestId;
+    return new Promise((resolve, reject) => {
+      this.pendingRequests.set(id, { resolve: resolve as (data: unknown) => void, reject });
+      this.postMessage({ type: 'requestTransactions', requestId: id, start, limit });
+    });
   }
 
   private async startVerification(config: VerificationConfig): Promise<void> {
@@ -56,11 +97,8 @@ class VerificationWorker {
     this.merkleTree = new MerkleTree();
 
     try {
-      // Initialize database connection in worker
-      await this.initializeDatabase();
-      
-      // Get total transaction count
-      const totalCount = await this.getTotalTransactionsCount();
+      // Get total transaction count from main thread
+      const totalCount = await this.requestTotalCount();
       
       // Start from the beginning (progress tracking handled by main thread)
       const startFromTransaction = config.resumeFromTransaction || 0;
@@ -87,7 +125,6 @@ class VerificationWorker {
 
       while (!this.shouldStop && start < totalCount) {
         // Handle pause
-        // Handle pausing
         if (this.isPaused && !this.shouldStop) {
           // Send paused message once when entering paused state
           this.postMessage({ 
@@ -106,8 +143,8 @@ class VerificationWorker {
 
         if (this.shouldStop) break;
 
-        // Get batch of transactions with related data
-        const transactions = await this.getTransactionsWithRelated(start, limit);
+        // Get batch of transactions with related data from main thread
+        const transactions = await this.requestTransactions(start, limit);
         
         if (transactions.length === 0) {
           break;
@@ -135,6 +172,9 @@ class VerificationWorker {
             // If we were stopped while paused, exit
             if (this.shouldStop) break;
           }
+
+          // Convert txHash from number array back to Uint8Array
+          const txHash = new Uint8Array(transaction.txHash);
 
           // Look for signature transactions FIRST - before adding to tree
           const signatureTx = transaction.tables.find(table => 
@@ -199,7 +239,7 @@ class VerificationWorker {
           }
 
           // Add transaction hash to Merkle tree AFTER checking signature
-          await this.merkleTree.insertLeaf(transaction.txHash);
+          this.merkleTree.insertLeaf(txHash);
           processedCount++;
 
           // Report progress more frequently for better UI responsiveness
@@ -249,10 +289,6 @@ class VerificationWorker {
       this.postMessage({ type: 'error', data: { message: errorMessage } });
     } finally {
       this.isRunning = false;
-      if (database) {
-        await database.close();
-        database = null;
-      }
     }
   }
 
@@ -272,12 +308,9 @@ class VerificationWorker {
     self.postMessage(message);
   }
 
-  // Note: Progress storage is now handled by the main thread, not the worker
-  // Workers don't have access to localStorage
-
   // Rebuild Merkle tree up to a specific transaction for resumption
   private async rebuildMerkleTree(upToTransaction: number): Promise<void> {
-    const limit = 500; // Use smaller batches for better pause responsiveness
+    const limit = 500;
     let start = 0;
 
     while (start < upToTransaction) {
@@ -289,7 +322,8 @@ class VerificationWorker {
         if (this.shouldStop) return;
       }
       
-      const transactions = await this.getTransactionsWithRelated(start, Math.min(limit, upToTransaction - start));
+      const batchLimit = Math.min(limit, upToTransaction - start);
+      const transactions = await this.requestTransactions(start, batchLimit);
       
       for (const transaction of transactions) {
         if (this.shouldStop) return;
@@ -302,38 +336,13 @@ class VerificationWorker {
           if (this.shouldStop) return;
         }
         
-        await this.merkleTree.insertLeaf(transaction.txHash);
+        // Convert txHash from number array back to Uint8Array
+        const txHash = new Uint8Array(transaction.txHash);
+        this.merkleTree.insertLeaf(txHash);
       }
 
       start += limit;
     }
-  }
-
-  // Initialize database connection in worker context
-  private async initializeDatabase(): Promise<void> {
-    // Create a new database instance with default OPFS filename
-    database = new CCFDatabase({ filename: 'ccf-ledger.sqlite3', useOpfs: true });
-    await database.initialize();
-  }
-
-  // Get transactions with their related data for verification
-  private async getTransactionsWithRelated(start: number, limit: number): Promise<Array<{
-    txId: number;
-    txHash: Uint8Array;
-    tables: Array<{
-      storeName: string;
-      value: string;
-    }>;
-  }>> {
-    if (!database) throw new Error('Database not initialized');
-
-    return await database.transactions.getWithRelated(start, limit);
-  }
-
-  private async getTotalTransactionsCount(): Promise<number> {
-    if (!database) throw new Error('Database not initialized');
-
-    return await database.transactions.getTotalCount();
   }
 }
 

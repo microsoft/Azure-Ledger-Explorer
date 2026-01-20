@@ -26,12 +26,26 @@ export interface VerificationConfig {
   resumeFromTransaction?: number; // Transaction number to resume from
 }
 
+/**
+ * Transaction data with related tables for verification
+ */
+export interface VerificationTransaction {
+  txId: number;
+  txHash: number[]; // Uint8Array serialized as number array for worker transfer
+  tables: Array<{
+    storeName: string;
+    value: string;
+  }>;
+}
+
 // Messages sent from main thread to worker
 export type WorkerInMessage = 
   | { type: 'start'; config: VerificationConfig }
   | { type: 'stop' }
   | { type: 'pause' }
-  | { type: 'resume' };
+  | { type: 'resume' }
+  | { type: 'totalCountResponse'; requestId: number; count: number }
+  | { type: 'transactionsResponse'; requestId: number; transactions: VerificationTransaction[] };
 
 // Messages sent from worker to main thread
 export type WorkerOutMessage = 
@@ -39,7 +53,9 @@ export type WorkerOutMessage =
   | { type: 'completed'; data: { success: boolean; totalTransactions: number } }
   | { type: 'error'; data: { message: string } }
   | { type: 'stopped' }
-  | { type: 'paused'; data: { currentTransaction: number; totalTransactions: number } };
+  | { type: 'paused'; data: { currentTransaction: number; totalTransactions: number } }
+  | { type: 'requestTotalCount'; requestId: number }
+  | { type: 'requestTransactions'; requestId: number; start: number; limit: number };
 
 export interface VerificationResult {
   transactionNumber: number;

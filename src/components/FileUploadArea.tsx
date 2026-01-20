@@ -25,6 +25,7 @@ import {
 } from '../utils/ledger-validation';
 import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
+import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({
   container: {
@@ -234,7 +235,12 @@ export const FileUploadArea: React.FC = () => {
   };
 
   // Perform the import of selected files
-  const doImport = useCallback(async (selectedFiles: ChunkFileInfo[], allPendingFiles: File[], mode: ImportMode) => {
+  const doImport = useCallback(async (
+    selectedFiles: ChunkFileInfo[], 
+    allPendingFiles: File[], 
+    mode: ImportMode,
+    autoVerify: boolean
+  ) => {
     if (selectedFiles.length === 0) return;
 
     setIsImporting(true);
@@ -243,6 +249,8 @@ export const FileUploadArea: React.FC = () => {
     try {
       if (mode === 'replace') {
         await clearAllDataMutation.mutateAsync();
+        // Clear any existing verification progress when replacing data
+        verificationService.clearSavedProgress();
       }
 
       // Build selected filenames
@@ -258,6 +266,17 @@ export const FileUploadArea: React.FC = () => {
       // Clear state after successful import
       setPendingFiles([]);
       setChunkFiles([]);
+      
+      // Start verification in background if requested
+      if (autoVerify) {
+        // Small delay to ensure database queries are updated
+        setTimeout(() => {
+          verificationService.clearSavedProgress(); // Start fresh
+          verificationService.startVerification().catch(err => {
+            console.error('Auto-verification failed to start:', err);
+          });
+        }, 500);
+      }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'Failed to import files');
     } finally {
@@ -265,10 +284,10 @@ export const FileUploadArea: React.FC = () => {
     }
   }, [clearAllDataMutation, handleFiles]);
 
-  // Called from ChunkSelector's onImport - uses overwrite preference from ChunkSelector
-  const handleImportRequest = useCallback((selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+  // Called from ChunkSelector's onImport - uses overwrite preference and autoVerify from ChunkSelector
+  const handleImportRequest = useCallback((selectedFiles: ChunkFileInfo[], overwriteExisting: boolean, autoVerify: boolean) => {
     const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
-    doImport(selectedFiles, pendingFiles, mode);
+    doImport(selectedFiles, pendingFiles, mode, autoVerify);
   }, [doImport, pendingFiles]);
 
   const handleClearSelection = () => {

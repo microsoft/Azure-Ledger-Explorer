@@ -27,6 +27,7 @@ import {
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
 import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({
   container: {
@@ -176,18 +177,20 @@ export const LedgerBackupView: React.FC = () => {
     }
   };
 
-  const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+  const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean, autoVerify: boolean) => {
     const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
-    await performImport(selectedFiles, mode);
+    await performImport(selectedFiles, mode, autoVerify);
   };
 
-  const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode) => {
+  const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode, autoVerify: boolean) => {
     setIsDownloading(true);
     setDownloadProgress(null);
 
     // Only clear existing data if user chose replace mode
     if (mode === 'replace') {
       await clearAllDataMutation.mutateAsync();
+      // Clear any existing verification progress when replacing data
+      verificationService.clearSavedProgress();
     }
 
     const filenames = selectedFiles.map(f => f.filename);
@@ -197,9 +200,20 @@ export const LedgerBackupView: React.FC = () => {
     );
 
     if (downloadedFiles.length > 0) {
-      handleFiles(downloadedFiles);
+      await handleFiles(downloadedFiles);
       setFiles([]);
       setDownloadedFiles(filesDownloaded);
+      
+      // Start verification in background if requested
+      if (autoVerify) {
+        // Small delay to ensure database queries are updated
+        setTimeout(() => {
+          verificationService.clearSavedProgress(); // Start fresh
+          verificationService.startVerification().catch(err => {
+            console.error('Auto-verification failed to start:', err);
+          });
+        }, 500);
+      }
     } else {
       console.error('No files downloaded');
     }

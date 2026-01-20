@@ -9,8 +9,11 @@ import type {
   WorkerInMessage, 
   WorkerOutMessage, 
   VerificationProgress, 
-  VerificationConfig 
+  VerificationConfig,
+  VerificationTransaction
 } from '../types/verification-types';
+import { CCFDatabase } from '@ccf/database';
+import { getDatabase } from '../hooks/use-ccf-data';
 
 export interface VerificationServiceEvents {
   onProgress: (progress: VerificationProgress) => void;
@@ -29,6 +32,14 @@ export class VerificationService {
   private worker: Worker | null = null;
   private events: Partial<VerificationServiceEvents> = {};
   private lastProgress: VerificationProgress | null = null;
+  private database: CCFDatabase | null = null;
+
+  /**
+   * Set the database instance to use for querying data
+   */
+  setDatabase(database: CCFDatabase): void {
+    this.database = database;
+  }
 
   /**
    * Set event handlers
@@ -44,6 +55,11 @@ export class VerificationService {
     if (this.worker) {
       console.warn('Verification already in progress');
       return;
+    }
+
+    // Ensure we have a database connection for handling data requests from worker
+    if (!this.database) {
+      this.database = await getDatabase();
     }
 
     // Check for saved progress
@@ -179,6 +195,14 @@ export class VerificationService {
 
   private handleWorkerMessage(message: WorkerOutMessage): void {
     switch (message.type) {
+      case 'requestTotalCount':
+        this.handleTotalCountRequest(message.requestId);
+        break;
+        
+      case 'requestTransactions':
+        this.handleTransactionsRequest(message.requestId, message.start, message.limit);
+        break;
+
       case 'progress':
         // Store the latest progress for state management
         this.lastProgress = message.data;
@@ -219,6 +243,76 @@ export class VerificationService {
         this.events.onStopped?.();
         this.cleanup();
         break;
+    }
+  }
+
+  /**
+   * Handle request for total transaction count from worker
+   */
+  private async handleTotalCountRequest(requestId: number): Promise<void> {
+    if (!this.database) {
+      console.error('Database not set for verification service');
+      this.worker?.postMessage({
+        type: 'totalCountResponse',
+        requestId,
+        count: 0
+      } as WorkerInMessage);
+      return;
+    }
+
+    try {
+      const count = await this.database.transactions.getTotalCount();
+      this.worker?.postMessage({
+        type: 'totalCountResponse',
+        requestId,
+        count
+      } as WorkerInMessage);
+    } catch (error) {
+      console.error('Error getting total count:', error);
+      this.worker?.postMessage({
+        type: 'totalCountResponse',
+        requestId,
+        count: 0
+      } as WorkerInMessage);
+    }
+  }
+
+  /**
+   * Handle request for transactions from worker
+   */
+  private async handleTransactionsRequest(requestId: number, start: number, limit: number): Promise<void> {
+    if (!this.database) {
+      console.error('Database not set for verification service');
+      this.worker?.postMessage({
+        type: 'transactionsResponse',
+        requestId,
+        transactions: []
+      } as WorkerInMessage);
+      return;
+    }
+
+    try {
+      const transactions = await this.database.transactions.getWithRelated(start, limit);
+      
+      // Convert Uint8Array to regular array for postMessage serialization
+      const serializableTransactions: VerificationTransaction[] = transactions.map(tx => ({
+        txId: tx.txId,
+        txHash: Array.from(tx.txHash),
+        tables: tx.tables
+      }));
+      
+      this.worker?.postMessage({
+        type: 'transactionsResponse',
+        requestId,
+        transactions: serializableTransactions
+      } as WorkerInMessage);
+    } catch (error) {
+      console.error('Error getting transactions:', error);
+      this.worker?.postMessage({
+        type: 'transactionsResponse',
+        requestId,
+        transactions: []
+      } as WorkerInMessage);
     }
   }
 

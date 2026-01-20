@@ -356,8 +356,9 @@ export { formatBytes, formatHex } from './formatting';
 // ✅ Correct database access
 const getDatabase = async (): Promise<CCFDatabase> => {
   if (!dbInstance) {
+    // Note: The actual filename is hardcoded in database-worker.ts as ccf-ledger.sqlite3
     dbInstance = new CCFDatabase({
-      filename: 'ccf-ledger.db',
+      filename: 'ccf-ledger.sqlite3',
       useOpfs: true,
     });
     await dbInstance.initialize();

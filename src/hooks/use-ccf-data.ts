@@ -27,8 +27,10 @@ export const initializeDatabase = async (): Promise<void> => {
     return; // Already initialized
   }
   
+  // Note: The actual filename is hardcoded in database-worker.ts as ccf-ledger.sqlite3
+  // This config is passed but not currently used by the worker
   dbInstance = new CCFDatabase({
-    filename: 'ccf-ledger.db',
+    filename: 'ccf-ledger.sqlite3',
     useOpfs: true,
   });
   
@@ -50,18 +52,19 @@ export const resetDatabase = async (): Promise<void> => {
     if ('storage' in navigator && 'getDirectory' in navigator.storage) {
       const root = await navigator.storage.getDirectory();
       // Try to remove the database files
+      // Note: The actual filename used by database-worker.ts is ccf-ledger.sqlite3
       try {
-        await root.removeEntry('ccf-ledger.db', { recursive: true });
+        await root.removeEntry('ccf-ledger.sqlite3', { recursive: true });
       } catch {
         // File might not exist, ignore
       }
       try {
-        await root.removeEntry('ccf-ledger.db-journal', { recursive: true });
+        await root.removeEntry('ccf-ledger.sqlite3-journal', { recursive: true });
       } catch {
         // File might not exist, ignore
       }
       try {
-        await root.removeEntry('ccf-ledger.db-wal', { recursive: true });
+        await root.removeEntry('ccf-ledger.sqlite3-wal', { recursive: true });
       } catch {
         // File might not exist, ignore
       }
