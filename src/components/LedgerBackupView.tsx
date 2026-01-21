@@ -188,45 +188,47 @@ export const LedgerBackupView: React.FC<LedgerBackupViewProps> = ({ onImportComp
   };
 
   const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode, autoVerify: boolean) => {
-    // Close dialog immediately when import starts
-    onImportComplete?.();
-
     setIsDownloading(true);
     setDownloadProgress(null);
 
-    // Only clear existing data if user chose replace mode
-    if (mode === 'replace') {
-      await clearAllDataMutation.mutateAsync();
-      // Clear any existing verification progress when replacing data
-      verificationService.clearSavedProgress();
-    }
-
-    const filenames = selectedFiles.map(f => f.filename);
-    const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
-      filenames,
-      (progress) => setDownloadProgress(progress)
-    );
-
-    if (downloadedFiles.length > 0) {
-      // Import files - shouldVerify controls inline merkle verification during parsing
-      await handleFiles(downloadedFiles, { shouldVerify: autoVerify });
-      setFiles([]);
-      setDownloadedFiles(filesDownloaded);
-      
-      // Clear saved verification progress
-      verificationService.clearSavedProgress();
-      
-      // If autoVerify is enabled, start the verification service to verify all chunks
-      if (autoVerify) {
-        // Start verification without awaiting - let it run in background
-        verificationService.startVerification({ progressReportInterval: 50 });
+    try {
+      // Only clear existing data if user chose replace mode
+      if (mode === 'replace') {
+        await clearAllDataMutation.mutateAsync();
+        // Clear any existing verification progress when replacing data
+        verificationService.clearSavedProgress();
       }
-    } else {
-      console.error('No files downloaded');
-    }
 
-    setIsDownloading(false);
-    setDownloadProgress(null);
+      const filenames = selectedFiles.map(f => f.filename);
+      const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
+        filenames,
+        (progress) => setDownloadProgress(progress)
+      );
+
+      if (downloadedFiles.length > 0) {
+        // Import files - shouldVerify controls inline merkle verification during parsing
+        await handleFiles(downloadedFiles, { shouldVerify: autoVerify });
+        setFiles([]);
+        setDownloadedFiles(filesDownloaded);
+        
+        // Clear saved verification progress
+        verificationService.clearSavedProgress();
+        
+        // If autoVerify is enabled, start the verification service to verify all chunks
+        if (autoVerify) {
+          // Start verification without awaiting - let it run in background
+          verificationService.startVerification({ progressReportInterval: 50 });
+        }
+      } else {
+        console.error('No files downloaded');
+      }
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
+      
+      // Close dialog only after import is complete
+      onImportComplete?.();
+    }
   };
 
   return (

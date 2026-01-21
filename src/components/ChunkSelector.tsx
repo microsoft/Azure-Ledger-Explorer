@@ -107,6 +107,15 @@ const useStyles = makeStyles({
     borderRadius: '4px',
     color: tokens.colorPaletteYellowForeground2,
   },
+  overlapRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
+    backgroundColor: tokens.colorPaletteRedBackground1,
+    borderRadius: '4px',
+    color: tokens.colorPaletteRedForeground2,
+  },
   summary: {
     padding: '12px',
     backgroundColor: tokens.colorNeutralBackground3,
@@ -226,7 +235,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   const [isClearing, setIsClearing] = useState(false);
   const [autoVerify, setAutoVerify] = useState(defaultAutoVerify);
 
-  // Group files by sequence range and detect duplicates/gaps/overlaps using shared validation logic
+  // Group files by sequence range and detect duplicates/gaps using shared validation logic
   const { chunkGroups, gaps } = useMemo(() => {
     const analysis = analyzeLedgerSequence(files);
     return { 
@@ -251,6 +260,84 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
 
     return { selectedVersions, checkedRanges };
   });
+
+  // Compute validation state and selected overlaps together (single source of truth)
+  const { validation, selectedOverlaps } = useMemo(() => {
+    const selectedGroups = chunkGroups.filter(g => selection.checkedRanges.has(g.rangeKey));
+
+    if (selectedGroups.length === 0) {
+      return { 
+        validation: { state: 'empty' as const, message: 'No chunks selected' },
+        selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+      };
+    }
+
+    // Check for unresolved duplicates
+    const unresolvedDuplicates = selectedGroups.filter(
+      g => g.isDuplicate && !selection.selectedVersions.has(g.rangeKey)
+    );
+    if (unresolvedDuplicates.length > 0) {
+      return {
+        validation: {
+          state: 'error' as const,
+          message: `Select a version for: ${unresolvedDuplicates.map(g => g.rangeKey).join(', ')}`,
+        },
+        selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+      };
+    }
+
+    // Get selected files (one per group, based on version selection)
+    const selectedFiles = selectedGroups.map(g => {
+      const selectedId = selection.selectedVersions.get(g.rangeKey);
+      return g.files.find(f => f.id === selectedId) || g.files[0];
+    });
+
+    // Use shared validation logic to detect gaps, overlaps, etc.
+    const analysis = analyzeLedgerSequence(selectedFiles);
+
+    // If there are overlaps, return error immediately
+    if (analysis.hasOverlaps) {
+      return {
+        validation: {
+          state: 'error' as const,
+          message: `Cannot import ${analysis.overlaps.length} overlapping chunk(s) - please deselect one file from each overlapping pair.`,
+          overlapCount: analysis.overlaps.length,
+        },
+        selectedOverlaps: analysis.overlaps,
+      };
+    }
+
+    // Build sequence range string
+    const firstChunk = analysis.sortedRanges[0];
+    const lastChunk = analysis.sortedRanges[analysis.sortedRanges.length - 1];
+    const rangeStr = `sequences ${firstChunk.startNo}–${lastChunk.endNo}`;
+
+    // Check for gaps
+    if (!analysis.isContiguous) {
+      return {
+        validation: {
+          state: 'warning' as const,
+          message: `Selection has ${analysis.gaps.length} gap(s) - ${rangeStr}`,
+          range: rangeStr,
+          gapCount: analysis.gaps.length,
+          startsFromBeginning: analysis.startsAtOne,
+          canFullyValidate: false,
+        },
+        selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+      };
+    }
+
+    return {
+      validation: {
+        state: 'valid' as const,
+        message: `Selection is contiguous - ${rangeStr}`,
+        range: rangeStr,
+        startsFromBeginning: analysis.startsAtOne,
+        canFullyValidate: analysis.startsAtOne,
+      },
+      selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+    };
+  }, [chunkGroups, selection]);
 
   // Update selection when files change
   useEffect(() => {
@@ -345,89 +432,6 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     setSelection(prev => ({ ...prev, checkedRanges: new Set() }));
   }, []);
 
-  // Compute validation state
-  const validation = useMemo(() => {
-    const selectedGroups = chunkGroups.filter(g => selection.checkedRanges.has(g.rangeKey));
-    const sortedSelected = [...selectedGroups].sort((a, b) => a.startNo - b.startNo);
-
-    if (sortedSelected.length === 0) {
-      return { state: 'empty' as const, message: 'No chunks selected' };
-    }
-
-    // Check for unresolved duplicates
-    const unresolvedDuplicates = sortedSelected.filter(
-      g => g.isDuplicate && !selection.selectedVersions.has(g.rangeKey)
-    );
-    if (unresolvedDuplicates.length > 0) {
-      return {
-        state: 'error' as const,
-        message: `Select a version for: ${unresolvedDuplicates.map(g => g.rangeKey).join(', ')}`,
-      };
-    }
-
-    // Check for overlaps in selection
-    const selectedOverlaps: Array<{ first: ChunkGroup; second: ChunkGroup }> = [];
-    for (let i = 0; i < sortedSelected.length - 1; i++) {
-      const current = sortedSelected[i];
-      const next = sortedSelected[i + 1];
-      // Overlap: current ends at or after next starts
-      if (current.endNo >= next.startNo) {
-        selectedOverlaps.push({ first: current, second: next });
-      }
-    }
-
-    // If there are overlaps, return error immediately
-    if (selectedOverlaps.length > 0) {
-      const overlapDescs = selectedOverlaps.map(o => 
-        `${o.first.rangeKey} overlaps with ${o.second.rangeKey}`
-      );
-      return {
-        state: 'error' as const,
-        message: `Overlapping chunks detected: ${overlapDescs.join('; ')}`,
-        overlapCount: selectedOverlaps.length,
-      };
-    }
-
-    // Check for gaps in selection
-    const selectedGaps: SequenceGap[] = [];
-    for (let i = 0; i < sortedSelected.length - 1; i++) {
-      const current = sortedSelected[i];
-      const next = sortedSelected[i + 1];
-      const expectedStart = current.endNo + 1;
-
-      if (next.startNo > expectedStart) {
-        selectedGaps.push({ startNo: expectedStart, endNo: next.startNo - 1 });
-      }
-    }
-
-    // Build sequence range string
-    const firstChunk = sortedSelected[0];
-    const lastChunk = sortedSelected[sortedSelected.length - 1];
-    const rangeStr = `sequences ${firstChunk.startNo}–${lastChunk.endNo}`;
-
-    // Check if selection starts from sequence 1
-    const startsFromBeginning = firstChunk.startNo === 1;
-
-    if (selectedGaps.length > 0) {
-      return {
-        state: 'warning' as const,
-        message: `Selection has ${selectedGaps.length} gap(s) - ${rangeStr}`,
-        range: rangeStr,
-        gapCount: selectedGaps.length,
-        startsFromBeginning,
-        canFullyValidate: false,
-      };
-    }
-
-    return {
-      state: 'valid' as const,
-      message: `Selection is contiguous - ${rangeStr}`,
-      range: rangeStr,
-      startsFromBeginning,
-      canFullyValidate: startsFromBeginning,
-    };
-  }, [chunkGroups, selection]);
-
   // Compute whether verification is possible considering existing data + new selection
   const canVerifyWithExisting = useMemo(() => {
     // Convert existing ranges to objects with filename format
@@ -507,6 +511,16 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     </div>
   );
 
+  // Render an overlap indicator between two chunks
+  const renderOverlap = (first: ChunkFileInfo, second: ChunkFileInfo) => (
+    <div key={`overlap-${first.startNo}-${first.endNo}-${second.startNo}-${second.endNo}`} className={styles.overlapRow}>
+      <ErrorCircle16Regular />
+      <Caption1>
+        Overlap: sequences {second.startNo}–{first.endNo} covered by both files above and below
+      </Caption1>
+    </div>
+  );
+
   // Render a chunk group (possibly with duplicates)
   const renderChunkGroup = (group: ChunkGroup) => {
     const isChecked = selection.checkedRanges.has(group.rangeKey);
@@ -580,10 +594,17 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     );
   };
 
-  // Build the display list with gaps inserted
+  // Build the display list with gaps and overlaps inserted
   const displayItems = useMemo(() => {
     const items: React.ReactNode[] = [];
     let gapIndex = 0;
+
+    // Build a map of overlaps keyed by the "second" chunk's range for quick lookup
+    const overlapsBySecond = new Map<string, typeof selectedOverlaps[0]>();
+    for (const overlap of selectedOverlaps) {
+      const secondKey = `${overlap.second.startNo}-${overlap.second.endNo}`;
+      overlapsBySecond.set(secondKey, overlap);
+    }
 
     for (const group of chunkGroups) {
       // Insert any gaps before this group
@@ -592,12 +613,18 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
         gapIndex++;
       }
 
+      // Insert overlap indicator if this group is the "second" in an overlap pair
+      const overlap = overlapsBySecond.get(group.rangeKey);
+      if (overlap) {
+        items.push(renderOverlap(overlap.first, overlap.second));
+      }
+
       items.push(renderChunkGroup(group));
     }
 
     return items;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chunkGroups, gaps, selection]);
+  }, [chunkGroups, gaps, selectedOverlaps]);
 
   const selectedCount = selection.checkedRanges.size;
   const canImport = selectedCount > 0 && validation.state !== 'error';
@@ -647,6 +674,17 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
       <div className={styles.chunkList}>
         {displayItems}
       </div>
+
+      {/* Warning for overlapping files in selection */}
+      {selectedOverlaps.length > 0 && (
+        <MessageBar intent="error">
+          <MessageBarBody>
+            <strong>Overlapping files detected in selection:</strong> {selectedOverlaps.map(o => 
+              `${o.first.filename} overlaps with ${o.second.filename}`
+            ).join('; ')}. You must deselect one file from each overlapping pair.
+          </MessageBarBody>
+        </MessageBar>
+      )}
 
       {/* Validation summary */}
       <div className={styles.summary}>
