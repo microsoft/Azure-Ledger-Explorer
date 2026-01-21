@@ -328,76 +328,78 @@ export class LedgerChunkV2 {
   }
 
   /**
-   * Parse and verify this chunk against Merkle tree signatures.
+   * Verify a list of transactions against Merkle tree signatures.
    * 
+   * @param transactions The transactions to verify (already parsed)
    * @param existingTree Optional MerkleTree from previous chunk (for continuity)
-   * @returns Verification result and the Merkle tree for use by subsequent chunks
+   * @returns Verification result and the updated Merkle tree for use by subsequent chunks
    */
-  async parseAndVerify(existingTree?: MerkleTree): Promise<{
+  static async verifyTransactions(
+    transactions: Transaction[],
+    existingTree?: MerkleTree
+  ): Promise<{
     result: ChunkVerificationResult;
     merkleTree: MerkleTree;
-    transactions: Transaction[];
   }> {
     const merkleTree = existingTree || new MerkleTree();
-    const transactions: Transaction[] = [];
     
-    // Track the initial leaf count (from previous chunks) so we can calculate correct slice index
-    const initialLeafCount = merkleTree.Leaves.length;
-    
-    // Track the last signature found in this chunk (for verification at the end)
-    let lastSignatureSeqNo: number | undefined;
-    let lastExpectedRoot: string | undefined;
-    let lastSignatureTransactionIndex: number | undefined;
+    if (transactions.length === 0) {
+      return {
+        result: {
+          verified: false,
+          transactionCount: 0,
+          error: 'No transactions to verify',
+        },
+        merkleTree,
+      };
+    }
 
     try {
-      // Reset position to beginning
-      this.offset = 8;
+      // Find the last signature transaction (must be the last transaction in a chunk)
+      // Search from the back - in a valid chunk, the last tx should be a signature
+      let lastSignatureIndex = -1;
+      let lastExpectedRoot: string | undefined;
+      let lastSignatureSeqNo: number | undefined;
 
-      // Read all transactions and build Merkle tree
-      for await (const transaction of this.readAllTransactions()) {
-        transactions.push(transaction);
-
-        // Check for signature transaction BEFORE adding to tree
-        const signatureTx = transaction.publicDomain.writes.find(write => 
+      for (let i = transactions.length - 1; i >= 0; i--) {
+        const transaction = transactions[i];
+        const signatureWrite = transaction.publicDomain.writes.find(write => 
           write.mapName?.includes('public:ccf.internal.signatures')
         );
 
-        if (signatureTx && signatureTx.value.length > 0) {
+        if (signatureWrite && signatureWrite.value.length > 0) {
           try {
-            // The signature value is plain JSON text, not CBOR
-            const signatureJson = new TextDecoder().decode(signatureTx.value);
+            const signatureJson = new TextDecoder().decode(signatureWrite.value);
             const signatureData = JSON.parse(signatureJson) as { root?: string };
             
             if (signatureData.root) {
-              // Remember this signature - we'll verify only the last one
-              lastSignatureSeqNo = transaction.gcmHeader.seqNo;
+              lastSignatureIndex = i;
               lastExpectedRoot = signatureData.root;
-              lastSignatureTransactionIndex = transactions.length - 1; // Index within THIS chunk's transactions
+              lastSignatureSeqNo = transaction.gcmHeader.seqNo;
+              break; // Found the last signature, stop searching
             }
           } catch (parseError) {
             console.warn(`Failed to parse signature data at transaction ${transaction.gcmHeader.seqNo}:`, parseError);
           }
         }
-
-        // Add transaction hash to Merkle tree AFTER checking signature
-        merkleTree.insertLeaf(transaction.txDigest);
       }
 
-      // Only verify once at the end, using the last signature transaction found
-      if (lastExpectedRoot !== undefined && lastSignatureTransactionIndex !== undefined) {
-        // Calculate the correct leaf index accounting for leaves from previous chunks
-        // initialLeafCount includes the zero hash + all transactions from previous chunks
-        // lastSignatureTransactionIndex is the index within THIS chunk's transactions
-        // We need leaves up to but NOT including the signature transaction
-        const targetLeafCount = initialLeafCount + lastSignatureTransactionIndex;
-        const leavesToVerify = merkleTree.Leaves.slice(0, targetLeafCount);
-        const tempTree = MerkleTree.fromLeaves([...leavesToVerify]);
-        
-        const calculatedRootBytes = await tempTree.calculateRootHash();
+      // Add transaction hashes to Merkle tree (up to but NOT including the signature transaction)
+      const txCountToInsert = lastSignatureIndex !== -1 ? lastSignatureIndex : transactions.length;
+      for (let i = 0; i < txCountToInsert; i++) {
+        merkleTree.insertLeaf(transactions[i].txDigest);
+      }
+
+      // Verify using the last signature transaction found
+      if (lastExpectedRoot !== undefined && lastSignatureIndex !== -1) {
+        const calculatedRootBytes = await merkleTree.calculateRootHash();
         const calculatedRoot = toHexStringLower(calculatedRootBytes);
         const expectedRootBytes = hexStringToBytes(lastExpectedRoot);
         
         if (areByteArraysEqual(calculatedRootBytes, expectedRootBytes)) {
+          // Verification passed - now add the signature transaction to carry forward
+          merkleTree.insertLeaf(transactions[lastSignatureIndex].txDigest);
+          
           return {
             result: {
               verified: true,
@@ -407,7 +409,6 @@ export class LedgerChunkV2 {
               calculatedRoot,
             },
             merkleTree,
-            transactions,
           };
         } else {
           return {
@@ -420,13 +421,11 @@ export class LedgerChunkV2 {
               error: `Merkle root mismatch at transaction ${lastSignatureSeqNo}`,
             },
             merkleTree,
-            transactions,
           };
         }
       }
 
       // No signature found in this chunk - that's okay for intermediate chunks
-      // The chunk is "not verified" but not an error
       return {
         result: {
           verified: false,
@@ -434,7 +433,6 @@ export class LedgerChunkV2 {
           error: 'No signature transaction found in chunk',
         },
         merkleTree,
-        transactions,
       };
 
     } catch (error) {
@@ -445,7 +443,6 @@ export class LedgerChunkV2 {
           error: error instanceof Error ? error.message : 'Unknown error during verification',
         },
         merkleTree,
-        transactions,
       };
     }
   }

@@ -178,25 +178,25 @@ self.onmessage = async (event: MessageEvent) => {
         // Define type for parsed transactions
         type ParsedTransaction = NonNullable<Awaited<ReturnType<typeof ledgerChunk.readSingleTransaction>>>;
         
-        // Parse and optionally verify the chunk
+        // Parse all transactions first
+        const transactionsToInsert: ParsedTransaction[] = [];
+        for await (const transaction of ledgerChunk.readAllTransactions()) {
+          if (transaction) {
+            transactionsToInsert.push(transaction);
+          }
+        }
+
+        // Optionally verify the chunk
         let verificationResult: { verified: boolean; transactionCount: number; signatureSeqNo?: number; expectedRoot?: string; calculatedRoot?: string; error?: string };
         let updatedTree: InstanceType<typeof MerkleTree>;
-        let transactionsToInsert: ParsedTransaction[] = [];
         
         if (shouldVerify !== false) {
-          const parseResult = await ledgerChunk.parseAndVerify(merkleTree);
-          verificationResult = parseResult.result;
-          updatedTree = parseResult.merkleTree;
-          transactionsToInsert = parseResult.transactions;
+          const verifyResult = await LedgerChunkV2.verifyTransactions(transactionsToInsert, merkleTree);
+          verificationResult = verifyResult.result;
+          updatedTree = verifyResult.merkleTree;
         } else {
-          // Parse without verification
-          verificationResult = { verified: false, transactionCount: 0 };
-          updatedTree = new MerkleTree();
-          for await (const transaction of ledgerChunk.readAllTransactions()) {
-            if (transaction) {
-              transactionsToInsert.push(transaction);
-            }
-          }
+          verificationResult = { verified: false, transactionCount: transactionsToInsert.length };
+          updatedTree = merkleTree || new MerkleTree();
         }
 
         // Import CBOR decoder
