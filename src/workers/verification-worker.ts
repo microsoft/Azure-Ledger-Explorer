@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '../utils/merkle-tree';
+import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '@ccf/ledger-parser';
 import type { 
   WorkerInMessage, 
   WorkerOutMessage,
