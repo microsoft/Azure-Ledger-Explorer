@@ -6,6 +6,9 @@
 // Main database class
 export { CCFDatabase } from './ccf-database';
 
+// Constants
+export { DATABASE_FILENAME, DATABASE_PATH } from './constants';
+
 export type { DatabaseConfig, DatabaseTransaction } from './types/database-types';
 
 export type {

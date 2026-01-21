@@ -3,11 +3,9 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useSyncExternalStore } from 'react';
-import { CCFDatabase } from '@ccf/database';
+import { CCFDatabase, DATABASE_FILENAME } from '@ccf/database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
 
@@ -27,10 +25,9 @@ export const initializeDatabase = async (): Promise<void> => {
     return; // Already initialized
   }
   
-  // Note: The actual filename is hardcoded in database-worker.ts as ccf-ledger.sqlite3
-  // This config is passed but not currently used by the worker
+  // Note: The actual filename is defined in @ccf/database constants
   dbInstance = new CCFDatabase({
-    filename: 'ccf-ledger.sqlite3',
+    filename: DATABASE_FILENAME,
     useOpfs: true,
   });
   
@@ -52,19 +49,18 @@ export const resetDatabase = async (): Promise<void> => {
     if ('storage' in navigator && 'getDirectory' in navigator.storage) {
       const root = await navigator.storage.getDirectory();
       // Try to remove the database files
-      // Note: The actual filename used by database-worker.ts is ccf-ledger.sqlite3
       try {
-        await root.removeEntry('ccf-ledger.sqlite3', { recursive: true });
+        await root.removeEntry(DATABASE_FILENAME, { recursive: true });
       } catch {
         // File might not exist, ignore
       }
       try {
-        await root.removeEntry('ccf-ledger.sqlite3-journal', { recursive: true });
+        await root.removeEntry(`${DATABASE_FILENAME}-journal`, { recursive: true });
       } catch {
         // File might not exist, ignore
       }
       try {
-        await root.removeEntry('ccf-ledger.sqlite3-wal', { recursive: true });
+        await root.removeEntry(`${DATABASE_FILENAME}-wal`, { recursive: true });
       } catch {
         // File might not exist, ignore
       }

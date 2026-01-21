@@ -354,11 +354,12 @@ export { formatBytes, formatHex } from './formatting';
 
 ```typescript
 // ✅ Correct database access
+import { CCFDatabase, DATABASE_FILENAME } from '@ccf/database';
+
 const getDatabase = async (): Promise<CCFDatabase> => {
   if (!dbInstance) {
-    // Note: The actual filename is hardcoded in database-worker.ts as ccf-ledger.sqlite3
     dbInstance = new CCFDatabase({
-      filename: 'ccf-ledger.sqlite3',
+      filename: DATABASE_FILENAME,
       useOpfs: true,
     });
     await dbInstance.initialize();

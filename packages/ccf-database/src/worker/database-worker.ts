@@ -3,10 +3,9 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations/migrations';
+import { DATABASE_PATH } from '../constants';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 
@@ -30,16 +29,16 @@ const initializeSQLite = async () => {
     if ('opfs' in sqlite3) {
       // try opening the database and fall back to readonly mode if SQLITE_BUSY error is thrown, then fall back to transient if that fails
       try {
-        db = new sqlite3.oo1.OpfsDb('/ccf-ledger.sqlite3', 'c');
+        db = new sqlite3.oo1.OpfsDb(DATABASE_PATH, 'c');
         log('OPFS is available, created persisted database at', db.filename);
       } catch (err) {
         if (err instanceof Error && err.message.includes('SQLITE_BUSY')) {
           error('Error creating or accessing OPFS database, falling back to readonly mode:', err);
           try {
-            db = new sqlite3.oo1.OpfsDb('/ccf-ledger.sqlite3', 'rt');
+            db = new sqlite3.oo1.OpfsDb(DATABASE_PATH, 'rt');
           } catch {
             error('Error creating or accessing OPFS readonly database, falling back to transient:', err);
-            db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+            db = new sqlite3.oo1.DB(DATABASE_PATH, 'ct');
           }
         } else {
           // Re-throw if it's not a SQLITE_BUSY error
@@ -47,7 +46,7 @@ const initializeSQLite = async () => {
         }
       }
     } else {
-      db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+      db = new sqlite3.oo1.DB(DATABASE_PATH, 'ct');
       log('OPFS is not available, created transient database', db.filename);
     }
 
@@ -478,10 +477,9 @@ self.onmessage = async (event: MessageEvent) => {
           if ('opfs' in sqlite3) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const opfsUtil = (sqlite3 as any).opfs;
-            const dbPath = '/ccf-ledger.sqlite3';
 
             try {
-              await opfsUtil.unlink(dbPath);
+              await opfsUtil.unlink(DATABASE_PATH);
               log('OPFS database file deleted successfully');
             } catch (unlinkErr) {
               // File might not exist, which is okay
@@ -489,11 +487,11 @@ self.onmessage = async (event: MessageEvent) => {
             }
 
             // Recreate the database
-            db = new sqlite3.oo1.OpfsDb(dbPath);
+            db = new sqlite3.oo1.OpfsDb(DATABASE_PATH);
             log('New OPFS database created at', db.filename);
           } else {
             // For non-OPFS (transient) databases, just recreate
-            db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+            db = new sqlite3.oo1.DB(DATABASE_PATH, 'ct');
             log('New transient database created');
           }
 
