@@ -25,7 +25,8 @@ import {
   ErrorCircle16Regular,
   Info16Regular,
 } from '@fluentui/react-icons';
-import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
+import { analyzeLedgerSequence, type SequenceGap, type RangeGroup } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
 
 const useStyles = makeStyles({
   container: {
@@ -150,41 +151,8 @@ const useStyles = makeStyles({
   },
 });
 
-/**
- * Extended file info with additional metadata for display
- */
-export interface ChunkFileInfo extends LedgerFileInfo {
-  /** Unique identifier for this file (e.g., hash, path, or generated id) */
-  id: string;
-  /** File size in bytes (optional) */
-  size?: number;
-  /** Last modified date (optional) */
-  lastModified?: Date;
-  /** Whether this file is already loaded in the database */
-  isExisting?: boolean;
-}
-
-/**
- * Group of files that cover the same sequence range (duplicates/forks)
- */
-interface ChunkGroup {
-  /** The sequence range key, e.g. "1-14" */
-  rangeKey: string;
-  startNo: number;
-  endNo: number;
-  /** All files that cover this range */
-  files: ChunkFileInfo[];
-  /** Whether this group has multiple files (is a fork/duplicate) */
-  isDuplicate: boolean;
-}
-
-/**
- * Gap in the sequence
- */
-interface SequenceGap {
-  startNo: number;
-  endNo: number;
-}
+// Use the shared RangeGroup type for chunk groups
+type ChunkGroup = RangeGroup<ChunkFileInfo>;
 
 /**
  * Selection state for the chunk selector
@@ -258,53 +226,10 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   const [isClearing, setIsClearing] = useState(false);
   const [autoVerify, setAutoVerify] = useState(defaultAutoVerify);
 
-  // Group files by sequence range and detect duplicates
+  // Group files by sequence range and detect duplicates/gaps using shared validation logic
   const { chunkGroups, gaps } = useMemo(() => {
-    const groupMap = new Map<string, ChunkGroup>();
-
-    // Parse and group files
-    for (const file of files) {
-      const parsed = parseLedgerFilename(file.filename);
-      if (!parsed.isValid) continue;
-
-      const rangeKey = `${parsed.startNo}-${parsed.endNo}`;
-      const existing = groupMap.get(rangeKey);
-
-      if (existing) {
-        existing.files.push(file);
-        existing.isDuplicate = true;
-      } else {
-        groupMap.set(rangeKey, {
-          rangeKey,
-          startNo: parsed.startNo,
-          endNo: parsed.endNo,
-          files: [file],
-          isDuplicate: false,
-        });
-      }
-    }
-
-    // Sort groups by start number
-    const sortedGroups = Array.from(groupMap.values()).sort(
-      (a, b) => a.startNo - b.startNo
-    );
-
-    // Detect gaps
-    const detectedGaps: SequenceGap[] = [];
-    for (let i = 0; i < sortedGroups.length - 1; i++) {
-      const current = sortedGroups[i];
-      const next = sortedGroups[i + 1];
-      const expectedStart = current.endNo + 1;
-
-      if (next.startNo > expectedStart) {
-        detectedGaps.push({
-          startNo: expectedStart,
-          endNo: next.startNo - 1,
-        });
-      }
-    }
-
-    return { chunkGroups: sortedGroups, gaps: detectedGaps };
+    const analysis = analyzeLedgerSequence(files);
+    return { chunkGroups: analysis.groups, gaps: analysis.gaps };
   }, [files]);
 
   // Initialize selection state

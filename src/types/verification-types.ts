@@ -3,7 +3,12 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
+import type { LedgerFile } from '@ccf/database';
+import type { LedgerFileInfo } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from './chunk-types';
 
+// Re-export types for convenience
+export type { LedgerFile, LedgerFileInfo, ChunkFileInfo };
 
 export interface VerificationProgress {
   currentChunk: number;
@@ -46,16 +51,6 @@ export interface ChunkTransactionsResponse {
 }
 
 /**
- * Ledger file info for chunk-based verification
- */
-export interface ChunkInfo {
-  id: number;
-  filename: string;
-  fileSize: number;
-  verified: boolean | null;
-}
-
-/**
  * Result of verifying a single chunk
  */
 export interface ChunkVerificationResult {
@@ -75,7 +70,7 @@ export type WorkerInMessage =
   | { type: 'stop' }
   | { type: 'pause' }
   | { type: 'resume' }
-  | { type: 'chunksResponse'; requestId: number; chunks: ChunkInfo[] }
+  | { type: 'chunksResponse'; requestId: number; chunks: LedgerFile[] }
   | { type: 'chunkTransactionsResponse'; requestId: number; transactions: VerificationTransaction[]; lastSignature: { txId: number; signatureData: string } | null }
   | { type: 'updateChunkVerificationResponse'; requestId: number; success: boolean }
   // Legacy - kept for backwards compatibility

@@ -3,8 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { LedgerFileInfo } from '../utils/ledger-validation';
-import { parseLedgerFilename } from '../utils/ledger-validation';
+import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
 
 export interface DownloadProgress {
   currentFile: number;

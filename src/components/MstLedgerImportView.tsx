@@ -6,7 +6,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 /* eslint-disable react-refresh/only-export-components */
 import { MstFilesService, type DownloadProgress } from '../services/MstFilesService';
-import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
+import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
 import {
     makeStyles,
     Button,
@@ -28,7 +29,7 @@ import {
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
 import { setLedgerDomain as storeLedgerDomain } from '../utils/ledger-domain-storage';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
-import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { ChunkSelector } from './ChunkSelector';
 import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({

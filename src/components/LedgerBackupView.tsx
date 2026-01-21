@@ -5,7 +5,8 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { AzureFileShareService, type DownloadProgress } from '../services/AzureFileShareService';
-import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
+import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
 import {
   makeStyles,
   Button,
@@ -26,7 +27,7 @@ import {
 } from '@fluentui/react-icons';
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
-import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { ChunkSelector } from './ChunkSelector';
 import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({

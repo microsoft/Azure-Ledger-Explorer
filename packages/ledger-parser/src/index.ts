@@ -17,6 +17,15 @@ export {
   hexStringToBytes 
 } from './merkle-tree';
 
+// Ledger validation utilities
+export {
+  parseLedgerFilename,
+  getRangeKey,
+  analyzeLedgerSequence,
+  formatFileSize,
+  formatDate,
+} from './ledger-validation';
+
 // Types
 export type {
   Transaction,
@@ -27,6 +36,13 @@ export type {
   LedgerConstants,
   ChunkVerificationResult,
 } from './types';
+
+export type {
+  LedgerFileInfo,
+  SequenceGap,
+  RangeGroup,
+  LedgerSequenceAnalysis,
+} from './ledger-validation';
 
 export {
   EntryType,

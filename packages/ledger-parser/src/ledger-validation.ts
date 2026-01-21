@@ -15,36 +15,6 @@ export interface LedgerFileInfo {
 }
 
 /**
- * Extended file info with additional metadata for UI display and selection.
- * Used by ChunkSelector and import views.
- */
-export interface ChunkFileInfo extends LedgerFileInfo {
-  /** Unique identifier for this file (e.g., hash, path, or generated id) */
-  id: string;
-  /** File size in bytes (optional) */
-  size?: number;
-  /** Last modified date (optional) */
-  lastModified?: Date;
-  /** Whether this file is already loaded in the database */
-  isExisting?: boolean;
-}
-
-/**
- * Ledger file info as stored in the database.
- * Used by verification worker and database queries.
- */
-export interface LedgerChunkRecord {
-  /** Database row ID */
-  id: number;
-  filename: string;
-  fileSize: number;
-  verified: boolean | null;
-  verificationError?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-/**
  * A gap in the sequence between chunks
  */
 export interface SequenceGap {
@@ -91,16 +61,6 @@ export interface LedgerSequenceAnalysis<T extends LedgerFileInfo = LedgerFileInf
 }
 
 /**
- * Validation result with human-readable errors.
- */
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-  sortedFiles: LedgerFileInfo[];
-  missingRanges: Array<{ start: number; end: number }>;
-}
-
-/**
  * Parse a ledger filename to extract start and end numbers
  * Expected format: ledger_<start>-<end>.committed
  */
@@ -139,17 +99,29 @@ export function getRangeKey(startNo: number, endNo: number): string {
  * Analyze a collection of ledger files to detect gaps, overlaps, and duplicates.
  * This is the core validation logic used throughout the application.
  * 
- * @param files - Array of files with filename property (or pre-parsed LedgerFileInfo)
+ * Files are parsed from their filename to extract sequence numbers.
+ * Any additional properties on the input objects are preserved in the output.
+ * 
+ * @param files - Array of objects with filename property
  * @returns Analysis result with groups, gaps, overlaps, and sequence information
  */
-export function analyzeLedgerSequence<T extends LedgerFileInfo>(
+export function analyzeLedgerSequence<T extends { filename: string }>(
   files: T[],
-): LedgerSequenceAnalysis<T> {
+): LedgerSequenceAnalysis<T & LedgerFileInfo> {
+  // Parse files and merge with original objects
+  const parsed = files.map(file => ({
+    ...file,
+    ...parseLedgerFilename(file.filename),
+  }));
+  
+  // Type alias for the parsed file type
+  type ParsedFile = T & LedgerFileInfo;
+  
   // Filter to valid files only
-  const validFiles = files.filter(info => info.isValid);
+  const validFiles = parsed.filter(info => info.isValid);
   
   // Group files by range
-  const groupMap = new Map<string, RangeGroup<T>>();
+  const groupMap = new Map<string, RangeGroup<ParsedFile>>();
   
   for (const file of validFiles) {
     const rangeKey = getRangeKey(file.startNo, file.endNo);
@@ -186,7 +158,7 @@ export function analyzeLedgerSequence<T extends LedgerFileInfo>(
   }
   
   // Detect overlaps
-  const overlaps: Array<{ first: T; second: T }> = [];
+  const overlaps: Array<{ first: ParsedFile; second: ParsedFile }> = [];
   for (let i = 0; i < sortedRanges.length - 1; i++) {
     const current = sortedRanges[i];
     const next = sortedRanges[i + 1];
@@ -222,83 +194,6 @@ export function analyzeLedgerSequence<T extends LedgerFileInfo>(
     startsAtOne,
     isContiguous: gaps.length === 0,
     duplicateRanges,
-  };
-}
-
-/**
- * Parse files (by filename) and analyze them.
- * Convenience overload that handles parsing from File objects or any object with a filename.
- * 
- * @param files - Array of objects with filename property
- * @returns Analysis result with groups, gaps, overlaps, and sequence information
- */
-export function parseAndAnalyzeFiles<T extends { filename: string }>(
-  files: T[],
-): LedgerSequenceAnalysis<T & LedgerFileInfo> {
-  // Parse files and merge with original objects
-  const parsed = files.map(file => ({
-    ...file,
-    ...parseLedgerFilename(file.filename),
-  }));
-  
-  return analyzeLedgerSequence(parsed);
-}
-
-/**
- * Validate a collection of ledger files to ensure they are contiguous and sequential.
- * This is the high-level validation function that returns human-readable errors.
- */
-export function validateLedgerSequence(files: File[], existingFiles: LedgerFileInfo[] = []): ValidationResult {
-  const errors: string[] = [];
-  
-  // Parse new files
-  const newFileInfos = files.map(file => parseLedgerFilename(file.name));
-  
-  // Check for invalid filenames
-  const invalidFiles = newFileInfos.filter(info => !info.isValid);
-  if (invalidFiles.length > 0) {
-    errors.push(
-      `Invalid filename format: ${invalidFiles.map(f => f.filename).join(', ')}. ` +
-      'Expected format: ledger_<start>-<end>.committed (e.g., ledger_1-18.committed)'
-    );
-  }
-  
-  // Combine existing and new valid files
-  const allFileInfos = [...existingFiles, ...newFileInfos.filter(info => info.isValid)];
-  
-  // Use the core analysis function
-  const analysis = analyzeLedgerSequence(allFileInfos);
-  
-  // Convert analysis to errors
-  if (analysis.duplicateRanges.size > 0) {
-    errors.push(`Duplicate files detected: ${Array.from(analysis.duplicateRanges).join(', ')}`);
-  }
-  
-  for (const overlap of analysis.overlaps) {
-    errors.push(
-      `Overlapping ranges detected: ${overlap.first.filename} (${overlap.first.startNo}-${overlap.first.endNo}) ` +
-      `overlaps with ${overlap.second.filename} (${overlap.second.startNo}-${overlap.second.endNo})`
-    );
-  }
-  
-  if (analysis.sortedRanges.length > 0 && !analysis.startsAtOne) {
-    errors.push('Ledger sequence must start at 1. Missing initial chunk.');
-  }
-
-  for (const gap of analysis.gaps) {
-    const beforeFile = analysis.sortedRanges.find(f => f.endNo === gap.startNo - 1);
-    const afterFile = analysis.sortedRanges.find(f => f.startNo === gap.endNo + 1);
-    errors.push(
-      `Missing chunk: ledger_${gap.startNo}-${gap.endNo}.committed ` +
-      `(gap between ${beforeFile?.filename || 'start'} and ${afterFile?.filename || 'end'})`
-    );
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-    sortedFiles: analysis.sortedRanges,
-    missingRanges: analysis.gaps.map(g => ({ start: g.startNo, end: g.endNo })),
   };
 }
 

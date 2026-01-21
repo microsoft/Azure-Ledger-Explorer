@@ -9,7 +9,7 @@ import type {
   WorkerOutMessage,
   VerificationConfig,
   ChunkTransactionsResponse,
-  ChunkInfo,
+  LedgerFile,
 } from '../types/verification-types';
 
 /**
@@ -79,7 +79,7 @@ class VerificationWorker {
   /**
    * Request all chunks (ledger files) from main thread
    */
-  private async requestChunks(): Promise<ChunkInfo[]> {
+  private async requestChunks(): Promise<LedgerFile[]> {
     const id = ++this.requestId;
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { resolve: resolve as (data: unknown) => void, reject });
@@ -244,7 +244,7 @@ class VerificationWorker {
   /**
    * Verify a single chunk using the optimized last-signature approach
    */
-  private async verifyChunk(chunk: ChunkInfo): Promise<{
+  private async verifyChunk(chunk: LedgerFile): Promise<{
     fileId: number;
     filename: string;
     verified: boolean;
