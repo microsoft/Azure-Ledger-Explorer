@@ -71,6 +71,19 @@ export class FileRepository extends BaseRepository {
   }
 
   /**
+   * Clear verification result for a single file.
+   * Sets verified to NULL, clears verified_at and verification_error.
+   */
+  async clearVerificationResult(fileId: number): Promise<void> {
+    await this.exec(
+      `UPDATE ledger_files 
+       SET verified = NULL, verified_at = NULL, verification_error = NULL
+       WHERE id = ?`,
+      [fileId]
+    );
+  }
+
+  /**
    * Get all ledger files sorted by sequence number extracted from filename.
    */
   async getAll(): Promise<LedgerFile[]> {

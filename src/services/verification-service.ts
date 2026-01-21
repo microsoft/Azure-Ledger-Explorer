@@ -63,15 +63,44 @@ export class VerificationService {
       this.database = await getDatabase();
     }
 
-    // Clear all existing verification results before starting fresh
-    await this.database.files.clearAllVerificationResults();
+    // Get all files to find the first unverified chunk
+    const allFiles = await this.database.files.getAll();
+    
+    // Sort by filename to match worker's processing order
+    allFiles.sort((a, b) => a.filename.localeCompare(b.filename, undefined, { numeric: true }));
+    
+    // Find index of first unverified chunk
+    const firstUnverifiedIndex = allFiles.findIndex(f => f.verified !== true);
+    
+    // If all chunks are already verified, nothing to do
+    if (firstUnverifiedIndex === -1 && allFiles.length > 0) {
+      console.log('All chunks already verified, skipping verification');
+      this.events.onCompleted?.({ 
+        success: true, 
+        totalChunks: allFiles.length, 
+        verifiedChunks: allFiles.length, 
+        failedChunks: 0 
+      });
+      return;
+    }
+    
+    // Only clear verification results for unverified files (from firstUnverifiedIndex onwards)
+    // This preserves already-verified files when resuming
+    if (firstUnverifiedIndex > 0) {
+      // We have some verified files - only clear from the unverified point
+      for (let i = firstUnverifiedIndex; i < allFiles.length; i++) {
+        await this.database.files.clearVerificationResult(allFiles[i].id);
+      }
+    } else {
+      // No verified files yet, clear all
+      await this.database.files.clearAllVerificationResults();
+    }
     
     // Notify that verification results were cleared (so UI can update)
     this.events.onVerificationCleared?.();
 
-    // Check for saved progress
-    const savedProgress = this.getSavedProgress();
-    const resumeFromChunk = savedProgress?.lastProcessedChunk || 0;
+    // Use firstUnverifiedIndex as the starting point (or 0 if no files exist)
+    const resumeFromChunk = firstUnverifiedIndex >= 0 ? firstUnverifiedIndex : 0;
 
     // Default configuration
     const fullConfig: VerificationConfig = {
