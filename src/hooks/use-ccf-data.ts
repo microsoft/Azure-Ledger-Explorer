@@ -282,10 +282,9 @@ export const useUploadLedgerFile = () => {
   return useMutation({
     mutationFn: async (params: { 
       file: File; 
-      existingMerkleTreeState?: { leaves: string[]; leafCount: number } | null;
       shouldVerify?: boolean;
     }) => {
-      const { file, existingMerkleTreeState, shouldVerify } = params;
+      const { file, shouldVerify } = params;
       const db = await getDatabase();
       
       // Read file into ArrayBuffer
@@ -293,8 +292,8 @@ export const useUploadLedgerFile = () => {
       
       // Transfer the ArrayBuffer to the worker for processing
       // The worker will parse, verify, and insert everything
+      // Merkle tree state is maintained inside the worker across calls
       const result = await db.insertLedgerFileWithData(file.name, file.size, arrayBuffer, {
-        existingMerkleTreeState,
         shouldVerify: shouldVerify !== false,
       });
       
@@ -462,8 +461,12 @@ export const useFileDrop = () => {
     const completedFiles = new Set<string>();
     const shouldVerify = options?.shouldVerify !== false;
     
-    // Track Merkle tree state across chunks for verification continuity
-    let currentMerkleTreeState: { leaves: string[]; leafCount: number } | null = null;
+    // Reset Merkle tree state before starting a new import sequence
+    // This ensures verification starts from a clean state
+    if (shouldVerify && totalFiles > 0) {
+      const db = await getDatabase();
+      await db.resetMerkleState();
+    }
     
     // Show all files immediately in the pending state
     if (totalFiles > 0) {
@@ -490,17 +493,11 @@ export const useFileDrop = () => {
           processingFile: file.name,
         });
         
-        // Pass the existing Merkle tree state from previous chunk
-        const result = await uploadMutation.mutateAsync({
+        // Worker maintains Merkle tree state internally across calls
+        await uploadMutation.mutateAsync({
           file,
-          existingMerkleTreeState: currentMerkleTreeState,
           shouldVerify,
         });
-        
-        // Carry forward the Merkle tree state for the next chunk
-        if (result.merkleTreeState) {
-          currentMerkleTreeState = result.merkleTreeState;
-        }
         
         // Mark as completed
         completedFiles.add(file.name);

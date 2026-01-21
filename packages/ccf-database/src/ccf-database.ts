@@ -126,11 +126,22 @@ export class CCFDatabase {
   /**
    * Clear all data from tables while preserving schema.
    * Use this to reset the database without deleting the file.
+   * Also resets the Merkle tree state in the worker.
    */
   async clearAllData(): Promise<void> {
     if (!this.client) throw new Error('Database not initialized');
     console.log('[CCFDatabase] Clearing all data from tables');
     await this.client.clearAllData();
+  }
+
+  /**
+   * Reset the Merkle tree state in the worker.
+   * Call this before starting a fresh import sequence to ensure
+   * verification starts from a clean state.
+   */
+  async resetMerkleState(): Promise<void> {
+    if (!this.client) throw new Error('Database not initialized');
+    await this.client.resetMerkleState();
   }
 
   /**

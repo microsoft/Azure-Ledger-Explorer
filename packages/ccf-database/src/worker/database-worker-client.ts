@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -37,17 +37,12 @@ export interface InsertLedgerFileResult {
     calculatedRoot?: string;
     error?: string;
   } | null;
-  merkleTreeState: {
-    leaves: string[];
-    leafCount: number;
-  } | null;
 }
 
 /**
  * Options for inserting a ledger file
  */
 export interface InsertLedgerFileOptions {
-  existingMerkleTreeState?: { leaves: string[]; leafCount: number } | null;
   shouldVerify?: boolean;
 }
 
@@ -175,7 +170,6 @@ export class DatabaseWorkerClient {
           filename, 
           fileSize, 
           arrayBuffer,
-          existingMerkleTreeState: options?.existingMerkleTreeState,
           shouldVerify: options?.shouldVerify !== false,
         },
       }, [arrayBuffer]);
@@ -196,6 +190,14 @@ export class DatabaseWorkerClient {
    */
   async clearAllData(): Promise<void> {
     await this.sendMessage('clearAllData', {});
+  }
+
+  /**
+   * Reset the Merkle tree state in the worker
+   * Call this before starting a fresh import sequence
+   */
+  async resetMerkleState(): Promise<void> {
+    await this.sendMessage('resetMerkleState', {});
   }
 
   /**

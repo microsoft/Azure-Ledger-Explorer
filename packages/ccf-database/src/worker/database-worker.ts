@@ -100,6 +100,11 @@ const execSQL = (db: SQLiteDB, sql: string, bind?: unknown[]): unknown[] => {
 // Initialize the worker
 let db: SQLiteDB;
 
+// Module-level Merkle tree state - persists across insertLedgerFile calls
+// This avoids expensive serialization/deserialization via postMessage
+// Using 'unknown' since the actual MerkleTree type is dynamically imported
+let currentMerkleTree: unknown = null;
+
 initializeSQLite().then((database) => {
   db = database;
 
@@ -130,7 +135,7 @@ self.onmessage = async (event: MessageEvent) => {
         // Import LedgerChunkV2 dynamically in the worker
         const { LedgerChunkV2, MerkleTree } = await import('@ccf/ledger-parser');
 
-        const { filename, fileSize, arrayBuffer, existingMerkleTreeState, shouldVerify } = payload;
+        const { filename, fileSize, arrayBuffer, shouldVerify } = payload;
 
         log(`Processing ledger file: ${filename} (${fileSize} bytes), verify: ${shouldVerify !== false}`);
 
@@ -161,19 +166,11 @@ self.onmessage = async (event: MessageEvent) => {
         // Parse ledger file with optional verification
         const ledgerChunk = new LedgerChunkV2(filename, arrayBuffer);
         
-        // If we have existing Merkle tree state from a previous chunk, reconstruct it
-        let merkleTree: InstanceType<typeof MerkleTree> | undefined;
-        if (existingMerkleTreeState && shouldVerify !== false) {
-          // Reconstruct the tree from serialized leaves using the factory method
-          const existingLeaves = existingMerkleTreeState.leaves.map((leafHex: string) => {
-            const bytes = new Uint8Array(leafHex.length / 2);
-            for (let i = 0; i < leafHex.length; i += 2) {
-              bytes[i / 2] = parseInt(leafHex.substr(i, 2), 16);
-            }
-            return bytes;
-          });
-          merkleTree = MerkleTree.fromLeaves(existingLeaves);
-        }
+        // Use module-level Merkle tree state (persists across calls, avoids postMessage overhead)
+        // Cast via unknown since the type is dynamically imported
+        const merkleTree = shouldVerify !== false 
+          ? (currentMerkleTree as InstanceType<typeof MerkleTree> | undefined) 
+          : undefined;
 
         // Define type for parsed transactions
         type ParsedTransaction = NonNullable<Awaited<ReturnType<typeof ledgerChunk.readSingleTransaction>>>;
@@ -342,13 +339,10 @@ self.onmessage = async (event: MessageEvent) => {
             log(`Verification status: ${verified ? 'PASSED' : 'FAILED'}${verificationError ? ` - ${verificationError}` : ''}`);
           }
 
-          // Serialize Merkle tree state for continuation to next chunk
-          // We store the leaves as hex strings since they need to be serialized
-          const { toHexStringLower } = await import('@ccf/ledger-parser');
-          const merkleTreeState = shouldVerify !== false ? {
-            leaves: updatedTree.Leaves.map((leaf: Uint8Array) => toHexStringLower(leaf)),
-            leafCount: updatedTree.leafCount,
-          } : null;
+          // Store Merkle tree state at module level for next chunk (avoids postMessage overhead)
+          if (shouldVerify !== false) {
+            currentMerkleTree = updatedTree;
+          }
 
           result = { 
             fileId, 
@@ -361,7 +355,6 @@ self.onmessage = async (event: MessageEvent) => {
               calculatedRoot: verificationResult.calculatedRoot,
               error: verificationResult.error,
             } : null,
-            merkleTreeState,
           };
         } catch (err) {
           db.exec('ROLLBACK');
@@ -455,6 +448,15 @@ self.onmessage = async (event: MessageEvent) => {
       case 'clearAllData': {
         // Clear all data from tables (preserves schema)
         clearAllTables(db, { log });
+        // Also reset the Merkle tree state since we're starting fresh
+        currentMerkleTree = null;
+        result = { success: true };
+        break;
+      }
+
+      case 'resetMerkleState': {
+        // Reset the module-level Merkle tree state (used when starting a fresh import)
+        currentMerkleTree = null;
         result = { success: true };
         break;
       }
