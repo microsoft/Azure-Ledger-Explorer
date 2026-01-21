@@ -175,23 +175,24 @@ self.onmessage = async (event: MessageEvent) => {
         // Define type for parsed transactions
         type ParsedTransaction = NonNullable<Awaited<ReturnType<typeof ledgerChunk.readSingleTransaction>>>;
         
-        // Parse all transactions first
-        const transactionsToInsert: ParsedTransaction[] = [];
-        for await (const transaction of ledgerChunk.readAllTransactions()) {
-          if (transaction) {
-            transactionsToInsert.push(transaction);
-          }
-        }
-
-        // Optionally verify the chunk
+        // Parse and optionally verify transactions
+        let transactionsToInsert: ParsedTransaction[];
         let verificationResult: { verified: boolean; transactionCount: number; signatureSeqNo?: number; expectedRoot?: string; calculatedRoot?: string; error?: string };
         let updatedTree: InstanceType<typeof MerkleTree>;
         
         if (shouldVerify !== false) {
-          const verifyResult = await LedgerChunkV2.verifyTransactions(transactionsToInsert, merkleTree);
+          const verifyResult = await ledgerChunk.verifyTransactions(merkleTree);
+          transactionsToInsert = verifyResult.transactions;
           verificationResult = verifyResult.result;
           updatedTree = verifyResult.merkleTree;
         } else {
+          // Parse without verification
+          transactionsToInsert = [];
+          for await (const transaction of ledgerChunk.readAllTransactions()) {
+            if (transaction) {
+              transactionsToInsert.push(transaction);
+            }
+          }
           verificationResult = { verified: false, transactionCount: transactionsToInsert.length };
           updatedTree = merkleTree || new MerkleTree();
         }

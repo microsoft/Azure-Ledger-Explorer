@@ -328,20 +328,28 @@ export class LedgerChunkV2 {
   }
 
   /**
-   * Verify a list of transactions against Merkle tree signatures.
+   * Verify all transactions in this chunk and return them along with verification result.
    * 
-   * @param transactions The transactions to verify (already parsed)
+   * This method iterates through all transactions, builds the Merkle tree, and verifies
+   * against the signature transaction at the end of the chunk.
+   * 
    * @param existingTree Optional MerkleTree from previous chunk (for continuity)
-   * @returns Verification result and the updated Merkle tree for use by subsequent chunks
+   * @returns Verification result, the transactions, and the updated Merkle tree
    */
-  static async verifyTransactions(
-    transactions: Transaction[],
+  async verifyTransactions(
     existingTree?: MerkleTree
   ): Promise<{
     result: ChunkVerificationResult;
+    transactions: Transaction[];
     merkleTree: MerkleTree;
   }> {
     const merkleTree = existingTree || new MerkleTree();
+    
+    // Parse all transactions first
+    const transactions: Transaction[] = [];
+    for await (const transaction of this.readAllTransactions()) {
+      transactions.push(transaction);
+    }
     
     if (transactions.length === 0) {
       return {
@@ -350,6 +358,7 @@ export class LedgerChunkV2 {
           transactionCount: 0,
           error: 'No transactions to verify',
         },
+        transactions,
         merkleTree,
       };
     }
@@ -408,6 +417,7 @@ export class LedgerChunkV2 {
               expectedRoot: lastExpectedRoot,
               calculatedRoot,
             },
+            transactions,
             merkleTree,
           };
         } else {
@@ -420,6 +430,7 @@ export class LedgerChunkV2 {
               calculatedRoot,
               error: `Merkle root mismatch at transaction ${lastSignatureSeqNo}`,
             },
+            transactions,
             merkleTree,
           };
         }
@@ -432,6 +443,7 @@ export class LedgerChunkV2 {
           transactionCount: transactions.length,
           error: 'No signature transaction found in chunk',
         },
+        transactions,
         merkleTree,
       };
 
@@ -442,6 +454,7 @@ export class LedgerChunkV2 {
           transactionCount: transactions.length,
           error: error instanceof Error ? error.message : 'Unknown error during verification',
         },
+        transactions,
         merkleTree,
       };
     }
