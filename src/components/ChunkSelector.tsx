@@ -233,12 +233,9 @@ export interface ChunkSelectorProps {
   onClearDatabase?: () => Promise<void>;
   /** Whether to show the auto-verify checkbox */
   showAutoVerifyOption?: boolean;
-  /** Default value for auto-verify option (will be overridden by localStorage if available) */
+  /** Default value for auto-verify option */
   defaultAutoVerify?: boolean;
 }
-
-// LocalStorage key for auto-verify preference
-const AUTO_VERIFY_PREFERENCE_KEY = 'ccf-auto-verify-on-import';
 
 /**
  * Smart chunk selector component that handles duplicates, gaps, and validation
@@ -259,26 +256,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   const styles = useStyles();
   const [overwriteExisting, setOverwriteExisting] = useState(defaultOverwrite);
   const [isClearing, setIsClearing] = useState(false);
-  
-  // Initialize auto-verify from localStorage, falling back to defaultAutoVerify
-  const [autoVerify, setAutoVerify] = useState(() => {
-    try {
-      const saved = localStorage.getItem(AUTO_VERIFY_PREFERENCE_KEY);
-      return saved !== null ? JSON.parse(saved) : defaultAutoVerify;
-    } catch {
-      return defaultAutoVerify;
-    }
-  });
-  
-  // Persist auto-verify preference to localStorage
-  const handleAutoVerifyChange = useCallback((checked: boolean) => {
-    setAutoVerify(checked);
-    try {
-      localStorage.setItem(AUTO_VERIFY_PREFERENCE_KEY, JSON.stringify(checked));
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
+  const [autoVerify, setAutoVerify] = useState(defaultAutoVerify);
 
   // Group files by sequence range and detect duplicates
   const { chunkGroups, gaps } = useMemo(() => {
@@ -499,6 +477,39 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     };
   }, [chunkGroups, selection]);
 
+  // Compute whether verification is possible considering existing data + new selection
+  const canVerifyWithExisting = useMemo(() => {
+    // Parse existing ranges into objects
+    const existingParsed = Array.from(existingRanges).map(rangeKey => {
+      const [start, end] = rangeKey.split('-').map(Number);
+      return { startNo: start, endNo: end };
+    });
+
+    // Get selected new chunks
+    const selectedGroups = chunkGroups.filter(g => selection.checkedRanges.has(g.rangeKey));
+    const selectedParsed = selectedGroups.map(g => ({ startNo: g.startNo, endNo: g.endNo }));
+
+    // Combine and sort all ranges
+    const allRanges = [...existingParsed, ...selectedParsed].sort((a, b) => a.startNo - b.startNo);
+
+    if (allRanges.length === 0) return false;
+
+    // Must start from sequence 1
+    if (allRanges[0].startNo !== 1) return false;
+
+    // Check for gaps in the combined ranges
+    let expectedStart = 1;
+    for (const range of allRanges) {
+      if (range.startNo > expectedStart) {
+        // There's a gap
+        return false;
+      }
+      expectedStart = Math.max(expectedStart, range.endNo + 1);
+    }
+
+    return true;
+  }, [existingRanges, chunkGroups, selection]);
+
   // Get selected files for import (excludes already-loaded files)
   const getSelectedFiles = useCallback((): ChunkFileInfo[] => {
     const result: ChunkFileInfo[] = [];
@@ -521,12 +532,9 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   // Handle import click
   const handleImport = useCallback(() => {
     const selectedFiles = getSelectedFiles();
-    // Only pass autoVerify=true if the selection can be fully verified
-    const canVerify = validation.state === 'valid' && 
-                      'startsFromBeginning' in validation && 
-                      validation.startsFromBeginning;
-    onImport(selectedFiles, overwriteExisting, autoVerify && canVerify);
-  }, [getSelectedFiles, onImport, overwriteExisting, autoVerify, validation]);
+    // Only pass autoVerify=true if combined existing + new data can be verified
+    onImport(selectedFiles, overwriteExisting, autoVerify && canVerifyWithExisting);
+  }, [getSelectedFiles, onImport, overwriteExisting, autoVerify, canVerifyWithExisting]);
 
   // Handle clear database
   const handleClearDatabase = useCallback(async () => {
@@ -764,23 +772,18 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
       )}
 
       {/* Auto-verify option */}
-      {showAutoVerifyOption && (() => {
-        const canVerify = validation.state === 'valid' && 
-                          'startsFromBeginning' in validation && 
-                          validation.startsFromBeginning;
-        return (
-          <Checkbox
-            checked={autoVerify && canVerify}
-            onChange={(_, data) => handleAutoVerifyChange(data.checked === true)}
-            disabled={!canVerify}
-            label={
-              canVerify 
-                ? "Verify ledger integrity after import (runs in background)"
-                : "Verify ledger integrity after import (requires contiguous ledger starting from sequence 1)"
-            }
-          />
-        );
-      })()}
+      {showAutoVerifyOption && (
+        <Checkbox
+          checked={autoVerify && canVerifyWithExisting}
+          onChange={(_, data) => setAutoVerify(data.checked === true)}
+          disabled={!canVerifyWithExisting}
+          label={
+            canVerifyWithExisting 
+              ? "Verify ledger integrity after import (runs in background)"
+              : "Verify ledger integrity after import (requires contiguous ledger starting from sequence 1)"
+          }
+        />
+      )}
 
       <Divider />
 
