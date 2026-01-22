@@ -112,6 +112,16 @@ const useStyles = makeStyles({
     marginBottom: '16px',
     opacity: 0.5,
   },
+  dialogHeader: {
+    position: 'relative',
+    paddingRight: '40px',
+    flexShrink: 0,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+  },
 });
 
 export interface AddFilesWizardProps {
@@ -154,8 +164,11 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
   return (
     <Dialog open={open} onOpenChange={(_, data) => onOpenChange(data.open)} >
       <DialogSurface className={styles.wizardDialog}>
-        <DialogTitle action={
+        <DialogTitle
+          className={styles.dialogHeader}
+          action={
           <Button
+            className={styles.closeButton}
             appearance="subtle"
             aria-label="Close"
             icon={<Dismiss24Regular />}
