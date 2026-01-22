@@ -3,10 +3,9 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations/migrations';
+import { DATABASE_PATH } from '../constants';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 
@@ -30,16 +29,16 @@ const initializeSQLite = async () => {
     if ('opfs' in sqlite3) {
       // try opening the database and fall back to readonly mode if SQLITE_BUSY error is thrown, then fall back to transient if that fails
       try {
-        db = new sqlite3.oo1.OpfsDb('/ccf-ledger.sqlite3', 'c');
+        db = new sqlite3.oo1.OpfsDb(DATABASE_PATH, 'c');
         log('OPFS is available, created persisted database at', db.filename);
       } catch (err) {
         if (err instanceof Error && err.message.includes('SQLITE_BUSY')) {
           error('Error creating or accessing OPFS database, falling back to readonly mode:', err);
           try {
-            db = new sqlite3.oo1.OpfsDb('/ccf-ledger.sqlite3', 'rt');
+            db = new sqlite3.oo1.OpfsDb(DATABASE_PATH, 'rt');
           } catch {
             error('Error creating or accessing OPFS readonly database, falling back to transient:', err);
-            db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+            db = new sqlite3.oo1.DB(DATABASE_PATH, 'ct');
           }
         } else {
           // Re-throw if it's not a SQLITE_BUSY error
@@ -47,7 +46,7 @@ const initializeSQLite = async () => {
         }
       }
     } else {
-      db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+      db = new sqlite3.oo1.DB(DATABASE_PATH, 'ct');
       log('OPFS is not available, created transient database', db.filename);
     }
 
@@ -101,6 +100,11 @@ const execSQL = (db: SQLiteDB, sql: string, bind?: unknown[]): unknown[] => {
 // Initialize the worker
 let db: SQLiteDB;
 
+// Module-level Merkle tree state - persists across insertLedgerFile calls
+// This avoids expensive serialization/deserialization via postMessage
+// Using 'unknown' since the actual MerkleTree type is dynamically imported
+let currentMerkleTree: unknown = null;
+
 initializeSQLite().then((database) => {
   db = database;
 
@@ -129,11 +133,11 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'insertLedgerFile': {
         // Import LedgerChunkV2 dynamically in the worker
-        const { LedgerChunkV2 } = await import('@ccf/ledger-parser');
+        const { LedgerChunkV2, MerkleTree } = await import('@ccf/ledger-parser');
 
-        const { filename, fileSize, arrayBuffer } = payload;
+        const { filename, fileSize, arrayBuffer, shouldVerify } = payload;
 
-        log(`Processing ledger file: ${filename} (${fileSize} bytes)`);
+        log(`Processing ledger file: ${filename} (${fileSize} bytes), verify: ${shouldVerify !== false}`);
 
         // Insert file record
         const fileResult = execSQL(db, `
@@ -145,7 +149,7 @@ self.onmessage = async (event: MessageEvent) => {
           fileId = (fileResult[0] as Record<string, unknown>).id as number;
           execSQL(db, `
             UPDATE ledger_files 
-            SET file_size = ?, updated_at = CURRENT_TIMESTAMP
+            SET file_size = ?, updated_at = CURRENT_TIMESTAMP, verified = NULL, verified_at = NULL, verification_error = NULL
             WHERE id = ?
           `, [fileSize, fileId]);
         } else {
@@ -159,8 +163,39 @@ self.onmessage = async (event: MessageEvent) => {
 
         log(`File ID: ${fileId}, parsing transactions...`);
 
-        // Parse ledger file
+        // Parse ledger file with optional verification
         const ledgerChunk = new LedgerChunkV2(filename, arrayBuffer);
+        
+        // Use module-level Merkle tree state (persists across calls, avoids postMessage overhead)
+        // Cast via unknown since the type is dynamically imported
+        const merkleTree = shouldVerify !== false 
+          ? (currentMerkleTree as InstanceType<typeof MerkleTree> | undefined) 
+          : undefined;
+
+        // Define type for parsed transactions
+        type ParsedTransaction = NonNullable<Awaited<ReturnType<typeof ledgerChunk.readSingleTransaction>>>;
+        
+        // Parse and optionally verify transactions
+        let transactionsToInsert: ParsedTransaction[];
+        let verificationResult: { verified: boolean; transactionCount: number; signatureSeqNo?: number; expectedRoot?: string; calculatedRoot?: string; error?: string };
+        let updatedTree: InstanceType<typeof MerkleTree>;
+        
+        if (shouldVerify !== false) {
+          const verifyResult = await ledgerChunk.verifyTransactions(merkleTree);
+          transactionsToInsert = verifyResult.transactions;
+          verificationResult = verifyResult.result;
+          updatedTree = verifyResult.merkleTree;
+        } else {
+          // Parse without verification
+          transactionsToInsert = [];
+          for await (const transaction of ledgerChunk.readAllTransactions()) {
+            if (transaction) {
+              transactionsToInsert.push(transaction);
+            }
+          }
+          verificationResult = { verified: false, transactionCount: transactionsToInsert.length };
+          updatedTree = merkleTree || new MerkleTree();
+        }
 
         // Import CBOR decoder
         const { cborArrayToText } = await import('@ccf/ledger-parser');
@@ -171,9 +206,9 @@ self.onmessage = async (event: MessageEvent) => {
         const deleteBinds: unknown[][] = [];
         let transactionCount = 0;
 
-        log('Parsing all transactions into memory...');
+        log('Preparing transactions for insert...');
 
-        for await (const transaction of ledgerChunk.readAllTransactions()) {
+        for (const transaction of transactionsToInsert) {
           const seqNo = transaction.gcmHeader.seqNo;
 
           // Collect transaction data
@@ -291,7 +326,37 @@ self.onmessage = async (event: MessageEvent) => {
 
           log(`Completed: ${transactionCount} transactions inserted`);
 
-          result = { fileId, transactionCount };
+          // Update verification status in the database
+          if (shouldVerify !== false) {
+            const verified = verificationResult.verified;
+            const verificationError = verificationResult.error || null;
+            
+            execSQL(db, `
+              UPDATE ledger_files 
+              SET verified = ?, verified_at = CURRENT_TIMESTAMP, verification_error = ?
+              WHERE id = ?
+            `, [verified ? 1 : 0, verificationError, fileId]);
+            
+            log(`Verification status: ${verified ? 'PASSED' : 'FAILED'}${verificationError ? ` - ${verificationError}` : ''}`);
+          }
+
+          // Store Merkle tree state at module level for next chunk (avoids postMessage overhead)
+          if (shouldVerify !== false) {
+            currentMerkleTree = updatedTree;
+          }
+
+          result = { 
+            fileId, 
+            transactionCount,
+            verification: shouldVerify !== false ? {
+              verified: verificationResult.verified,
+              transactionCount: verificationResult.transactionCount,
+              signatureSeqNo: verificationResult.signatureSeqNo,
+              expectedRoot: verificationResult.expectedRoot,
+              calculatedRoot: verificationResult.calculatedRoot,
+              error: verificationResult.error,
+            } : null,
+          };
         } catch (err) {
           db.exec('ROLLBACK');
           // Always finalize statements even on error
@@ -384,6 +449,15 @@ self.onmessage = async (event: MessageEvent) => {
       case 'clearAllData': {
         // Clear all data from tables (preserves schema)
         clearAllTables(db, { log });
+        // Also reset the Merkle tree state since we're starting fresh
+        currentMerkleTree = null;
+        result = { success: true };
+        break;
+      }
+
+      case 'resetMerkleState': {
+        // Reset the module-level Merkle tree state (used when starting a fresh import)
+        currentMerkleTree = null;
         result = { success: true };
         break;
       }
@@ -406,10 +480,9 @@ self.onmessage = async (event: MessageEvent) => {
           if ('opfs' in sqlite3) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const opfsUtil = (sqlite3 as any).opfs;
-            const dbPath = '/ccf-ledger.sqlite3';
 
             try {
-              await opfsUtil.unlink(dbPath);
+              await opfsUtil.unlink(DATABASE_PATH);
               log('OPFS database file deleted successfully');
             } catch (unlinkErr) {
               // File might not exist, which is okay
@@ -417,11 +490,11 @@ self.onmessage = async (event: MessageEvent) => {
             }
 
             // Recreate the database
-            db = new sqlite3.oo1.OpfsDb(dbPath);
+            db = new sqlite3.oo1.OpfsDb(DATABASE_PATH);
             log('New OPFS database created at', db.filename);
           } else {
             // For non-OPFS (transient) databases, just recreate
-            db = new sqlite3.oo1.DB('/ccf-ledger.sqlite3', 'ct');
+            db = new sqlite3.oo1.DB(DATABASE_PATH, 'ct');
             log('New transient database created');
           }
 

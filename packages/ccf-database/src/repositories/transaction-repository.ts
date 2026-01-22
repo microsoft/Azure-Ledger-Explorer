@@ -286,6 +286,51 @@ export class TransactionRepository extends BaseRepository {
   }
 
   /**
+   * Get transactions for a specific file with hash data for per-chunk verification
+   * This is optimized for chunk-based verification where we verify once per chunk
+   */
+  async getByFileIdForVerification(fileId: number): Promise<{
+    transactions: Array<{ txId: number; txHash: Uint8Array }>;
+    lastSignature: { txId: number; signatureData: string } | null;
+  }> {
+    // Fetch all transactions with their hashes
+    const transactionResult = await this.exec(
+      `SELECT sequence_no, tx_digest
+       FROM transactions
+       WHERE file_id = ?
+       ORDER BY sequence_no`,
+      [fileId]
+    );
+
+    const transactions = transactionResult.map(tx => ({
+      txId: tx.sequence_no as number,
+      txHash: new Uint8Array(tx.tx_digest as ArrayBuffer),
+    }));
+
+    // Fetch the last signature transaction for this file in a single query
+    const lastSignatureResult = await this.exec(
+      `SELECT w.sequence_no, w.value_text
+       FROM kv_writes w
+       JOIN transactions t ON w.sequence_no = t.sequence_no
+       WHERE t.file_id = ?
+         AND w.map_name LIKE '%public:ccf.internal.signatures%'
+         AND w.value_text IS NOT NULL
+       ORDER BY w.sequence_no DESC
+       LIMIT 1`,
+      [fileId]
+    );
+
+    const lastSignature = lastSignatureResult.length > 0
+      ? {
+          txId: lastSignatureResult[0].sequence_no as number,
+          signatureData: lastSignatureResult[0].value_text as string,
+        }
+      : null;
+
+    return { transactions, lastSignature };
+  }
+
+  /**
    * Search transactions by key name
    */
   async searchByKey(keyName: string, limit = 50): Promise<SearchResult[]> {

@@ -57,6 +57,24 @@ export interface Transaction {
 }
 
 /**
+ * Result of chunk verification against Merkle tree signatures
+ */
+export interface ChunkVerificationResult {
+  /** Whether verification passed */
+  verified: boolean;
+  /** Number of transactions verified in this chunk */
+  transactionCount: number;
+  /** Sequence number of signature transaction (if found) */
+  signatureSeqNo?: number;
+  /** Expected root hash from signature (hex string) */
+  expectedRoot?: string;
+  /** Calculated root hash (hex string) */
+  calculatedRoot?: string;
+  /** Error message if verification failed */
+  error?: string;
+}
+
+/**
  * Entry types for ledger transactions
  */
 export const EntryType = {

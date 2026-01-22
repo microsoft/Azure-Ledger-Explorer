@@ -3,34 +3,39 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { verificationService, type SavedProgress, type VerificationServiceEvents } from '../services/verification-service';
 import type { 
   VerificationProgress, 
-  VerificationConfig 
+  VerificationConfig,
+  ChunkVerificationResult,
 } from '../types/verification-types';
+import { queryKeys } from './use-ccf-data';
 
 interface UseVerificationResult {
   // State
   isRunning: boolean;
   progress: VerificationProgress | null;
   error: string | null;
+  lastVerifiedChunk: ChunkVerificationResult | null;
 
   // Actions
   start: (config?: Partial<VerificationConfig>) => Promise<void>;
   pause: () => void;
   resume: () => void;
+  stop: () => void;
   clearProgress: () => void;
   getSavedProgress: () => SavedProgress;
   canResumeVerification: () => boolean;
 }
 
 export function useVerification(): UseVerificationResult {
+  const queryClient = useQueryClient();
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState<VerificationProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastVerifiedChunk, setLastVerifiedChunk] = useState<ChunkVerificationResult | null>(null);
   
   const eventsSetRef = useRef(false);
 
@@ -44,10 +49,23 @@ export function useVerification(): UseVerificationResult {
         setError(null);
       },
       
-      onCompleted: () => {
+      onChunkVerified: (result) => {
+        setLastVerifiedChunk(result);
+        // Invalidate ledger files query to refresh verification status in UI
+        queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
+      },
+      
+      onCompleted: (data) => {
         setIsRunning(false);
-        setProgress(prev => prev ? { ...prev, status: 'completed' } : null);
+        setProgress(prev => prev ? { 
+          ...prev, 
+          status: 'completed',
+          verifiedChunks: data.verifiedChunks,
+          failedChunks: data.failedChunks
+        } : null);
         setError(null);
+        // Final invalidation to ensure UI is up to date
+        queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       },
       
       onError: (errorData) => {
@@ -60,11 +78,35 @@ export function useVerification(): UseVerificationResult {
       onStopped: () => {
         setIsRunning(false);
         setProgress(prev => prev ? { ...prev, status: 'stopped' } : null);
+      },
+      
+      onVerificationCleared: () => {
+        // Immediately invalidate ledger files query so UI shows all files as unverified
+        queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       }
     };
 
     verificationService.setEvents(events);
     eventsSetRef.current = true;
+  }, [queryClient]);
+
+  // Sync isRunning state with service - poll periodically when running
+  useEffect(() => {
+    // Initial sync
+    setIsRunning(verificationService.isRunning());
+    
+    // Poll to keep in sync while verification might be running
+    const interval = setInterval(() => {
+      const serviceIsRunning = verificationService.isRunning();
+      setIsRunning(prev => {
+        if (prev !== serviceIsRunning) {
+          return serviceIsRunning;
+        }
+        return prev;
+      });
+    }, 500);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Initialize running state from service and restore saved progress
@@ -75,10 +117,14 @@ export function useVerification(): UseVerificationResult {
     const savedProgress = verificationService.getSavedProgress();
     if (savedProgress && savedProgress.status) {
       const restoredProgress: VerificationProgress = {
-        currentTransaction: savedProgress.lastProcessedTransaction,
-        totalTransactions: savedProgress.totalTransactions,
+        currentChunk: savedProgress.lastProcessedChunk,
+        totalChunks: savedProgress.totalChunks,
+        currentChunkName: '',
         status: savedProgress.status as 'stopped' | 'running' | 'paused' | 'completed' | 'failed',
-        startTime: Date.now() // Default to current time since we don't store startTime
+        startTime: Date.now(),
+        // Legacy fields
+        currentTransaction: savedProgress.lastProcessedChunk,
+        totalTransactions: savedProgress.totalChunks,
       };
       setProgress(restoredProgress);
       
@@ -114,6 +160,12 @@ export function useVerification(): UseVerificationResult {
     setProgress(prev => prev ? { ...prev, status: 'running' } : null);
   }, []);
 
+  const stop = useCallback(() => {
+    verificationService.stopVerification();
+    setIsRunning(false);
+    setProgress(prev => prev ? { ...prev, status: 'stopped' } : null);
+  }, []);
+
   const clearProgress = useCallback(() => {
     verificationService.clearSavedProgress();
     setProgress(null);
@@ -129,17 +181,19 @@ export function useVerification(): UseVerificationResult {
     isRunning,
     progress,
     error,
+    lastVerifiedChunk,
 
     // Actions
     start,
     pause,
     resume,
+    stop,
     clearProgress,
     canResumeVerification: () => {
       const savedProgress = verificationService.getSavedProgress();
       return savedProgress !== null && 
              (savedProgress.status === 'paused' || savedProgress.status === 'stopped') &&
-             savedProgress.lastProcessedTransaction > 0;
+             savedProgress.lastProcessedChunk > 0;
     },
     getSavedProgress
   };

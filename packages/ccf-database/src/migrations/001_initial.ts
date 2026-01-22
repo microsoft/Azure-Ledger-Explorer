@@ -18,6 +18,9 @@ export const migration: Migration = {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       filename TEXT NOT NULL UNIQUE,
       file_size INTEGER NOT NULL,
+      verified INTEGER DEFAULT NULL,
+      verified_at DATETIME DEFAULT NULL,
+      verification_error TEXT DEFAULT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,

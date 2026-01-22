@@ -13,8 +13,6 @@ import {
   RadioGroup,
   Radio,
   Badge,
-  MessageBar,
-  MessageBarBody,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -24,7 +22,8 @@ import {
   ErrorCircle16Regular,
   Info16Regular,
 } from '@fluentui/react-icons';
-import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
+import { analyzeLedgerSequence, type SequenceGap, type RangeGroup } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
 
 const useStyles = makeStyles({
   container: {
@@ -60,7 +59,8 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
-    maxHeight: '280px',
+    flex: 1,
+    minHeight: '120px',
     overflowY: 'auto',
     overflowX: 'hidden',
     border: `1px solid ${tokens.colorNeutralStroke2}`,
@@ -124,6 +124,15 @@ const useStyles = makeStyles({
     borderRadius: '4px',
     color: tokens.colorPaletteYellowForeground2,
   },
+  overlapRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
+    backgroundColor: tokens.colorPaletteRedBackground1,
+    borderRadius: '4px',
+    color: tokens.colorPaletteRedForeground2,
+  },
   summary: {
     padding: '12px',
     backgroundColor: tokens.colorNeutralBackground3,
@@ -143,7 +152,6 @@ const useStyles = makeStyles({
     gap: '12px',
     flexShrink: 0,
     paddingTop: '12px',
-    marginTop: 'auto',
     backgroundColor: tokens.colorNeutralBackground1,
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     boxSizing: 'border-box',
@@ -188,39 +196,8 @@ const useStyles = makeStyles({
   },
 });
 
-/**
- * Extended file info with additional metadata for display
- */
-export interface ChunkFileInfo extends LedgerFileInfo {
-  /** Unique identifier for this file (e.g., hash, path, or generated id) */
-  id: string;
-  /** File size in bytes (optional) */
-  size?: number;
-  /** Last modified date (optional) */
-  lastModified?: Date;
-}
-
-/**
- * Group of files that cover the same sequence range (duplicates/forks)
- */
-interface ChunkGroup {
-  /** The sequence range key, e.g. "1-14" */
-  rangeKey: string;
-  startNo: number;
-  endNo: number;
-  /** All files that cover this range */
-  files: ChunkFileInfo[];
-  /** Whether this group has multiple files (is a fork/duplicate) */
-  isDuplicate: boolean;
-}
-
-/**
- * Gap in the sequence
- */
-interface SequenceGap {
-  startNo: number;
-  endNo: number;
-}
+// Use the shared RangeGroup type for chunk groups
+type ChunkGroup = RangeGroup<ChunkFileInfo>;
 
 /**
  * Selection state for the chunk selector
@@ -232,13 +209,29 @@ export interface ChunkSelection {
   checkedRanges: Set<string>;
 }
 
+/**
+ * Validation result for the current selection
+ */
+export interface ChunkSelectionValidation {
+  /** Whether the selection is valid for import */
+  canImport: boolean;
+  /** Whether the selection starts from sequence 1 */
+  startsFromBeginning: boolean;
+  /** Whether the selection is contiguous (no gaps) */
+  isContiguous: boolean;
+  /** Whether the selection can be fully verified (starts at 1 and no gaps) */
+  canFullyVerify: boolean;
+  /** Human-readable message about the selection */
+  message: string;
+}
+
 export interface ChunkSelectorProps {
   /** List of available files to select from */
   files: ChunkFileInfo[];
   /** Callback when selection changes */
   onSelectionChange?: (selection: ChunkSelection) => void;
-  /** Callback when import is confirmed - receives selected files and overwrite preference */
-  onImport: (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => void;
+  /** Callback when import is confirmed - receives selected files, overwrite preference, and auto-verify preference */
+  onImport: (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean, autoVerify: boolean) => void;
   /** Whether import is in progress */
   isImporting?: boolean;
   /** Import button label */
@@ -251,6 +244,10 @@ export interface ChunkSelectorProps {
   existingRanges?: Set<string>;
   /** Callback to clear the database */
   onClearDatabase?: () => Promise<void>;
+  /** Whether to show the auto-verify checkbox */
+  showAutoVerifyOption?: boolean;
+  /** Default value for auto-verify option */
+  defaultAutoVerify?: boolean;
 }
 
 /**
@@ -266,58 +263,21 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   defaultOverwrite = false,
   existingRanges = new Set(),
   onClearDatabase,
+  showAutoVerifyOption = true,
+  defaultAutoVerify = true,
 }) => {
   const styles = useStyles();
   const [overwriteExisting, setOverwriteExisting] = useState(defaultOverwrite);
   const [isClearing, setIsClearing] = useState(false);
+  const [autoVerify, setAutoVerify] = useState(defaultAutoVerify);
 
-  // Group files by sequence range and detect duplicates
+  // Group files by sequence range and detect duplicates/gaps using shared validation logic
   const { chunkGroups, gaps } = useMemo(() => {
-    const groupMap = new Map<string, ChunkGroup>();
-
-    // Parse and group files
-    for (const file of files) {
-      const parsed = parseLedgerFilename(file.filename);
-      if (!parsed.isValid) continue;
-
-      const rangeKey = `${parsed.startNo}-${parsed.endNo}`;
-      const existing = groupMap.get(rangeKey);
-
-      if (existing) {
-        existing.files.push(file);
-        existing.isDuplicate = true;
-      } else {
-        groupMap.set(rangeKey, {
-          rangeKey,
-          startNo: parsed.startNo,
-          endNo: parsed.endNo,
-          files: [file],
-          isDuplicate: false,
-        });
-      }
-    }
-
-    // Sort groups by start number
-    const sortedGroups = Array.from(groupMap.values()).sort(
-      (a, b) => a.startNo - b.startNo
-    );
-
-    // Detect gaps
-    const detectedGaps: SequenceGap[] = [];
-    for (let i = 0; i < sortedGroups.length - 1; i++) {
-      const current = sortedGroups[i];
-      const next = sortedGroups[i + 1];
-      const expectedStart = current.endNo + 1;
-
-      if (next.startNo > expectedStart) {
-        detectedGaps.push({
-          startNo: expectedStart,
-          endNo: next.startNo - 1,
-        });
-      }
-    }
-
-    return { chunkGroups: sortedGroups, gaps: detectedGaps };
+    const analysis = analyzeLedgerSequence(files);
+    return {
+      chunkGroups: analysis.groups,
+      gaps: analysis.gaps,
+    };
   }, [files]);
 
   // Initialize selection state
@@ -325,14 +285,95 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     const selectedVersions = new Map<string, string>();
     const checkedRanges = new Set<string>();
 
-    // Default: select first version of each group, check all
+    // Default: select first version of each group, check only non-existing ranges
     for (const group of chunkGroups) {
       selectedVersions.set(group.rangeKey, group.files[0].id);
-      checkedRanges.add(group.rangeKey);
+      // Don't pre-check ranges that are already loaded
+      if (!existingRanges.has(group.rangeKey)) {
+        checkedRanges.add(group.rangeKey);
+      }
     }
 
     return { selectedVersions, checkedRanges };
   });
+
+  // Compute validation state and selected overlaps together (single source of truth)
+  const { validation, selectedOverlaps } = useMemo(() => {
+    const selectedGroups = chunkGroups.filter(g => selection.checkedRanges.has(g.rangeKey));
+
+    if (selectedGroups.length === 0) {
+      return {
+        validation: { state: 'empty' as const, message: 'No chunks selected' },
+        selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+      };
+    }
+
+    // Check for unresolved duplicates
+    const unresolvedDuplicates = selectedGroups.filter(
+      g => g.isDuplicate && !selection.selectedVersions.has(g.rangeKey)
+    );
+    if (unresolvedDuplicates.length > 0) {
+      return {
+        validation: {
+          state: 'error' as const,
+          message: `Select a version for: ${unresolvedDuplicates.map(g => g.rangeKey).join(', ')}`,
+        },
+        selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+      };
+    }
+
+    // Get selected files (one per group, based on version selection)
+    const selectedFiles = selectedGroups.map(g => {
+      const selectedId = selection.selectedVersions.get(g.rangeKey);
+      return g.files.find(f => f.id === selectedId) || g.files[0];
+    });
+
+    // Use shared validation logic to detect gaps, overlaps, etc.
+    const analysis = analyzeLedgerSequence(selectedFiles);
+
+    // If there are overlaps, return error immediately
+    if (analysis.hasOverlaps) {
+      return {
+        validation: {
+          state: 'error' as const,
+          message: `Cannot import ${analysis.overlaps.length} overlapping chunk(s) - please deselect one file from each overlapping pair.`,
+          overlapCount: analysis.overlaps.length,
+        },
+        selectedOverlaps: analysis.overlaps,
+      };
+    }
+
+    // Build sequence range string
+    const firstChunk = analysis.sortedRanges[0];
+    const lastChunk = analysis.sortedRanges[analysis.sortedRanges.length - 1];
+    const rangeStr = `sequences ${firstChunk.startNo}–${lastChunk.endNo}`;
+
+    // Check for gaps
+    if (!analysis.isContiguous) {
+      return {
+        validation: {
+          state: 'warning' as const,
+          message: `Selection has ${analysis.gaps.length} gap(s) - ${rangeStr}`,
+          range: rangeStr,
+          gapCount: analysis.gaps.length,
+          startsFromBeginning: analysis.startsAtOne,
+          canFullyValidate: false,
+        },
+        selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+      };
+    }
+
+    return {
+      validation: {
+        state: 'valid' as const,
+        message: `Selection is contiguous - ${rangeStr}`,
+        range: rangeStr,
+        startsFromBeginning: analysis.startsAtOne,
+        canFullyValidate: analysis.startsAtOne,
+      },
+      selectedOverlaps: [] as Array<{ first: ChunkFileInfo; second: ChunkFileInfo }>,
+    };
+  }, [chunkGroups, selection]);
 
   // Update selection when files change
   useEffect(() => {
@@ -348,22 +389,24 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
         newSelectedVersions.set(group.rangeKey, group.files[0].id);
       }
 
-      // Keep existing checked state if still valid
-      if (selection.checkedRanges.has(group.rangeKey)) {
+      // Keep existing checked state if still valid, but never check already-loaded ranges
+      if (selection.checkedRanges.has(group.rangeKey) && !existingRanges.has(group.rangeKey)) {
         newCheckedRanges.add(group.rangeKey);
       }
     }
 
-    // If this is initial load (nothing was checked), check all
+    // If this is initial load (nothing was checked), check all non-existing ranges
     if (selection.checkedRanges.size === 0) {
       for (const group of chunkGroups) {
-        newCheckedRanges.add(group.rangeKey);
+        if (!existingRanges.has(group.rangeKey)) {
+          newCheckedRanges.add(group.rangeKey);
+        }
       }
     }
 
     setSelection({ selectedVersions: newSelectedVersions, checkedRanges: newCheckedRanges });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chunkGroups]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chunkGroups, existingRanges]);
 
   // Notify parent of selection changes
   useEffect(() => {
@@ -425,86 +468,53 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     setSelection(prev => ({ ...prev, checkedRanges: new Set() }));
   }, []);
 
-  // Compute validation state
-  const validation = useMemo(() => {
+  // Compute whether verification is possible considering existing data + new selection
+  const canVerifyWithExisting = useMemo(() => {
+    // Convert existing ranges to objects with filename format
+    const existingAsFiles = Array.from(existingRanges).map(rangeKey => ({
+      filename: `ledger_${rangeKey}.committed`,
+    }));
+
+    // Get selected new chunks
     const selectedGroups = chunkGroups.filter(g => selection.checkedRanges.has(g.rangeKey));
-    const sortedSelected = [...selectedGroups].sort((a, b) => a.startNo - b.startNo);
+    const selectedAsFiles = selectedGroups.map(g => ({ filename: g.files[0].filename }));
 
-    if (sortedSelected.length === 0) {
-      return { state: 'empty' as const, message: 'No chunks selected' };
-    }
+    // Combine and analyze using shared validation logic
+    const allFiles = [...existingAsFiles, ...selectedAsFiles];
 
-    // Check for unresolved duplicates
-    const unresolvedDuplicates = sortedSelected.filter(
-      g => g.isDuplicate && !selection.selectedVersions.has(g.rangeKey)
-    );
-    if (unresolvedDuplicates.length > 0) {
-      return {
-        state: 'error' as const,
-        message: `Select a version for: ${unresolvedDuplicates.map(g => g.rangeKey).join(', ')}`,
-      };
-    }
+    if (allFiles.length === 0) return false;
 
-    // Check for gaps in selection
-    const selectedGaps: SequenceGap[] = [];
-    for (let i = 0; i < sortedSelected.length - 1; i++) {
-      const current = sortedSelected[i];
-      const next = sortedSelected[i + 1];
-      const expectedStart = current.endNo + 1;
+    const analysis = analyzeLedgerSequence(allFiles);
 
-      if (next.startNo > expectedStart) {
-        selectedGaps.push({ startNo: expectedStart, endNo: next.startNo - 1 });
-      }
-    }
+    // Can verify if: starts at 1, no gaps, no overlaps
+    return analysis.startsAtOne && analysis.isContiguous && !analysis.hasOverlaps;
+  }, [existingRanges, chunkGroups, selection]);
 
-    // Build sequence range string
-    const firstChunk = sortedSelected[0];
-    const lastChunk = sortedSelected[sortedSelected.length - 1];
-    const rangeStr = `sequences ${firstChunk.startNo}–${lastChunk.endNo}`;
-
-    // Check if selection starts from sequence 1
-    const startsFromBeginning = firstChunk.startNo === 1;
-
-    if (selectedGaps.length > 0) {
-      return {
-        state: 'warning' as const,
-        message: `Selection has ${selectedGaps.length} gap(s) - ${rangeStr}`,
-        range: rangeStr,
-        gapCount: selectedGaps.length,
-        startsFromBeginning,
-        canFullyValidate: false,
-      };
-    }
-
-    return {
-      state: 'valid' as const,
-      message: `Selection is contiguous - ${rangeStr}`,
-      range: rangeStr,
-      startsFromBeginning,
-      canFullyValidate: startsFromBeginning,
-    };
-  }, [chunkGroups, selection]);
-
-  // Get selected files for import
+  // Get selected files for import (excludes already-loaded files)
   const getSelectedFiles = useCallback((): ChunkFileInfo[] => {
     const result: ChunkFileInfo[] = [];
 
     for (const group of chunkGroups) {
       if (!selection.checkedRanges.has(group.rangeKey)) continue;
+      // Skip already-loaded ranges
+      if (existingRanges.has(group.rangeKey)) continue;
 
       const selectedId = selection.selectedVersions.get(group.rangeKey);
       const file = group.files.find(f => f.id === selectedId) || group.files[0];
+      // Also skip if the file itself is marked as existing
+      if (file.isExisting) continue;
       result.push(file);
     }
 
     return result.sort((a, b) => a.startNo - b.startNo);
-  }, [chunkGroups, selection]);
+  }, [chunkGroups, selection, existingRanges]);
 
   // Handle import click
   const handleImport = useCallback(() => {
     const selectedFiles = getSelectedFiles();
-    onImport(selectedFiles, overwriteExisting);
-  }, [getSelectedFiles, onImport, overwriteExisting]);
+    // Only pass autoVerify=true if combined existing + new data can be verified
+    onImport(selectedFiles, overwriteExisting, autoVerify && canVerifyWithExisting);
+  }, [getSelectedFiles, onImport, overwriteExisting, autoVerify, canVerifyWithExisting]);
 
   // Handle clear database
   const handleClearDatabase = useCallback(async () => {
@@ -537,6 +547,16 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     </div>
   );
 
+  // Render an overlap indicator between two chunks
+  const renderOverlap = (first: ChunkFileInfo, second: ChunkFileInfo) => (
+    <div key={`overlap-${first.startNo}-${first.endNo}-${second.startNo}-${second.endNo}`} className={styles.overlapRow}>
+      <ErrorCircle16Regular />
+      <Caption1>
+        Overlap: sequences {second.startNo}–{first.endNo} covered by both files above and below
+      </Caption1>
+    </div>
+  );
+
   // Render a chunk group (possibly with duplicates)
   const renderChunkGroup = (group: ChunkGroup) => {
     const isChecked = selection.checkedRanges.has(group.rangeKey);
@@ -549,7 +569,8 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
           className={`${styles.chunkRow} ${isChecked ? styles.chunkRowSelected : ''} ${isAlreadyLoaded ? styles.chunkRowAlreadyLoaded : ''}`}
         >
           <Checkbox
-            checked={isChecked}
+            checked={isChecked || isAlreadyLoaded}
+            disabled={isAlreadyLoaded}
             onChange={() => toggleRange(group.rangeKey)}
           />
           <div className={styles.chunkInfo}>
@@ -609,10 +630,17 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     );
   };
 
-  // Build the display list with gaps inserted
+  // Build the display list with gaps and overlaps inserted
   const displayItems = useMemo(() => {
     const items: React.ReactNode[] = [];
     let gapIndex = 0;
+
+    // Build a map of overlaps keyed by the "second" chunk's range for quick lookup
+    const overlapsBySecond = new Map<string, typeof selectedOverlaps[0]>();
+    for (const overlap of selectedOverlaps) {
+      const secondKey = `${overlap.second.startNo}-${overlap.second.endNo}`;
+      overlapsBySecond.set(secondKey, overlap);
+    }
 
     for (const group of chunkGroups) {
       // Insert any gaps before this group
@@ -621,12 +649,18 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
         gapIndex++;
       }
 
+      // Insert overlap indicator if this group is the "second" in an overlap pair
+      const overlap = overlapsBySecond.get(group.rangeKey);
+      if (overlap) {
+        items.push(renderOverlap(overlap.first, overlap.second));
+      }
+
       items.push(renderChunkGroup(group));
     }
 
     return items;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chunkGroups, gaps, selection]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chunkGroups, gaps, selectedOverlaps]);
 
   const selectedCount = selection.checkedRanges.size;
   const canImport = selectedCount > 0 && validation.state !== 'error';
@@ -679,7 +713,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
           {displayItems}
         </div>
 
-        {/* Validation summary */}
+        {/* Validation summary - consolidated messages */}
         <div className={styles.summary}>
           <div className={styles.summaryRow}>
             {validation.state === 'valid' && (
@@ -691,7 +725,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
             {validation.state === 'warning' && (
               <>
                 <Warning16Regular primaryFill={tokens.colorPaletteYellowForeground1} />
-                <Text>{selectedCount} chunk(s) selected</Text>
+                <Text>{selectedCount} chunk(s) selected — {validation.message}</Text>
               </>
             )}
             {validation.state === 'error' && (
@@ -707,31 +741,20 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
               </>
             )}
           </div>
-          {validation.state !== 'empty' && validation.state !== 'error' && (
-            <Caption1 className={styles.sequenceRange}>
-              {validation.message}
+          {/* Warning when verification isn't possible */}
+          {validation.state !== 'empty' && validation.state !== 'error' && !canVerifyWithExisting && (
+            <Caption1 style={{ marginTop: '4px', color: tokens.colorPaletteYellowForeground2 }}>
+              Combined data doesn't start from sequence 1 or has gaps. The ledger may not be fully analyzable.
+            </Caption1>
+          )}
+          {selectedOverlaps.length > 0 && (
+            <Caption1 style={{ marginTop: '4px', color: tokens.colorPaletteRedForeground2 }}>
+              <strong>Overlapping files:</strong> {selectedOverlaps.map(o =>
+                `${o.first.filename} ↔ ${o.second.filename}`
+              ).join('; ')}.
             </Caption1>
           )}
         </div>
-
-        {/* Warning for gaps */}
-        {validation.state === 'warning' && (
-          <MessageBar intent="warning">
-            <MessageBarBody>
-              Your selection has gaps. The ledger may not be fully analyzable.
-            </MessageBarBody>
-          </MessageBar>
-        )}
-
-        {/* Warning for not starting from sequence 1 */}
-        {validation.state !== 'empty' && validation.state !== 'error' && 
-         'startsFromBeginning' in validation && !validation.startsFromBeginning && (
-          <MessageBar intent="warning">
-            <MessageBarBody>
-              Selection doesn't start from sequence 1. Cryptographic verification will not be possible.
-            </MessageBarBody>
-          </MessageBar>
-        )}
 
         {/* Overwrite option */}
         {showOverwriteOption && (
@@ -741,23 +764,39 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
             label="Replace existing data (unchecked = append to existing)"
           />
         )}
-      </div>
 
-      {/* Sticky footer - always visible */}
-      <div className={styles.stickyFooter}>
-        <div className={styles.actions}>
-          <Button
-            appearance="primary"
-            size="large"
-            className={styles.importButton}
-            disabled={!canImport || isImporting}
-            onClick={handleImport}
-          >
-            {isImporting ? 'Importing...' : `${importButtonLabel} (${selectedCount})`}
-          </Button>
+        {/* Auto-verify option */}
+        {showAutoVerifyOption && (
+          <Checkbox
+            checked={autoVerify && canVerifyWithExisting}
+            onChange={(_, data) => setAutoVerify(data.checked === true)}
+            disabled={!canVerifyWithExisting}
+            label={
+              canVerifyWithExisting
+                ? "Verify ledger integrity after import (runs in background)"
+                : "Verify ledger integrity after import (requires contiguous ledger starting from sequence 1)"
+            }
+          />
+        )}
+
+        {/* Actions */}
+        {/* Sticky footer - always visible */}
+        <div className={styles.stickyFooter}>
+          <div className={styles.actions}>
+            <div />
+            <Button
+              appearance="primary"
+              className={styles.importButton}
+              disabled={!canImport || isImporting}
+              onClick={handleImport}
+            >
+              {isImporting ? 'Importing...' : `${importButtonLabel} (${selectedCount})`}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
+
   );
 };
 

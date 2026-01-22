@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -21,6 +21,29 @@ interface WorkerResponse {
   id?: number;
   result?: unknown;
   error?: string;
+}
+
+/**
+ * Result from inserting a ledger file with verification
+ */
+export interface InsertLedgerFileResult {
+  fileId: number;
+  transactionCount: number;
+  verification: {
+    verified: boolean;
+    transactionCount: number;
+    signatureSeqNo?: number;
+    expectedRoot?: string;
+    calculatedRoot?: string;
+    error?: string;
+  } | null;
+}
+
+/**
+ * Options for inserting a ledger file
+ */
+export interface InsertLedgerFileOptions {
+  shouldVerify?: boolean;
 }
 
 /**
@@ -117,12 +140,18 @@ export class DatabaseWorkerClient {
   /**
    * Insert a ledger file directly in the worker using transferable ArrayBuffer
    * Transfers ownership of ArrayBuffer to worker for zero-copy performance
+   * 
+   * @param filename - Name of the ledger file
+   * @param fileSize - Size of the file in bytes
+   * @param arrayBuffer - The file contents (ownership transferred to worker)
+   * @param options - Optional parameters for verification
    */
   async insertLedgerFile(
     filename: string,
     fileSize: number,
-    arrayBuffer: ArrayBuffer
-  ): Promise<{ fileId: number; transactionCount: number }> {
+    arrayBuffer: ArrayBuffer,
+    options?: InsertLedgerFileOptions
+  ): Promise<InsertLedgerFileResult> {
     await this.readyPromise;
 
     const id = this.messageId++;
@@ -137,9 +166,14 @@ export class DatabaseWorkerClient {
       this.worker.postMessage({
         type: 'insertLedgerFile',
         id,
-        payload: { filename, fileSize, arrayBuffer },
+        payload: { 
+          filename, 
+          fileSize, 
+          arrayBuffer,
+          shouldVerify: options?.shouldVerify !== false,
+        },
       }, [arrayBuffer]);
-    }) as Promise<{ fileId: number; transactionCount: number }>;
+    }) as Promise<InsertLedgerFileResult>;
   }
 
   /**
@@ -156,6 +190,14 @@ export class DatabaseWorkerClient {
    */
   async clearAllData(): Promise<void> {
     await this.sendMessage('clearAllData', {});
+  }
+
+  /**
+   * Reset the Merkle tree state in the worker
+   * Call this before starting a fresh import sequence
+   */
+  async resetMerkleState(): Promise<void> {
+    await this.sendMessage('resetMerkleState', {});
   }
 
   /**

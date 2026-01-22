@@ -20,11 +20,11 @@ import {
   DocumentAdd24Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useLedgerFiles, useClearAllData } from '../hooks/use-ccf-data';
-import { 
-  parseLedgerFilename, 
-} from '../utils/ledger-validation';
-import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { parseLedgerFilename } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
+import { ChunkSelector } from './ChunkSelector';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
+import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({
   container: {
@@ -125,7 +125,11 @@ const useStyles = makeStyles({
   },
 });
 
-export const FileUploadArea: React.FC = () => {
+export interface FileUploadAreaProps {
+  onImportComplete?: () => void;
+}
+
+export const FileUploadArea: React.FC<FileUploadAreaProps> = ({ onImportComplete }) => {
   const styles = useStyles();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -140,6 +144,27 @@ export const FileUploadArea: React.FC = () => {
 
   const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
 
+  // Convert existing database files to ChunkFileInfo format
+  const existingChunkFiles = useMemo((): ChunkFileInfo[] => {
+    if (!existingLedgerFiles) return [];
+    return existingLedgerFiles
+      .map(file => {
+        const parsed = parseLedgerFilename(file.filename);
+        if (!parsed.isValid) return null;
+        return {
+          id: `existing-${file.id}`,
+          filename: file.filename,
+          startNo: parsed.startNo,
+          endNo: parsed.endNo,
+          isValid: true,
+          size: file.fileSize,
+          lastModified: file.createdAt ? new Date(file.createdAt) : undefined,
+          isExisting: true, // Mark as already in database
+        } as ChunkFileInfo;
+      })
+      .filter((chunk): chunk is ChunkFileInfo => chunk !== null);
+  }, [existingLedgerFiles]);
+
   // Compute set of already-loaded range keys
   const existingRanges = useMemo(() => {
     if (!existingLedgerFiles) return new Set<string>();
@@ -152,6 +177,17 @@ export const FileUploadArea: React.FC = () => {
     }
     return ranges;
   }, [existingLedgerFiles]);
+
+  // Combine existing and new files for display
+  const allChunkFiles = useMemo(() => {
+    // Combine existing files with newly selected files
+    // Filter out any newly selected files that duplicate existing ones
+    const newFilesFiltered = chunkFiles.filter(f => {
+      const rangeKey = `${f.startNo}-${f.endNo}`;
+      return !existingRanges.has(rangeKey);
+    });
+    return [...existingChunkFiles, ...newFilesFiltered];
+  }, [existingChunkFiles, chunkFiles, existingRanges]);
 
   // Handle clear database
   const handleClearDatabase = useCallback(async () => {
@@ -234,8 +270,16 @@ export const FileUploadArea: React.FC = () => {
   };
 
   // Perform the import of selected files
-  const doImport = useCallback(async (selectedFiles: ChunkFileInfo[], allPendingFiles: File[], mode: ImportMode) => {
+  const doImport = useCallback(async (
+    selectedFiles: ChunkFileInfo[], 
+    allPendingFiles: File[], 
+    mode: ImportMode,
+    autoVerify: boolean
+  ) => {
     if (selectedFiles.length === 0) return;
+
+    // Close dialog immediately when import starts
+    onImportComplete?.();
 
     setIsImporting(true);
     setImportError(null);
@@ -243,6 +287,8 @@ export const FileUploadArea: React.FC = () => {
     try {
       if (mode === 'replace') {
         await clearAllDataMutation.mutateAsync();
+        // Clear any existing verification progress when replacing data
+        verificationService.clearSavedProgress();
       }
 
       // Build selected filenames
@@ -252,30 +298,35 @@ export const FileUploadArea: React.FC = () => {
       const filesToImport = allPendingFiles.filter(f => selectedFilenames.has(f.name));
       
       if (filesToImport.length > 0) {
-        await handleFiles(filesToImport);
+        // Import files - shouldVerify controls inline merkle verification during parsing
+        await handleFiles(filesToImport, { shouldVerify: autoVerify });
       }
 
       // Clear state after successful import
       setPendingFiles([]);
       setChunkFiles([]);
+      
+      // Clear saved verification progress
+      verificationService.clearSavedProgress();
+      
+      // If autoVerify is enabled, start the verification service to verify all chunks
+      // This runs after import and provides UI feedback on verification progress
+      if (autoVerify) {
+        // Start verification without awaiting - let it run in background
+        verificationService.startVerification({ progressReportInterval: 50 });
+      }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : 'Failed to import files');
     } finally {
       setIsImporting(false);
     }
-  }, [clearAllDataMutation, handleFiles]);
+  }, [clearAllDataMutation, handleFiles, onImportComplete]);
 
-  // Called from ChunkSelector's onImport - uses overwrite preference from ChunkSelector
-  const handleImportRequest = useCallback((selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+  // Called from ChunkSelector's onImport - uses overwrite preference and autoVerify from ChunkSelector
+  const handleImportRequest = useCallback((selectedFiles: ChunkFileInfo[], overwriteExisting: boolean, autoVerify: boolean) => {
     const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
-    doImport(selectedFiles, pendingFiles, mode);
+    doImport(selectedFiles, pendingFiles, mode, autoVerify);
   }, [doImport, pendingFiles]);
-
-  const handleClearSelection = () => {
-    setPendingFiles([]);
-    setChunkFiles([]);
-    setImportError(null);
-  };
 
   return (
     <div className={styles.container}>
@@ -355,11 +406,11 @@ export const FileUploadArea: React.FC = () => {
         </MessageBar>
       )}
 
-      {/* Chunk Selector */}
-      {chunkFiles.length > 0 && (
+      {/* Chunk Selector - show when there are files (existing or newly selected) */}
+      {allChunkFiles.length > 0 && (
         <div className={styles.chunkSelectorWrapper}>
           <ChunkSelector
-            files={chunkFiles}
+            files={allChunkFiles}
             onImport={handleImportRequest}
             isImporting={isImporting}
             importButtonLabel="Import Selected"
@@ -368,20 +419,11 @@ export const FileUploadArea: React.FC = () => {
             existingRanges={existingRanges}
             onClearDatabase={handleClearDatabase}
           />
-          
-          <Button
-            appearance="secondary"
-            onClick={handleClearSelection}
-            disabled={isImporting}
-            style={{ marginTop: '8px' }}
-          >
-            Clear Selection
-          </Button>
         </div>
       )}
 
       {/* Empty State */}
-      {chunkFiles.length === 0 && !isImporting && (
+      {allChunkFiles.length === 0 && !isImporting && (
         <div className={styles.emptyState}>
           <Caption1 className={styles.emptySubtext}>
             Select CCF ledger .committed files to preview and import.

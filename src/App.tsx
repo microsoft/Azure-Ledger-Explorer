@@ -23,6 +23,7 @@ import GridLayout from './components/AppLayout';
 import { ConfigPage } from './pages/ConfigPage';
 import { SplashScreen } from './components/SplashScreen';
 import { PWAPrompt } from './components/PWAPrompt';
+import { VerificationStatusIndicator } from './components/VerificationStatusIndicator';
 import { initializeDatabase, resetDatabase } from './hooks/use-ccf-data';
 
 // Create a client
@@ -117,6 +118,7 @@ function App() {
             </GridLayout.Main>
           </GridLayout>
           <PWAPrompt />
+          <VerificationStatusIndicator />
         </Router>
       </FluentProvider>
     </QueryClientProvider>

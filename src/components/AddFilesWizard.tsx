@@ -135,6 +135,11 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
   const styles = useStyles();
   const [selectedTab, setSelectedTab] = useState<AllowedOptions>('local');
 
+  // Callback to close the dialog when import completes
+  const handleImportComplete = () => {
+    onOpenChange(false);
+  };
+
   const getHelpContent = () => {
     switch (selectedTab) {
       case 'azure':
@@ -150,12 +155,12 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'azure':
-        return <LedgerBackupView />;
+        return <LedgerBackupView onImportComplete={handleImportComplete} />;
       case 'mst':
-        return <MstLedgerImportView />;
+        return <MstLedgerImportView onImportComplete={handleImportComplete} />;
       case 'local':
       default:
-        return <FileUploadArea />;
+        return <FileUploadArea onImportComplete={handleImportComplete} />;
     }
   };
 

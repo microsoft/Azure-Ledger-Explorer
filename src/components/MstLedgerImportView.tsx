@@ -6,7 +6,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 /* eslint-disable react-refresh/only-export-components */
 import { MstFilesService, type DownloadProgress } from '../services/MstFilesService';
-import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
+import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
 import {
     makeStyles,
     Button,
@@ -28,7 +29,8 @@ import {
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
 import { setLedgerDomain as storeLedgerDomain } from '../utils/ledger-domain-storage';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
-import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { ChunkSelector } from './ChunkSelector';
+import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({
     container: {
@@ -126,7 +128,7 @@ const useStyles = makeStyles({
 export const useDownloadMstFiles = () => {
     const { handleFiles } = useFileDrop();
 
-    const downloadFiles = async (targetDomain?: string) => {
+    const downloadFiles = async (targetDomain?: string, options?: { shouldVerify?: boolean }) => {
         const domainToUse = targetDomain;
         if (!domainToUse) {
             throw new Error('Domain is required to download files');
@@ -134,7 +136,7 @@ export const useDownloadMstFiles = () => {
         const fileShareService = new MstFilesService();
         await fileShareService.initialize(domainToUse);
         const { files: downloadedFiles } = await fileShareService.downloadAllLedgerFiles();
-        await handleFiles(downloadedFiles);
+        await handleFiles(downloadedFiles, { shouldVerify: options?.shouldVerify ?? false });
     };
 
     return { 
@@ -142,7 +144,11 @@ export const useDownloadMstFiles = () => {
     };
 };
 
-export const MstLedgerImportView: React.FC = () => {
+export interface MstLedgerImportViewProps {
+    onImportComplete?: () => void;
+}
+
+export const MstLedgerImportView: React.FC<MstLedgerImportViewProps> = ({ onImportComplete }) => {
     const styles = useStyles();
     const clearAllDataMutation = useClearAllData();
     const { data: existingLedgerFiles } = useLedgerFiles();
@@ -210,41 +216,58 @@ export const MstLedgerImportView: React.FC = () => {
         }
     };
 
-    const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+    const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean, autoVerify: boolean) => {
         const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
-        await performImport(selectedFiles, mode);
+        await performImport(selectedFiles, mode, autoVerify);
     };
 
-    const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode) => {
+    const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode, autoVerify: boolean) => {
         setIsDownloading(true);
         setDownloadProgress(null);
 
-        // Only clear existing data if user chose replace mode
-        if (mode === 'replace') {
-            await clearAllDataMutation.mutateAsync();
-        }
-
-        const filenames = selectedFiles.map(f => f.filename);
-        const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
-            filenames,
-            (progress) => setDownloadProgress(progress)
-        );
-
-        if (downloadedFiles.length > 0) {
-            handleFiles(downloadedFiles);
-
-            if (ledgerDomain) {
-                storeLedgerDomain(ledgerDomain, 'MST');
+        try {
+            // Only clear existing data if user chose replace mode
+            if (mode === 'replace') {
+                await clearAllDataMutation.mutateAsync();
+                // Clear any existing verification progress when replacing data
+                verificationService.clearSavedProgress();
             }
 
-            setFiles([]);
-            setDownloadedFiles(filesDownloaded);
-        } else {
-            console.error('No files downloaded');
-        }
+            const filenames = selectedFiles.map(f => f.filename);
+            const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
+                filenames,
+                (progress) => setDownloadProgress(progress)
+            );
 
-        setIsDownloading(false);
-        setDownloadProgress(null);
+            if (downloadedFiles.length > 0) {
+                // Import files - shouldVerify controls inline merkle verification during parsing
+                await handleFiles(downloadedFiles, { shouldVerify: autoVerify });
+
+                if (ledgerDomain) {
+                    storeLedgerDomain(ledgerDomain, 'MST');
+                }
+
+                setFiles([]);
+                setDownloadedFiles(filesDownloaded);
+                
+                // Clear saved verification progress
+                verificationService.clearSavedProgress();
+                
+                // If autoVerify is enabled, start the verification service to verify all chunks
+                if (autoVerify) {
+                    // Start verification without awaiting - let it run in background
+                    verificationService.startVerification({ progressReportInterval: 50 });
+                }
+            } else {
+                console.error('No files downloaded');
+            }
+        } finally {
+            setIsDownloading(false);
+            setDownloadProgress(null);
+            
+            // Close dialog only after import is complete
+            onImportComplete?.();
+        }
     };
 
     return (

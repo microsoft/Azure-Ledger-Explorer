@@ -3,11 +3,9 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useSyncExternalStore } from 'react';
-import { CCFDatabase } from '@ccf/database';
+import { CCFDatabase, DATABASE_FILENAME } from '@ccf/database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
 
@@ -27,8 +25,9 @@ export const initializeDatabase = async (): Promise<void> => {
     return; // Already initialized
   }
   
+  // Note: The actual filename is defined in @ccf/database constants
   dbInstance = new CCFDatabase({
-    filename: 'ccf-ledger.db',
+    filename: DATABASE_FILENAME,
     useOpfs: true,
   });
   
@@ -51,17 +50,17 @@ export const resetDatabase = async (): Promise<void> => {
       const root = await navigator.storage.getDirectory();
       // Try to remove the database files
       try {
-        await root.removeEntry('ccf-ledger.db', { recursive: true });
+        await root.removeEntry(DATABASE_FILENAME, { recursive: true });
       } catch {
         // File might not exist, ignore
       }
       try {
-        await root.removeEntry('ccf-ledger.db-journal', { recursive: true });
+        await root.removeEntry(`${DATABASE_FILENAME}-journal`, { recursive: true });
       } catch {
         // File might not exist, ignore
       }
       try {
-        await root.removeEntry('ccf-ledger.db-wal', { recursive: true });
+        await root.removeEntry(`${DATABASE_FILENAME}-wal`, { recursive: true });
       } catch {
         // File might not exist, ignore
       }
@@ -281,15 +280,22 @@ export const useUploadLedgerFile = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (file: File): Promise<{ fileId: number; transactionCount: number }> => {
+    mutationFn: async (params: { 
+      file: File; 
+      shouldVerify?: boolean;
+    }) => {
+      const { file, shouldVerify } = params;
       const db = await getDatabase();
       
       // Read file into ArrayBuffer
       const arrayBuffer = await file.arrayBuffer();
       
       // Transfer the ArrayBuffer to the worker for processing
-      // The worker will parse and insert everything
-      const result = await db.insertLedgerFileWithData(file.name, file.size, arrayBuffer);
+      // The worker will parse, verify, and insert everything
+      // Merkle tree state is maintained inside the worker across calls
+      const result = await db.insertLedgerFileWithData(file.name, file.size, arrayBuffer, {
+        shouldVerify: shouldVerify !== false,
+      });
       
       return result;
     },
@@ -445,11 +451,22 @@ export const useFileDrop = () => {
     getUploadProgressSnapshot
   );
 
-  const handleFiles = useCallback(async (files: FileList | File[]) => {
+  const handleFiles = useCallback(async (
+    files: FileList | File[], 
+    options?: { shouldVerify?: boolean }
+  ) => {
     const fileArray = Array.from(files).filter(f => f.size > 0);
     const totalFiles = fileArray.length;
     const allFiles = fileArray.map(f => f.name);
     const completedFiles = new Set<string>();
+    const shouldVerify = options?.shouldVerify !== false;
+    
+    // Reset Merkle tree state before starting a new import sequence
+    // This ensures verification starts from a clean state
+    if (shouldVerify && totalFiles > 0) {
+      const db = await getDatabase();
+      await db.resetMerkleState();
+    }
     
     // Show all files immediately in the pending state
     if (totalFiles > 0) {
@@ -476,7 +493,11 @@ export const useFileDrop = () => {
           processingFile: file.name,
         });
         
-        await uploadMutation.mutateAsync(file);
+        // Worker maintains Merkle tree state internally across calls
+        await uploadMutation.mutateAsync({
+          file,
+          shouldVerify,
+        });
         
         // Mark as completed
         completedFiles.add(file.name);

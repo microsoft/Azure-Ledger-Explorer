@@ -9,12 +9,19 @@ import type {
   GcmHeader, 
   PublicDomain, 
   LedgerKeyValue,
+  ChunkVerificationResult,
 } from './types';
 import { 
   EntryType,
   LEDGER_CONSTANTS,
   entryTypeHelpers
 } from './types';
+import { 
+  MerkleTree, 
+  areByteArraysEqual, 
+  toHexStringLower,
+  hexStringToBytes 
+} from './merkle-tree';
 
 /**
  * Parser for CCF LedgerChunkV2 format files.
@@ -317,6 +324,139 @@ export class LedgerChunkV2 {
       } else {
         break;
       }
+    }
+  }
+
+  /**
+   * Verify all transactions in this chunk and return them along with verification result.
+   * 
+   * This method iterates through all transactions, builds the Merkle tree, and verifies
+   * against the signature transaction at the end of the chunk.
+   * 
+   * @param existingTree Optional MerkleTree from previous chunk (for continuity)
+   * @returns Verification result, the transactions, and the updated Merkle tree
+   */
+  async verifyTransactions(
+    existingTree?: MerkleTree
+  ): Promise<{
+    result: ChunkVerificationResult;
+    transactions: Transaction[];
+    merkleTree: MerkleTree;
+  }> {
+    const merkleTree = existingTree || new MerkleTree();
+    
+    // Parse all transactions first
+    const transactions: Transaction[] = [];
+    for await (const transaction of this.readAllTransactions()) {
+      transactions.push(transaction);
+    }
+    
+    if (transactions.length === 0) {
+      return {
+        result: {
+          verified: false,
+          transactionCount: 0,
+          error: 'No transactions to verify',
+        },
+        transactions,
+        merkleTree,
+      };
+    }
+
+    try {
+      // Find the last signature transaction (must be the last transaction in a chunk)
+      // Search from the back - in a valid chunk, the last tx should be a signature
+      let lastSignatureIndex = -1;
+      let lastExpectedRoot: string | undefined;
+      let lastSignatureSeqNo: number | undefined;
+
+      for (let i = transactions.length - 1; i >= 0; i--) {
+        const transaction = transactions[i];
+        const signatureWrite = transaction.publicDomain.writes.find(write => 
+          write.mapName?.includes('public:ccf.internal.signatures')
+        );
+
+        if (signatureWrite && signatureWrite.value.length > 0) {
+          try {
+            const signatureJson = new TextDecoder().decode(signatureWrite.value);
+            const signatureData = JSON.parse(signatureJson) as { root?: string };
+            
+            if (signatureData.root) {
+              lastSignatureIndex = i;
+              lastExpectedRoot = signatureData.root;
+              lastSignatureSeqNo = transaction.gcmHeader.seqNo;
+              break; // Found the last signature, stop searching
+            }
+          } catch (parseError) {
+            console.warn(`Failed to parse signature data at transaction ${transaction.gcmHeader.seqNo}:`, parseError);
+          }
+        }
+      }
+
+      // Add transaction hashes to Merkle tree (up to but NOT including the signature transaction)
+      const txCountToInsert = lastSignatureIndex !== -1 ? lastSignatureIndex : transactions.length;
+      for (let i = 0; i < txCountToInsert; i++) {
+        merkleTree.insertLeaf(transactions[i].txDigest);
+      }
+
+      // Verify using the last signature transaction found
+      if (lastExpectedRoot !== undefined && lastSignatureIndex !== -1) {
+        const calculatedRootBytes = await merkleTree.calculateRootHash();
+        const calculatedRoot = toHexStringLower(calculatedRootBytes);
+        const expectedRootBytes = hexStringToBytes(lastExpectedRoot);
+        
+        if (areByteArraysEqual(calculatedRootBytes, expectedRootBytes)) {
+          // Verification passed - now add the signature transaction to carry forward
+          merkleTree.insertLeaf(transactions[lastSignatureIndex].txDigest);
+          
+          return {
+            result: {
+              verified: true,
+              transactionCount: transactions.length,
+              signatureSeqNo: lastSignatureSeqNo,
+              expectedRoot: lastExpectedRoot,
+              calculatedRoot,
+            },
+            transactions,
+            merkleTree,
+          };
+        } else {
+          return {
+            result: {
+              verified: false,
+              transactionCount: transactions.length,
+              signatureSeqNo: lastSignatureSeqNo,
+              expectedRoot: lastExpectedRoot,
+              calculatedRoot,
+              error: `Merkle root mismatch at transaction ${lastSignatureSeqNo}`,
+            },
+            transactions,
+            merkleTree,
+          };
+        }
+      }
+
+      // No signature found in this chunk - that's okay for intermediate chunks
+      return {
+        result: {
+          verified: false,
+          transactionCount: transactions.length,
+          error: 'No signature transaction found in chunk',
+        },
+        transactions,
+        merkleTree,
+      };
+
+    } catch (error) {
+      return {
+        result: {
+          verified: false,
+          transactionCount: transactions.length,
+          error: error instanceof Error ? error.message : 'Unknown error during verification',
+        },
+        transactions,
+        merkleTree,
+      };
     }
   }
 

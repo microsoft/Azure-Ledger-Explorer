@@ -631,8 +631,8 @@ export const AIChat: React.FC<AIChatProps> = ({
     } catch (error) {
       console.error('Ledger verification error:', error);
       return {
-        lastProcessedTransaction: 0,
-        totalTransactions: 0,
+        lastProcessedChunk: 0,
+        totalChunks: 0,
         status: 'error'
       };
     }

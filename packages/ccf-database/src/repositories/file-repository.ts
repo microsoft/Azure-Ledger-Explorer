@@ -25,7 +25,7 @@ export class FileRepository extends BaseRepository {
       const fileId = existing[0].id as number;
       await this.exec(
         `UPDATE ledger_files 
-         SET file_size = ?, updated_at = CURRENT_TIMESTAMP
+         SET file_size = ?, updated_at = CURRENT_TIMESTAMP, verified = NULL, verified_at = NULL, verification_error = NULL
          WHERE id = ?`,
         [fileSize, fileId]
       );
@@ -44,11 +44,51 @@ export class FileRepository extends BaseRepository {
   }
 
   /**
+   * Update verification status for a ledger file.
+   */
+  async updateVerificationStatus(
+    fileId: number, 
+    verified: boolean, 
+    errorMessage?: string
+  ): Promise<void> {
+    await this.exec(
+      `UPDATE ledger_files 
+       SET verified = ?, verified_at = CURRENT_TIMESTAMP, verification_error = ?
+       WHERE id = ?`,
+      [verified ? 1 : 0, errorMessage || null, fileId]
+    );
+  }
+
+  /**
+   * Clear all verification results for all files.
+   * Sets verified to NULL, clears verified_at and verification_error.
+   */
+  async clearAllVerificationResults(): Promise<void> {
+    await this.exec(
+      `UPDATE ledger_files 
+       SET verified = NULL, verified_at = NULL, verification_error = NULL`
+    );
+  }
+
+  /**
+   * Clear verification result for a single file.
+   * Sets verified to NULL, clears verified_at and verification_error.
+   */
+  async clearVerificationResult(fileId: number): Promise<void> {
+    await this.exec(
+      `UPDATE ledger_files 
+       SET verified = NULL, verified_at = NULL, verification_error = NULL
+       WHERE id = ?`,
+      [fileId]
+    );
+  }
+
+  /**
    * Get all ledger files sorted by sequence number extracted from filename.
    */
   async getAll(): Promise<LedgerFile[]> {
     const result = await this.exec(`
-      SELECT id, filename, file_size, created_at, updated_at
+      SELECT id, filename, file_size, created_at, updated_at, verified, verified_at, verification_error
       FROM ledger_files
       ORDER BY filename ASC
     `);
@@ -59,6 +99,9 @@ export class FileRepository extends BaseRepository {
       fileSize: row.file_size as number,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
+      verified: row.verified === null ? null : Boolean(row.verified),
+      verifiedAt: row.verified_at as string | null,
+      verificationError: row.verification_error as string | null,
     }));
 
     // Sort by ledger sequence (extract start number from filename)

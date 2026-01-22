@@ -5,7 +5,8 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { AzureFileShareService, type DownloadProgress } from '../services/AzureFileShareService';
-import { parseLedgerFilename, type LedgerFileInfo } from '../utils/ledger-validation';
+import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import type { ChunkFileInfo } from '../types/chunk-types';
 import {
   makeStyles,
   Button,
@@ -26,7 +27,8 @@ import {
 } from '@fluentui/react-icons';
 import { useFileDrop, useClearAllData, useLedgerFiles } from '../hooks/use-ccf-data';
 import { type ImportMode } from './ReplaceDataConfirmDialog';
-import { ChunkSelector, type ChunkFileInfo } from './ChunkSelector';
+import { ChunkSelector } from './ChunkSelector';
+import { verificationService } from '../services/verification-service';
 
 const useStyles = makeStyles({
   container: {
@@ -109,7 +111,11 @@ const useStyles = makeStyles({
   },
 });
 
-export const LedgerBackupView: React.FC = () => {
+export interface LedgerBackupViewProps {
+  onImportComplete?: () => void;
+}
+
+export const LedgerBackupView: React.FC<LedgerBackupViewProps> = ({ onImportComplete }) => {
   const styles = useStyles();
   const clearAllDataMutation = useClearAllData();
   const { data: existingLedgerFiles } = useLedgerFiles();
@@ -176,36 +182,53 @@ export const LedgerBackupView: React.FC = () => {
     }
   };
 
-  const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean) => {
+  const handleImportClick = async (selectedFiles: ChunkFileInfo[], overwriteExisting: boolean, autoVerify: boolean) => {
     const mode: ImportMode = overwriteExisting ? 'replace' : 'append';
-    await performImport(selectedFiles, mode);
+    await performImport(selectedFiles, mode, autoVerify);
   };
 
-  const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode) => {
+  const performImport = async (selectedFiles: ChunkFileInfo[], mode: ImportMode, autoVerify: boolean) => {
     setIsDownloading(true);
     setDownloadProgress(null);
 
-    // Only clear existing data if user chose replace mode
-    if (mode === 'replace') {
-      await clearAllDataMutation.mutateAsync();
+    try {
+      // Only clear existing data if user chose replace mode
+      if (mode === 'replace') {
+        await clearAllDataMutation.mutateAsync();
+        // Clear any existing verification progress when replacing data
+        verificationService.clearSavedProgress();
+      }
+
+      const filenames = selectedFiles.map(f => f.filename);
+      const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
+        filenames,
+        (progress) => setDownloadProgress(progress)
+      );
+
+      if (downloadedFiles.length > 0) {
+        // Import files - shouldVerify controls inline merkle verification during parsing
+        await handleFiles(downloadedFiles, { shouldVerify: autoVerify });
+        setFiles([]);
+        setDownloadedFiles(filesDownloaded);
+        
+        // Clear saved verification progress
+        verificationService.clearSavedProgress();
+        
+        // If autoVerify is enabled, start the verification service to verify all chunks
+        if (autoVerify) {
+          // Start verification without awaiting - let it run in background
+          verificationService.startVerification({ progressReportInterval: 50 });
+        }
+      } else {
+        console.error('No files downloaded');
+      }
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
+      
+      // Close dialog only after import is complete
+      onImportComplete?.();
     }
-
-    const filenames = selectedFiles.map(f => f.filename);
-    const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
-      filenames,
-      (progress) => setDownloadProgress(progress)
-    );
-
-    if (downloadedFiles.length > 0) {
-      handleFiles(downloadedFiles);
-      setFiles([]);
-      setDownloadedFiles(filesDownloaded);
-    } else {
-      console.error('No files downloaded');
-    }
-
-    setIsDownloading(false);
-    setDownloadProgress(null);
   };
 
   return (

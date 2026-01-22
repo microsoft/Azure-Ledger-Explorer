@@ -11,7 +11,7 @@ import {
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
 } from '../utils/ccf-internal-tree';
-import { toHexStringLower } from '../utils/merkle-tree';
+import { toHexStringLower } from '@ccf/ledger-parser';
 
 type NodeId = string;
 

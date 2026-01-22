@@ -22,6 +22,12 @@ export interface LedgerFile {
   fileSize: number;
   createdAt: string;
   updatedAt: string;
+  /** null = not verified, true = verified successfully, false = verification failed */
+  verified: boolean | null;
+  /** Timestamp when verification was performed */
+  verifiedAt: string | null;
+  /** Error message if verification failed */
+  verificationError: string | null;
 }
 
 /**

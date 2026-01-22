@@ -136,7 +136,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         throw new Error('Origin Private File System (OPFS) is not supported in this browser. Please use Chrome, Edge, or another Chromium-based browser.');
       }
 
-      setStatusMessage('Initializing SQLite database...');
+      setStatusMessage('Initializing database...');
       
       // Initialize the database
       await initializeDatabase();

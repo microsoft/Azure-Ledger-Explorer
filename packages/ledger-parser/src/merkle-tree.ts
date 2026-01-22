@@ -3,17 +3,46 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
-
+/**
+ * Merkle Tree implementation for CCF ledger verification.
+ * 
+ * The tree always starts with a zero hash as the first leaf.
+ * Each transaction's digest is added as a leaf, and the root
+ * hash is compared against signature transactions.
+ */
 export class MerkleTree {
   // First leaf is always a 32-byte zero hash
   private readonly leaves: Uint8Array[] = [new Uint8Array(32)];
+
+  /**
+   * Create a MerkleTree from existing leaves (for state restoration).
+   * This replaces the default initial leaves with the provided ones.
+   * 
+   * @param existingLeaves Array of leaves to restore (should include the initial zero hash)
+   */
+  static fromLeaves(existingLeaves: Uint8Array[]): MerkleTree {
+    const tree = new MerkleTree();
+    // Replace the default leaves with the existing ones
+    // Clear the array and add all existing leaves
+    tree.leaves.length = 0;
+    for (const leaf of existingLeaves) {
+      tree.leaves.push(leaf);
+    }
+    return tree;
+  }
 
   /**
    * Get read-only access to the leaves
    */
   get Leaves(): readonly Uint8Array[] {
     return this.leaves;
+  }
+
+  /**
+   * Get the number of leaves (excluding the initial zero hash)
+   */
+  get leafCount(): number {
+    return this.leaves.length - 1;
   }
 
   /**

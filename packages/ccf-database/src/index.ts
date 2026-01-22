@@ -6,6 +6,9 @@
 // Main database class
 export { CCFDatabase } from './ccf-database';
 
+// Constants
+export { DATABASE_FILENAME, DATABASE_PATH } from './constants';
+
 export type { DatabaseConfig, DatabaseTransaction } from './types/database-types';
 
 export type {
@@ -31,6 +34,11 @@ export type {
 export type {
   Migration
 } from './types/migration-types';
+
+export type {
+  InsertLedgerFileResult,
+  InsertLedgerFileOptions,
+} from './worker/database-worker-client';
 
 // Schema query utilities (functions only - types come from ./types)
 export {

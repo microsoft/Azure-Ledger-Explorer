@@ -354,10 +354,12 @@ export { formatBytes, formatHex } from './formatting';
 
 ```typescript
 // ✅ Correct database access
+import { CCFDatabase, DATABASE_FILENAME } from '@ccf/database';
+
 const getDatabase = async (): Promise<CCFDatabase> => {
   if (!dbInstance) {
     dbInstance = new CCFDatabase({
-      filename: 'ccf-ledger.db',
+      filename: DATABASE_FILENAME,
       useOpfs: true,
     });
     await dbInstance.initialize();
