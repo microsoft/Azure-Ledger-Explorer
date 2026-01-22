@@ -5,7 +5,7 @@
 
 import * as React from 'react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   makeStyles,
   Body1,
@@ -167,11 +167,35 @@ const useStyles = makeStyles({
 export const CCFVisualizerApp: React.FC = () => {
   const styles = useStyles();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [selectedFileId, setSelectedFileId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [transactionPage, setTransactionPage] = useState(0);
-  const [selectedTypeFilters, setSelectedTypeFilters] = useState<Set<TransactionType>>(new Set());
-  const pageSize = 50;
+
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
+
+  const [transactionPage, setTransactionPage] = useState(() => {
+    const p = parseInt(searchParams.get('page') || '1', 10);
+    return Number.isFinite(p) && p > 0 ? p - 1 : 0;
+  });
+
+  const [selectedTypeFilters, setSelectedTypeFilters] = useState<Set<TransactionType>>(() => {
+    const raw = searchParams.get('types') || '';
+    const values = raw
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean) as TransactionType[];
+    return new Set(values);
+  });
+
+  const pageSize = 10;
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   const { data: stats } = useStats();
   const { data: ledgerFiles } = useLedgerFiles();
@@ -205,49 +229,120 @@ export const CCFVisualizerApp: React.FC = () => {
   const transactionsLoading = fileTransactionsLoading;
   const totalTransactions = fileTransactionsCount;
 
+  const filteredTotalTransactions = React.useMemo(() => {
+    if (selectedTypeFilters.size > 0) {
+      return transactions?.length ?? 0;
+    }
+    return totalTransactions ?? 0;
+  }, [selectedTypeFilters, totalTransactions, transactions]);
+
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
   const handleFileSelect = (fileId: number) => {
     setSelectedFileId(fileId);
     setTransactionPage(0);
+
+    // Preserve query params but reset page when switching files
+    const next = new URLSearchParams(searchParams);
+    next.set('page', '1');
+    setSearchParams(next, { replace: true });
   };
 
   const handleTransactionClick = (transactionId: number) => {
-    navigate(`/transaction/${transactionId}`);
+    // keep current query params so Back returns to same filtered/paged view
+    const qs = searchParams.toString();
+    navigate(`/transaction/${transactionId}${qs ? `?${qs}` : ''}`);
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     setTransactionPage(0);
-    // Note: Search is now performed server-side with proper pagination
+
+    const next = new URLSearchParams(searchParams);
+    const normalized = query.trim();
+    if (normalized) {
+      next.set('q', normalized);
+    } else {
+      next.delete('q');
+    }
+    next.set('page', '1');
+    setSearchParams(next, { replace: true });
   };
 
   const handlePreviousPage = () => {
     if (transactionPage > 0) {
-      setTransactionPage(transactionPage - 1);
+      const nextPage = transactionPage - 1;
+      setTransactionPage(nextPage);
+
+      const next = new URLSearchParams(searchParams);
+      next.set('page', String(nextPage + 1));
+      setSearchParams(next, { replace: true });
     }
   };
 
   const handleNextPage = () => {
     const maxPage = Math.ceil((totalTransactions || 0) / pageSize) - 1;
     if (transactionPage < maxPage) {
-      setTransactionPage(transactionPage + 1);
+      const nextPage = transactionPage + 1;
+      setTransactionPage(nextPage);
+
+      const next = new URLSearchParams(searchParams);
+      next.set('page', String(nextPage + 1));
+      setSearchParams(next, { replace: true });
     }
   };
 
   // Calculate pagination info
-  const totalPages = Math.ceil((totalTransactions || 0) / pageSize);
+  const totalPages = Math.ceil((filteredTotalTransactions || 0) / pageSize);
   const currentPage = transactionPage + 1;
   const hasNextPage = currentPage < totalPages;
   const hasPreviousPage = currentPage > 1;
 
-  // Helper function to format bytes (still used in status bar and file tree)
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  // Keep local state in sync with URL
+  React.useEffect(() => {
+    const urlQ = searchParams.get('q') || '';
+    if (urlQ !== searchQuery) {
+      setSearchQuery(urlQ);
+    }
+
+    const urlPage = parseInt(searchParams.get('page') || '1', 10);
+    const normalizedPage = Number.isFinite(urlPage) && urlPage > 0 ? urlPage - 1 : 0;
+    if (normalizedPage !== transactionPage) {
+      setTransactionPage(normalizedPage);
+    }
+
+    const rawTypes = searchParams.get('types') || '';
+    const urlTypes = new Set(
+      rawTypes
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean) as TransactionType[],
+    );
+
+    const sameTypes =
+      urlTypes.size === selectedTypeFilters.size &&
+      Array.from(urlTypes).every(t => selectedTypeFilters.has(t));
+
+    if (!sameTypes) {
+      setSelectedTypeFilters(urlTypes);
+    }
+  }, [searchParams]);
+
+  const handleTypeFiltersChange = (nextTypes: Set<TransactionType>) => {
+    setSelectedTypeFilters(nextTypes);
+    setTransactionPage(0);
+
+    const next = new URLSearchParams(searchParams);
+    const encoded = Array.from(nextTypes).sort().join(',');
+
+    if (encoded) {
+      next.set('types', encoded);
+    } else {
+      next.delete('types');
+    }
+
+    next.set('page', '1');
+    setSearchParams(next, { replace: true });
   };
 
   // Show upload screen if no data
@@ -344,7 +439,7 @@ export const CCFVisualizerApp: React.FC = () => {
   };
 
   const selectedFileName = ledgerFiles?.find(f => f.id === selectedFileId)?.filename;
-  const showPagination = transactions && transactions.length > 0 && totalTransactions && totalTransactions > pageSize;
+  const showPagination = transactions && transactions.length > 0 && filteredTotalTransactions > pageSize;
 
   // Main layout: container (column) -> messages, mainContent (row: sidebar + canvas), footer
   return (
@@ -393,7 +488,7 @@ export const CCFVisualizerApp: React.FC = () => {
                 isLoading={transactionsLoading}
                 maxTransactions={500}
                 selectedTypeFilters={selectedTypeFilters}
-                onFilterChange={setSelectedTypeFilters}
+                onFilterChange={handleTypeFiltersChange}
               />
             </div>
           )}
@@ -407,7 +502,7 @@ export const CCFVisualizerApp: React.FC = () => {
           {showPagination && (
             <div className={styles.paginationContainer}>
               <div className={styles.paginationInfo}>
-                Page {currentPage} of {totalPages} ({totalTransactions} total)
+                Page {currentPage} of {totalPages} ({filteredTotalTransactions} total)
               </div>
               <div className={styles.paginationControls}>
                 <Button
@@ -436,7 +531,7 @@ export const CCFVisualizerApp: React.FC = () => {
       {/* Footer */}
       <footer className={styles.statusBar}>
         <Caption1>
-          {transactions?.length || 0}{totalTransactions && totalTransactions > pageSize ? ` of ${totalTransactions}` : ''} transactions
+          {transactions?.length || 0}{filteredTotalTransactions && filteredTotalTransactions > pageSize ? ` of ${filteredTotalTransactions}` : ''} transactions
           {selectedFileName && ` • ${selectedFileName}`}
           {storageInfo?.quota && ` • Storage: ${formatBytes(storageInfo.quota.usage)} / ${formatBytes(storageInfo.quota.quota)} (${storageInfo.quota.usagePercentage.toFixed(1)}%)`}
         </Caption1>

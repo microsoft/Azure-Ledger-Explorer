@@ -102,6 +102,19 @@ const useStyles = makeStyles({
   emptySubtext: {
     marginTop: '8px',
   },
+  pagination: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: '16px',
+    gap: '12px',
+    flexWrap: 'wrap',
+  },
+  paginationControls: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+  },
 });
 
 interface FileListViewProps {
@@ -116,6 +129,9 @@ export const FileListView: React.FC<FileListViewProps> = ({
   const styles = useStyles();
   const { data: ledgerFiles, isLoading, error } = useLedgerFiles();
   const deleteMutation = useDeleteLedgerFile();
+
+  const [pageSize] = React.useState<number>(10);
+  const [currentPage, setCurrentPage] = React.useState<number>(1);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -144,10 +160,27 @@ export const FileListView: React.FC<FileListViewProps> = ({
   };
 
   const handleDeleteFile = (fileId: number, fileName: string) => {
-    if (confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+    if (
+      confirm(
+        `Are you sure you want to delete "${fileName}"? This action cannot be undone.`,
+      )
+    ) {
       deleteMutation.mutate(fileId);
     }
   };
+
+  React.useEffect(() => {
+    if (!ledgerFiles || ledgerFiles.length === 0) return;
+
+    const maxPage = Math.max(1, Math.ceil(ledgerFiles.length / pageSize));
+    if (currentPage > maxPage) {
+      setCurrentPage(maxPage);
+    }
+  }, [ledgerFiles, currentPage, pageSize]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [ledgerFiles]);
 
   if (isLoading) {
     return (
@@ -174,7 +207,9 @@ export const FileListView: React.FC<FileListViewProps> = ({
       <div className={styles.container}>
         <div className={styles.emptyState}>
           <DocumentRegular className={styles.emptyIcon} />
-          <Text size={500} weight="semibold">No ledger files uploaded</Text>
+          <Text size={500} weight="semibold">
+            No ledger files uploaded
+          </Text>
           <Caption1 className={styles.emptySubtext}>
             Go to the Upload tab to add your first CCF ledger file.
           </Caption1>
@@ -182,6 +217,11 @@ export const FileListView: React.FC<FileListViewProps> = ({
       </div>
     );
   }
+
+  const totalFiles = ledgerFiles.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiles / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const pagedFiles = ledgerFiles.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className={styles.container}>
@@ -192,7 +232,7 @@ export const FileListView: React.FC<FileListViewProps> = ({
       </div>
 
       <div className={styles.fileGrid}>
-        {ledgerFiles.map((file) => (
+        {pagedFiles.map((file) => (
           <Card
             key={file.id}
             className={`${styles.fileCard} ${
@@ -206,7 +246,7 @@ export const FileListView: React.FC<FileListViewProps> = ({
                   <DocumentRegular className={styles.fileIcon} />
                   <div className={styles.fileInfo}>
                     <Text className={styles.fileName}>{file.filename}</Text>
-                    
+
                     <div className={styles.fileDetails}>
                       <Badge size="small" appearance="outline">
                         {formatFileSize(file.fileSize)}
@@ -247,6 +287,53 @@ export const FileListView: React.FC<FileListViewProps> = ({
             />
           </Card>
         ))}
+      </div>
+
+      <div className={styles.pagination}>
+        <Caption1 className={styles.fileMeta}>
+          Showing {startIndex + 1}?{Math.min(startIndex + pageSize, totalFiles)} of{' '}
+          {totalFiles}
+        </Caption1>
+
+        <div className={styles.paginationControls}>
+          <Button
+            size="small"
+            appearance="secondary"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage === 1}
+          >
+            First
+          </Button>
+          <Button
+            size="small"
+            appearance="secondary"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+
+          <Caption1 className={styles.fileMeta}>
+            Page {currentPage} of {totalPages}
+          </Caption1>
+
+          <Button
+            size="small"
+            appearance="secondary"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            Next
+          </Button>
+          <Button
+            size="small"
+            appearance="secondary"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage === totalPages}
+          >
+            Last
+          </Button>
+        </div>
       </div>
     </div>
   );

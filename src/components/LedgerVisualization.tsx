@@ -223,7 +223,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
         view: tx.version, // Using version as a proxy for view
         seqno: tx.id, // Using transaction ID as sequence number
       }));
-    
+
     return classified;
   }, [transactions, maxTransactions]);
 
@@ -240,17 +240,15 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
     return groupTransactionsByView(filteredTransactions);
   }, [filteredTransactions]);
 
-  // Calculate statistics
-  const stats = useMemo(() => {
+  const totalByType = useMemo(() => {
     const typeCounts = new Map<TransactionType, number>();
-    
-    for (const tx of filteredTransactions) {
-      const current = typeCounts.get(tx.type) || 0;
-      typeCounts.set(tx.type, current + 1);
+
+    for (const tx of classifiedTransactions) {
+      typeCounts.set(tx.type, (typeCounts.get(tx.type) || 0) + 1);
     }
-    
+
     return typeCounts;
-  }, [filteredTransactions]);
+  }, [classifiedTransactions]);
 
   if (isLoading) {
     return (
@@ -311,7 +309,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
         {Object.entries(TRANSACTION_TYPES).map(([type, info]) => {
           const isSelected = selectedTypes.has(type as TransactionType);
           const typeKey = type as TransactionType;
-          const count = stats.get(typeKey) || 0;
+          const count = totalByType.get(typeKey) || 0;
           
           return (
             <Tooltip
