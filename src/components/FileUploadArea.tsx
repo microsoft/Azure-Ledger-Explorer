@@ -425,17 +425,6 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({ onImportComplete
             existingRanges={existingRanges}
             onClearDatabase={handleClearDatabase}
           />
-          
-          {chunkFiles.length > 0 && (
-            <Button
-              appearance="secondary"
-              onClick={handleClearSelection}
-              disabled={isImporting}
-              style={{ marginTop: '8px' }}
-            >
-              Clear Selection
-            </Button>
-          )}
         </div>
       )}
 
