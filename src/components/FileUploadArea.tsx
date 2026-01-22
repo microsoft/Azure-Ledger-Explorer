@@ -328,12 +328,6 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({ onImportComplete
     doImport(selectedFiles, pendingFiles, mode, autoVerify);
   }, [doImport, pendingFiles]);
 
-  const handleClearSelection = () => {
-    setPendingFiles([]);
-    setChunkFiles([]);
-    setImportError(null);
-  };
-
   return (
     <div className={styles.container}>
       {/* Drop Zone */}
