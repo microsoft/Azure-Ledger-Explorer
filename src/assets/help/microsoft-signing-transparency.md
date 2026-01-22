@@ -14,4 +14,4 @@ Maintains tamper-evident logs of software artifacts for trust and verification.
 
 ### Learn More
 
-- [Signing Transparency](https://www.microsoft.com/security/blog/2023/05/09/microsoft-announces-new-supply-chain-transparency-initiatives/)
+- [Signing Transparency](https://azure.microsoft.com/en-us/blog/enhancing-software-supply-chain-security-with-microsofts-signing-transparency)

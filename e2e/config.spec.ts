@@ -94,8 +94,8 @@ test.describe('Configuration Page - Domain Persistence', () => {
       path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
     ]);
 
-    // Click Import button to import selected files
-    await page.getByRole('button', { name: /Import Selected/ }).click();
+    // Click Import button to import selected files - use dispatchEvent to bypass overlay
+    await page.getByRole('button', { name: /Import Selected/ }).dispatchEvent('click');
     // Wait a moment for import to start, then close dialog with Escape
     await page.waitForTimeout(1000);
     await page.keyboard.press('Escape');

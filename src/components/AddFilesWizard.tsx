@@ -48,19 +48,25 @@ const useStyles = makeStyles({
       width: '98vw',
       height: '90vh',
     },
-    overflow: 'hidden'
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   wizardContent: {
     display: 'flex',
-    height: 'calc(100% - 30px)',
+    flex: 1,
+    minHeight: 0,
     gap: '0',
     padding: '0',
+    overflow: 'hidden',
   },
   leftPanel: {
     flex: '2',
     display: 'flex',
     flexDirection: 'column',
     padding: '24px',
+    minHeight: 0,
+    overflow: 'hidden',
   },
   rightPanel: {
     flex: '1',
@@ -69,16 +75,22 @@ const useStyles = makeStyles({
     display: 'flex',
     flexDirection: 'column',
     backgroundClip: 'padding-box',
+    overflowY: 'auto',
+    overflowX: 'hidden',
   },
   tabList: {
     marginBottom: '24px',
     display: 'flex',
     gap: '8px',
     flexWrap: 'wrap',
+    flexShrink: 0,
   },
   tabContent: {
     flex: 1,
-    overflow: 'auto',
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
   helpSection: {
     height: '100%',
@@ -99,6 +111,16 @@ const useStyles = makeStyles({
     fontSize: '48px',
     marginBottom: '16px',
     opacity: 0.5,
+  },
+  dialogHeader: {
+    position: 'relative',
+    paddingRight: '40px',
+    flexShrink: 0,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
   },
 });
 
@@ -142,8 +164,11 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
   return (
     <Dialog open={open} onOpenChange={(_, data) => onOpenChange(data.open)} >
       <DialogSurface className={styles.wizardDialog}>
-        <DialogTitle action={
+        <DialogTitle
+          className={styles.dialogHeader}
+          action={
           <Button
+            className={styles.closeButton}
             appearance="subtle"
             aria-label="Close"
             icon={<Dismiss24Regular />}

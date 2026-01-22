@@ -15,7 +15,6 @@ import {
   Badge,
   MessageBar,
   MessageBarBody,
-  Divider,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -31,20 +30,39 @@ const useStyles = makeStyles({
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
     width: '100%',
+    height: '100%',
+    minHeight: 0,
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+  },
+  scrollableContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    flex: 1,
+    minHeight: 0,
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingRight: '4px',
+    boxSizing: 'border-box',
+    '> *': {
+      textOverflow: 'ellipsis',
+    },
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexShrink: 0,
   },
   chunkList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
-    maxHeight: '400px',
+    maxHeight: '280px',
     overflowY: 'auto',
+    overflowX: 'hidden',
     border: `1px solid ${tokens.colorNeutralStroke2}`,
     borderRadius: '6px',
     padding: '8px',
@@ -110,6 +128,8 @@ const useStyles = makeStyles({
     padding: '12px',
     backgroundColor: tokens.colorNeutralBackground3,
     borderRadius: '6px',
+    boxSizing: 'border-box',
+    width: '100%',
   },
   summaryRow: {
     display: 'flex',
@@ -117,17 +137,35 @@ const useStyles = makeStyles({
     gap: '8px',
     marginBottom: '4px',
   },
+  stickyFooter: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    flexShrink: 0,
+    paddingTop: '12px',
+    marginTop: 'auto',
+    backgroundColor: tokens.colorNeutralBackground1,
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    boxSizing: 'border-box',
+    width: '100%',
+    position: 'relative',
+    zIndex: 10,
+  },
   actions: {
     display: 'flex',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: '12px',
+    paddingTop: '8px',
   },
   quickActions: {
     display: 'flex',
     gap: '8px',
+    flexWrap: 'wrap',
   },
   importButton: {
-    minWidth: '140px',
+    minWidth: '160px',
+    fontWeight: 600,
   },
   sequenceRange: {
     fontFamily: 'monospace',
@@ -597,124 +635,127 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
 
   return (
     <div className={styles.container}>
-      {/* Existing data info bar */}
-      {existingCount > 0 && (
-        <div className={styles.existingDataInfo}>
-          <CheckmarkCircle16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
-          <Text size={200}>
-            {existingCount} chunk(s) already loaded in database
-          </Text>
-          {onClearDatabase && (
-            <Button
-              size="small"
-              appearance="subtle"
-              onClick={handleClearDatabase}
-              disabled={isClearing || isImporting}
-              style={{ marginLeft: 'auto' }}
-            >
-              {isClearing ? 'Clearing...' : 'Clear Database'}
+      {/* Scrollable content area */}
+      <div className={styles.scrollableContent}>
+        {/* Existing data info bar */}
+        {existingCount > 0 && (
+          <div className={styles.existingDataInfo}>
+            <CheckmarkCircle16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
+            <Text size={200}>
+              {existingCount} chunk(s) already loaded in database
+            </Text>
+            {onClearDatabase && (
+              <Button
+                size="small"
+                appearance="subtle"
+                onClick={handleClearDatabase}
+                disabled={isClearing || isImporting}
+                style={{ marginLeft: 'auto' }}
+              >
+                {isClearing ? 'Clearing...' : 'Clear Database'}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Header with count */}
+        <div className={styles.header}>
+          <Text weight="semibold">Available Chunks ({chunkGroups.length})</Text>
+          <div className={styles.quickActions}>
+            <Button size="small" appearance="subtle" onClick={selectContiguousFromStart}>
+              Select contiguous
             </Button>
+            <Button size="small" appearance="subtle" onClick={selectAll}>
+              Select all
+            </Button>
+            <Button size="small" appearance="subtle" onClick={clearAll}>
+              Clear
+            </Button>
+          </div>
+        </div>
+
+        {/* Chunk list - this is the only vertically scrollable area */}
+        <div className={styles.chunkList}>
+          {displayItems}
+        </div>
+
+        {/* Validation summary */}
+        <div className={styles.summary}>
+          <div className={styles.summaryRow}>
+            {validation.state === 'valid' && (
+              <>
+                <CheckmarkCircle16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
+                <Text>{selectedCount} chunk(s) selected</Text>
+              </>
+            )}
+            {validation.state === 'warning' && (
+              <>
+                <Warning16Regular primaryFill={tokens.colorPaletteYellowForeground1} />
+                <Text>{selectedCount} chunk(s) selected</Text>
+              </>
+            )}
+            {validation.state === 'error' && (
+              <>
+                <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
+                <Text>{validation.message}</Text>
+              </>
+            )}
+            {validation.state === 'empty' && (
+              <>
+                <Info16Regular />
+                <Text>{validation.message}</Text>
+              </>
+            )}
+          </div>
+          {validation.state !== 'empty' && validation.state !== 'error' && (
+            <Caption1 className={styles.sequenceRange}>
+              {validation.message}
+            </Caption1>
           )}
         </div>
-      )}
 
-      {/* Header with count */}
-      <div className={styles.header}>
-        <Text weight="semibold">Available Chunks ({chunkGroups.length})</Text>
-        <div className={styles.quickActions}>
-          <Button size="small" appearance="subtle" onClick={selectContiguousFromStart}>
-            Select contiguous from start
-          </Button>
-          <Button size="small" appearance="subtle" onClick={selectAll}>
-            Select all
-          </Button>
-          <Button size="small" appearance="subtle" onClick={clearAll}>
-            Clear
-          </Button>
-        </div>
-      </div>
+        {/* Warning for gaps */}
+        {validation.state === 'warning' && (
+          <MessageBar intent="warning">
+            <MessageBarBody>
+              Your selection has gaps. The ledger may not be fully analyzable.
+            </MessageBarBody>
+          </MessageBar>
+        )}
 
-      {/* Chunk list */}
-      <div className={styles.chunkList}>
-        {displayItems}
-      </div>
+        {/* Warning for not starting from sequence 1 */}
+        {validation.state !== 'empty' && validation.state !== 'error' && 
+         'startsFromBeginning' in validation && !validation.startsFromBeginning && (
+          <MessageBar intent="warning">
+            <MessageBarBody>
+              Selection doesn't start from sequence 1. Cryptographic verification will not be possible.
+            </MessageBarBody>
+          </MessageBar>
+        )}
 
-      {/* Validation summary */}
-      <div className={styles.summary}>
-        <div className={styles.summaryRow}>
-          {validation.state === 'valid' && (
-            <>
-              <CheckmarkCircle16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
-              <Text>{selectedCount} chunk(s) selected</Text>
-            </>
-          )}
-          {validation.state === 'warning' && (
-            <>
-              <Warning16Regular primaryFill={tokens.colorPaletteYellowForeground1} />
-              <Text>{selectedCount} chunk(s) selected</Text>
-            </>
-          )}
-          {validation.state === 'error' && (
-            <>
-              <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
-              <Text>{validation.message}</Text>
-            </>
-          )}
-          {validation.state === 'empty' && (
-            <>
-              <Info16Regular />
-              <Text>{validation.message}</Text>
-            </>
-          )}
-        </div>
-        {validation.state !== 'empty' && validation.state !== 'error' && (
-          <Caption1 className={styles.sequenceRange}>
-            {validation.message}
-          </Caption1>
+        {/* Overwrite option */}
+        {showOverwriteOption && (
+          <Checkbox
+            checked={overwriteExisting}
+            onChange={(_, data) => setOverwriteExisting(data.checked === true)}
+            label="Replace existing data (unchecked = append to existing)"
+          />
         )}
       </div>
 
-      {/* Warning for gaps */}
-      {validation.state === 'warning' && (
-        <MessageBar intent="warning">
-          <MessageBarBody>
-            Your selection has gaps. The ledger may not be fully analyzable.
-          </MessageBarBody>
-        </MessageBar>
-      )}
-
-      {/* Warning for not starting from sequence 1 */}
-      {validation.state !== 'empty' && validation.state !== 'error' && 
-       'startsFromBeginning' in validation && !validation.startsFromBeginning && (
-        <MessageBar intent="warning">
-          <MessageBarBody>
-            Selection doesn't start from sequence 1. Cryptographic verification of the ledger chain will not be possible without a complete sequence from the beginning.
-          </MessageBarBody>
-        </MessageBar>
-      )}
-
-      {/* Overwrite option */}
-      {showOverwriteOption && (
-        <Checkbox
-          checked={overwriteExisting}
-          onChange={(_, data) => setOverwriteExisting(data.checked === true)}
-          label="Replace existing data (unchecked = append to existing)"
-        />
-      )}
-
-      <Divider />
-
-      {/* Actions */}
-      <div className={styles.actions}>
-        <div />
-        <Button
-          appearance="primary"
-          className={styles.importButton}
-          disabled={!canImport || isImporting}
-          onClick={handleImport}
-        >
-          {isImporting ? 'Importing...' : `${importButtonLabel} (${selectedCount})`}
-        </Button>
+      {/* Sticky footer - always visible */}
+      <div className={styles.stickyFooter}>
+        <div className={styles.actions}>
+          <Button
+            appearance="primary"
+            size="large"
+            className={styles.importButton}
+            disabled={!canImport || isImporting}
+            onClick={handleImport}
+          >
+            {isImporting ? 'Importing...' : `${importButtonLabel} (${selectedCount})`}
+          </Button>
+        </div>
       </div>
     </div>
   );
