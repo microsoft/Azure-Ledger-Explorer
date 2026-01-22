@@ -144,10 +144,12 @@ const useStyles = makeStyles({
     flexShrink: 0,
     paddingTop: '12px',
     marginTop: 'auto',
+    backgroundColor: tokens.colorNeutralBackground1,
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     boxSizing: 'border-box',
     width: '100%',
-    pointerEvents: 'none', // Allow clicks to pass through container
+    position: 'relative',
+    zIndex: 10,
   },
   actions: {
     display: 'flex',
@@ -155,7 +157,6 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: '12px',
     paddingTop: '8px',
-    pointerEvents: 'auto', // Re-enable clicks for the button
   },
   quickActions: {
     display: 'flex',

@@ -40,7 +40,8 @@ const useStyles = makeStyles({
         width: '100%',
         height: '100%',
         minHeight: 0,
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
         boxSizing: 'border-box',
     },
     header: {
