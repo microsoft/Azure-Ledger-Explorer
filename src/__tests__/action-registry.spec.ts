@@ -9,12 +9,16 @@ import {
   hasAction, 
   executeAction, 
   executeActions,
-  extractActions 
+  extractActions,
+  clearActions
 } from '../services/chat/actions/action-registry';
 import type { UIAction } from '../types/chat-types';
 
 describe('Action Registry', () => {
   beforeEach(() => {
+    // Clear all registered actions for test isolation
+    clearActions();
+    
     // Register a test action before each test
     registerAction('testaction', async (content) => {
       return { result: `Executed: ${content}` };

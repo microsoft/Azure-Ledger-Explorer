@@ -143,7 +143,7 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Register clearChat function with parent component
   useEffect(() => {
-    onRegisterClearChat?.(() => clearChat);
+    onRegisterClearChat?.(clearChat);
     return () => onRegisterClearChat?.(null);
   }, [onRegisterClearChat, clearChat]);
 

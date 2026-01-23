@@ -95,5 +95,60 @@ describe('SSE Parser', () => {
       expect(result.textDelta).toBe('');
       expect(result.annotations).toEqual({});
     });
+
+    it('buffers incomplete lines across chunks', () => {
+      // First chunk ends with incomplete line
+      const chunk1 = 'data: {"type":"response.output_text.delta","delta":"Hel';
+      const result1 = parseSSEChunk(chunk1, {});
+      
+      expect(result1.textDelta).toBe('');
+      expect(result1.remainingBuffer).toBe(chunk1);
+      
+      // Second chunk completes the line
+      const chunk2 = 'lo"}\n';
+      const result2 = parseSSEChunk(chunk2, {}, result1.remainingBuffer);
+      
+      expect(result2.textDelta).toBe('Hello');
+      expect(result2.remainingBuffer).toBe('');
+    });
+
+    it('buffers partial JSON across multiple chunks', () => {
+      // First chunk has partial JSON
+      const chunk1 = 'data: {"type":"response.output_text.delta","del';
+      const result1 = parseSSEChunk(chunk1, {});
+      
+      expect(result1.textDelta).toBe('');
+      expect(result1.remainingBuffer).toBe(chunk1);
+      
+      // Second chunk continues but still incomplete
+      const chunk2 = 'ta":"Hello ';
+      const result2 = parseSSEChunk(chunk2, {}, result1.remainingBuffer);
+      
+      expect(result2.textDelta).toBe('');
+      expect(result2.remainingBuffer).toBe(chunk1 + chunk2);
+      
+      // Third chunk completes the line
+      const chunk3 = 'World"}\n';
+      const result3 = parseSSEChunk(chunk3, {}, result2.remainingBuffer);
+      
+      expect(result3.textDelta).toBe('Hello World');
+      expect(result3.remainingBuffer).toBe('');
+    });
+
+    it('handles complete lines even when previous chunk had buffer', () => {
+      // First chunk with buffer
+      const chunk1 = 'data: {"type":"response.output_text.delta","delta":"First"}\ndata: {"type":"response';
+      const result1 = parseSSEChunk(chunk1, {});
+      
+      expect(result1.textDelta).toBe('First');
+      expect(result1.remainingBuffer).toBe('data: {"type":"response');
+      
+      // Second chunk completes previous and adds new complete line
+      const chunk2 = '.output_text.delta","delta":"Second"}\ndata: {"type":"response.output_text.delta","delta":"Third"}\n';
+      const result2 = parseSSEChunk(chunk2, {}, result1.remainingBuffer);
+      
+      expect(result2.textDelta).toBe('SecondThird');
+      expect(result2.remainingBuffer).toBe('');
+    });
   });
 });

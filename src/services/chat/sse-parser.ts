@@ -15,6 +15,8 @@ export interface SSEParseResult {
   responseId?: string;
   /** New annotations discovered */
   annotations: Record<string, ChatAnnotation>;
+  /** Leftover partial line to prepend to next chunk */
+  remainingBuffer?: string;
 }
 
 /**
@@ -107,9 +109,24 @@ function processOutputItemEvent(data: any): string {
 
 /**
  * Parse a chunk of SSE data and extract text deltas, annotations, and response ID
+ * @param chunk - The raw chunk to parse
+ * @param existingAnnotations - Previously discovered annotations
+ * @param buffer - Partial line from previous chunk (optional)
+ * @returns Parse result including any remaining buffer
  */
-export function parseSSEChunk(chunk: string, existingAnnotations: Record<string, ChatAnnotation> = {}): SSEParseResult {
-  const lines = chunk.split('\n');
+export function parseSSEChunk(
+  chunk: string, 
+  existingAnnotations: Record<string, ChatAnnotation> = {},
+  buffer = ''
+): SSEParseResult {
+  // Prepend any buffered partial line from previous chunk
+  const fullChunk = buffer + chunk;
+  const lines = fullChunk.split('\n');
+  
+  // The last element might be a partial line (no trailing newline)
+  // Keep it for the next chunk unless the chunk ended with \n
+  const remainingBuffer = chunk.endsWith('\n') ? '' : lines.pop() || '';
+  
   const annotations = { ...existingAnnotations };
   let textDelta = '';
   let responseId: string | undefined;
@@ -137,7 +154,7 @@ export function parseSSEChunk(chunk: string, existingAnnotations: Record<string,
     }
   }
   
-  return { textDelta, responseId, annotations };
+  return { textDelta, responseId, annotations, remainingBuffer };
 }
 
 /**
@@ -152,6 +169,7 @@ export function createSSEReader(
   let fullText = '';
   let allAnnotations: Record<string, ChatAnnotation> = {};
   let finalResponseId: string | undefined;
+  let buffer = ''; // Buffer for incomplete SSE lines
   
   const processStream = async (): Promise<{ fullText: string; annotations: Record<string, ChatAnnotation>; responseId?: string }> => {
     try {
@@ -162,11 +180,24 @@ export function createSSEReader(
         
         const { done, value } = await reader.read();
         if (done) {
+          // Process any remaining buffer
+          if (buffer) {
+            const finalResult = parseSSEChunk('', allAnnotations, buffer);
+            fullText += finalResult.textDelta;
+            allAnnotations = finalResult.annotations;
+            if (finalResult.responseId) {
+              finalResponseId = finalResult.responseId;
+            }
+            onChunk(finalResult);
+          }
           break;
         }
         
-        const chunk = decoder.decode(value);
-        const result = parseSSEChunk(chunk, allAnnotations);
+        const chunk = decoder.decode(value, { stream: true });
+        const result = parseSSEChunk(chunk, allAnnotations, buffer);
+        
+        // Store any partial line for next iteration
+        buffer = result.remainingBuffer || '';
         
         fullText += result.textDelta;
         allAnnotations = result.annotations;
