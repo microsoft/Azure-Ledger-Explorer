@@ -18,7 +18,7 @@ export default tseslint.config([
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
-      reactHooks.configs['recommended-latest'],
+      reactHooks.configs.flat['recommended-latest'],
       reactRefresh.configs.vite,
     ],
     plugins: {
@@ -61,6 +61,10 @@ export default tseslint.config([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
       eqeqeq: ['error', 'always', { null: 'ignore' }],
+
+      // Disable new strict react-hooks v7 rules (can be enabled after code refactoring)
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
     },
   },
 
