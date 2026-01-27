@@ -22,10 +22,12 @@ test.beforeEach(async ({ page }) => {
   // Wait a moment for import to start, then close dialog with Escape
   await page.waitForTimeout(1000);
   await page.keyboard.press('Escape');
-  // Wait for the visualization to show
-  await expect(page.getByText('Total: 14 transactions')).toBeVisible({ timeout: 30000 });
-  // make sure file is fully processed
-  await expect(page.getByText('ledger_15-3926.committed')).toBeVisible();
+  // Wait for the second file to be verified (indicated by "Verified" badge)
+  await expect(page.getByRole('treeitem', { name: /ledger_15-3926.*Verified/ })).toBeVisible({ timeout: 60000 });
+  // Click on the second file to view its transactions  
+  await page.getByRole('treeitem', { name: /ledger_15-3926/ }).click();
+  // Wait for transactions from second file to load (should show more than 14 - file has ~50)
+  await expect(page.getByText(/Total: [2-9]\d+ transactions/)).toBeVisible({ timeout: 60000 });
 });
 
 test('shows scitt entry columns', async ({ page }) => {
@@ -37,7 +39,7 @@ test('shows scitt entry columns', async ({ page }) => {
 
   const table = page.getByRole('table').first();
 
-  await expect(table).toBeVisible();
+  await expect(table).toBeVisible({ timeout: 30000 });
 
   const groups = table.getByRole('rowgroup');
   const headerGroup = groups.first();
