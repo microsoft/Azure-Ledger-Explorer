@@ -130,7 +130,7 @@ export class CCFDatabase {
    */
   async clearAllData(): Promise<void> {
     if (!this.client) throw new Error('Database not initialized');
-    console.log('[CCFDatabase] Clearing all data from tables');
+    console.warn('[CCFDatabase] Clearing all data from tables');
     await this.client.clearAllData();
   }
 

@@ -58,7 +58,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^17.0.0",
-    "jsdom": "^27.4.0",
+    "jsdom": "^26.0.0",
     "sharp": "^0.34.5",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.53.0",

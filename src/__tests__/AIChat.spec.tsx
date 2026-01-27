@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AIChat } from '../components/AIChat';
-import type { ChatMessage } from '../components/AIChat';
+import type { ChatMessage } from '../types/chat-types';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 describe('AIChat component', () => {

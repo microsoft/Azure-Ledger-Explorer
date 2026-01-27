@@ -7,6 +7,12 @@
 - React shell in src/App.tsx uses FluentProvider + QueryClientProvider; navigation pods live in src/pages.
 - Data path: FileUploadArea -> useFileDrop (src/hooks/use-ccf-data.ts) -> CCFDatabase.insertLedgerFileWithData -> workers/database-worker.ts -> sqlite-wasm -> OPFS.
 - Transactions/KV tables are keyed by sequence_no and ordered ledger_*.committed names; utils/ledger-validation.ts guards gaps.
+## Chat Architecture
+- AIChat.tsx is an orchestrator; UI is split into src/components/chat/ sub-components (ChatInput, ChatMessageList, ChatMessageBubble, etc.).
+- State lives in src/hooks/use-chat.ts (messages, loading, error, streaming); never manage chat state in components directly.
+- API calls go through src/services/chat/chat-service.ts; SSE parsing in sse-parser.ts.
+- Actions use registry pattern in src/services/chat/actions/; add new actions by creating handler + calling registerAction().
+- Types live in src/types/chat-types.ts; constants in src/constants/chat.ts.
 ## Data & State
 - src/hooks/use-ccf-data.ts centralizes query keys and DB access; add new reads/writes there and extend queryKeys helpers.
 - Mutations must update queryClient.invalidateQueries in the same file; prefer predicates for broad cache busting.

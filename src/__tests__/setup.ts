@@ -25,6 +25,9 @@ beforeAll(() => {
     value: localStorageMock,
     writable: true,
   });
+
+  // Mock window.scrollTo for jsdom environment
+  window.scrollTo = () => {};
 });
 
 // runs a clean after each test case (e.g. clearing jsdom)
