@@ -288,10 +288,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     // Default: select first version of each group, check only non-existing ranges
     for (const group of chunkGroups) {
       selectedVersions.set(group.rangeKey, group.files[0].id);
-      // Don't pre-check ranges that are already loaded
-      if (!existingRanges.has(group.rangeKey)) {
-        checkedRanges.add(group.rangeKey);
-      }
+      // Don't pre-check ranges as it is computed later
     }
 
     return { selectedVersions, checkedRanges };
@@ -375,6 +372,40 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     };
   }, [chunkGroups, selection]);
 
+  const getContiguousRangeKeys = useCallback((groupsToSearch:RangeGroup[]) => {
+    const newChecked = new Set<string>();
+    // 1. if there is one group return early
+    if (groupsToSearch.length === 0) {
+      return newChecked;
+    } else if (groupsToSearch.length === 1) {
+      newChecked.add(groupsToSearch[0].rangeKey);
+      return newChecked;
+    }
+    // 2. sort groups to make sure they are in order based on startNo and endNo
+    const sortedGroups = [...groupsToSearch].sort((a, b) => {
+      if (a.startNo !== b.startNo) {
+        return a.startNo - b.startNo;
+      }
+      return a.endNo - b.endNo;
+    });
+    // 3. iterate through sorted groups and skip overlapping ones
+    for (let i = 1; i < sortedGroups.length; i++) {
+      const currGroup = sortedGroups[i - 1];
+      const nextGroup = sortedGroups[i];
+      if (currGroup.startNo < nextGroup.startNo) {
+        // add the previous group only 
+        newChecked.add(currGroup.rangeKey);
+      } else if (currGroup.startNo === nextGroup.startNo) {
+        // next group will be bigger or equal, so skip current
+      }
+      if (i === sortedGroups.length - 1) {
+        // last group, add it
+        newChecked.add(nextGroup.rangeKey);
+      }
+    }
+    return newChecked;
+  }, []);
+
   // Update selection when files change
   useEffect(() => {
     const newSelectedVersions = new Map<string, string>();
@@ -395,11 +426,12 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
       }
     }
 
-    // If this is initial load (nothing was checked), check all non-existing ranges
+    // If this is initial load (nothing was checked), check only contiguous ranges by default
     if (selection.checkedRanges.size === 0) {
-      for (const group of chunkGroups) {
-        if (!existingRanges.has(group.rangeKey)) {
-          newCheckedRanges.add(group.rangeKey);
+      const newChecked = getContiguousRangeKeys(chunkGroups);
+      for (const rangeKey of newChecked) {
+        if (!existingRanges.has(rangeKey)) {
+          newCheckedRanges.add(rangeKey);
         }
       }
     }
@@ -437,20 +469,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
 
   // Select all contiguous from start
   const selectContiguousFromStart = useCallback(() => {
-    const newChecked = new Set<string>();
-    let expectedStart = 1;
-
-    for (const group of chunkGroups) {
-      // Check if this group starts where we expect
-      if (group.startNo <= expectedStart && group.endNo >= expectedStart) {
-        newChecked.add(group.rangeKey);
-        expectedStart = group.endNo + 1;
-      } else if (group.startNo > expectedStart) {
-        // Gap detected, stop here
-        break;
-      }
-    }
-
+    const newChecked = getContiguousRangeKeys(chunkGroups);
     setSelection(prev => ({ ...prev, checkedRanges: newChecked }));
   }, [chunkGroups]);
 

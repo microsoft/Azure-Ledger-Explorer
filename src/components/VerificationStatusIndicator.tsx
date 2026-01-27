@@ -83,8 +83,9 @@ const useStyles = makeStyles({
     marginTop: '4px',
   },
   spinnerIcon: {
-    animation: 'spin 1s linear infinite',
-    '@keyframes spin': {
+    animationIterationCount: 'infinite',
+    animationDuration: '1s',
+    animationName: {
       from: { transform: 'rotate(0deg)' },
       to: { transform: 'rotate(360deg)' },
     },
@@ -102,7 +103,7 @@ export const VerificationStatusIndicator: React.FC = () => {
   const { progress, isRunning, error, clearProgress } = useVerification();
   const [dismissed, setDismissed] = React.useState(false);
   const [showSuccess, setShowSuccess] = React.useState(false);
-  
+
   // Track previous status to detect completion
   const prevStatusRef = React.useRef<string | null>(null);
   

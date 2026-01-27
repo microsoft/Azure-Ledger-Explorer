@@ -169,6 +169,7 @@ const useStyles = makeStyles({
   },
   badge: {
     marginLeft: '8px',
+    whiteSpace: 'nowrap',
   },
   processingIndicator: {
     display: 'flex',
