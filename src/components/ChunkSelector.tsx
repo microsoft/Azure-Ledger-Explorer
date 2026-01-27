@@ -438,19 +438,36 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   // Select all contiguous from start
   const selectContiguousFromStart = useCallback(() => {
     const newChecked = new Set<string>();
-    let expectedStart = 1;
-
-    for (const group of chunkGroups) {
-      // Check if this group starts where we expect
-      if (group.startNo <= expectedStart && group.endNo >= expectedStart) {
-        newChecked.add(group.rangeKey);
-        expectedStart = group.endNo + 1;
-      } else if (group.startNo > expectedStart) {
-        // Gap detected, stop here
-        break;
+    // 1. if there is one group return early
+    if (chunkGroups.length === 0) {
+      return;
+    } else if (chunkGroups.length === 1) {
+      newChecked.add(chunkGroups[0].rangeKey);
+      setSelection(prev => ({ ...prev, checkedRanges: newChecked }));
+      return;
+    }
+    // 2. sort groups to make sure they are in order based on startNo and endNo
+    const sortedGroups = [...chunkGroups].sort((a, b) => {
+      if (a.startNo !== b.startNo) {
+        return a.startNo - b.startNo;
+      }
+      return a.endNo - b.endNo;
+    });
+    // 3. iterate through sorted groups and skip overlapping ones
+    for (let i = 1; i < sortedGroups.length; i++) {
+      const currGroup = sortedGroups[i - 1];
+      const nextGroup = sortedGroups[i];
+      if (currGroup.startNo < nextGroup.startNo) {
+        // add the previous group only 
+        newChecked.add(currGroup.rangeKey);
+      } else if (currGroup.startNo === nextGroup.startNo) {
+        // next group will be bigger or equal, so skip current
+      }
+      if (i === sortedGroups.length - 1) {
+        // last group, add it
+        newChecked.add(nextGroup.rangeKey);
       }
     }
-
     setSelection(prev => ({ ...prev, checkedRanges: newChecked }));
   }, [chunkGroups]);
 
