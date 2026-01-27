@@ -441,7 +441,7 @@ export const CCFVisualizerApp: React.FC = () => {
                     iconBefore={<Document24Regular />}
                     onClick={() => handleFileSelect(file.id)}
                   >
-                    <div className={styles.fileTreeItem}>
+                    <div className={styles.fileTreeItem} data-testid={`file-item-${file.filename}-${file.verified === true ? 'verified' : file.verified === false ? 'unverified' : 'not-verified'}`}>
                       <div className={styles.fileNameContainer}>{file.filename}</div>
                       <div className={styles.processingIndicator}>
                         {processingStatus === 'processing' && (

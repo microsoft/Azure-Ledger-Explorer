@@ -805,6 +805,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
             <div />
             <Button
               appearance="primary"
+              data-testid="import-button"
               className={styles.importButton}
               disabled={!canImport || isImporting}
               onClick={handleImport}
