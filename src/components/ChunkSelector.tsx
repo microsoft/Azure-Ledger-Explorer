@@ -471,7 +471,7 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
   const selectContiguousFromStart = useCallback(() => {
     const newChecked = getContiguousRangeKeys(chunkGroups);
     setSelection(prev => ({ ...prev, checkedRanges: newChecked }));
-  }, [chunkGroups]);
+  }, [chunkGroups, getContiguousRangeKeys]);
 
   // Select all
   const selectAll = useCallback(() => {

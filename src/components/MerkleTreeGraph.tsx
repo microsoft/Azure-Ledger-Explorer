@@ -10,8 +10,8 @@ import {
   computeCcfInternalTreeRoot,
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
-} from '../utils/ccf-internal-tree';
-import { toHexStringLower } from '@ccf/ledger-parser';
+  toHexStringLower,
+} from '@ccf/ledger-parser';
 
 type NodeId = string;
 
