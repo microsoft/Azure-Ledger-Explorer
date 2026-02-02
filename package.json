@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@azure-rest/confidential-ledger": "1.1.2-beta.3",
-    "@azure/storage-file-share": "^12.27.0",
+    "@azure/storage-file-share": "^12.30.0",
     "@ccf/database": "*",
     "@ccf/ledger-parser": "*",
     "@fluentui/react-components": "^9.68.0",
