@@ -79,9 +79,21 @@ graph TB
 - **MenuBar.tsx**: Navigation and application controls
 - **CCFVisualizerApp.tsx**: Main application component
 - **TransactionViewer.tsx**: Transaction browsing and details
-- **AIChat.tsx**: AI-powered query interface
+- **AIChat.tsx**: AI-powered query interface (orchestrator component)
 - **FileUploadArea.tsx**: Drag-and-drop file handling
 - **AddFilesWizard.tsx**: Multi-source file import wizard
+
+#### Chat Components (`src/components/chat/`)
+
+The AI chat interface follows a modular architecture with single-responsibility components:
+
+- **ChatInput.tsx**: Text input area with send/stop buttons
+- **ChatMessageList.tsx**: Scrollable message container with auto-scroll
+- **ChatMessageBubble.tsx**: Individual message rendering (user/assistant)
+- **ChatActionResult.tsx**: Displays executed action results with expandable raw data
+- **ChatAnnotations.tsx**: File reference links section
+- **ChatStarterTemplates.tsx**: Initial prompt suggestions
+- **chat.styles.ts**: Shared Fluent UI makeStyles definitions
 
 #### Page Components (`src/pages/`)
 
@@ -97,6 +109,45 @@ graph TB
 - **Dark/Light Themes**: User preference support
 
 ### 2. State Management Layer
+
+#### Chat State (`src/hooks/use-chat.ts`)
+
+The `useChat` hook centralizes all chat state management:
+
+```typescript
+const {
+  messages,        // Chat message history
+  isLoading,       // Streaming state
+  error,           // Error message
+  sendMessage,     // Send user message
+  stopResponse,    // Abort streaming
+  clearChat,       // Reset conversation
+  getAnnotationUrl // Get file download URL
+} = useChat({ baseUrl, systemPrompt, actionContext });
+```
+
+#### Chat Services (`src/services/chat/`)
+
+- **chat-service.ts**: API communication with OpenAI-compatible endpoints
+- **sse-parser.ts**: Server-Sent Events stream parsing
+- **actions/action-registry.ts**: Extensible action execution system
+
+##### Action Registry Pattern
+
+To add a new action that the AI can execute:
+
+```typescript
+// 1. Create handler in src/services/chat/actions/my-action.ts
+export async function handleMyAction(content: string, context: ActionContext): Promise<ActionResult> {
+  // Execute action logic
+  return { result: 'Success' };
+}
+
+// 2. Register in src/services/chat/actions/index.ts
+registerAction('myaction', handleMyAction);
+
+// 3. AI can now use: ```action:myaction\nparameters```
+```
 
 #### TanStack Query (`@tanstack/react-query`)
 

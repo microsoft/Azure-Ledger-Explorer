@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { ChatMessage } from '../components/AIChat';
+import type { ChatMessage } from './chat-types';
 
 export interface SavedConversation {
   id: string;

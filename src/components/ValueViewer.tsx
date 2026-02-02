@@ -17,9 +17,8 @@ import {
   computeCcfInternalTreeRoot,
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
-} from '../utils/ccf-internal-tree';
-
-import { extractCoseSignatureTimeFromCcfValue } from '../utils/cose-signature-time';
+  extractCoseSignatureTimeFromCcfValue,
+} from '@ccf/ledger-parser';
 
 import { MerkleTreeGraph } from './MerkleTreeGraph';
 

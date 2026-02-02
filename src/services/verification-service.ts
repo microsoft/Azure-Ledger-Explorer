@@ -74,7 +74,7 @@ export class VerificationService {
     
     // If all chunks are already verified, nothing to do
     if (firstUnverifiedIndex === -1 && allFiles.length > 0) {
-      console.log('All chunks already verified, skipping verification');
+      console.warn('All chunks already verified, skipping verification');
       this.events.onCompleted?.({ 
         success: true, 
         totalChunks: allFiles.length, 

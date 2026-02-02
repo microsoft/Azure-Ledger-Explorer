@@ -60,6 +60,45 @@ console.log(readable);
 const hex = uint8ArrayToHexString(binaryData);
 ```
 
+### Extracting COSE Signature Time
+
+Extract timestamps from CCF's internal COSE signatures:
+
+```typescript
+import { extractCoseSignatureTimeFromCcfValue } from '@ccf/ledger-parser';
+
+// Parse COSE signature time from ccf.internal.cose_signatures value
+const result = extractCoseSignatureTimeFromCcfValue(valueBytes);
+if (result) {
+  console.log('Timestamp:', result.isoTime);
+  console.log('Unix seconds:', result.iatSeconds);
+}
+```
+
+### Decoding CCF Internal Tree
+
+Decode and compute roots from CCF's serialized Merkle tree (`public:ccf.internal.tree`):
+
+```typescript
+import { 
+  decodeCcfInternalTree, 
+  computeCcfInternalTreeRoot,
+  formatCcfInternalTreeSummary 
+} from '@ccf/ledger-parser';
+
+// Decode the serialized tree
+const decoded = decodeCcfInternalTree(treeBytes);
+console.log('Leaf count:', decoded.leafCount);
+console.log('Min index:', decoded.minIndex);
+
+// Compute the root hash
+const root = await computeCcfInternalTreeRoot(decoded);
+
+// Get a formatted summary
+const summary = formatCcfInternalTreeSummary(decoded, root);
+console.log(summary);
+```
+
 ## API Reference
 
 ### `LedgerChunkV2`

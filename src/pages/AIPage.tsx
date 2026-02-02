@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { AIChat } from '../components/AIChat';
-import type { ChatMessage } from '../components/AIChat';
+import type { ChatMessage } from '../types/chat-types';
 import { ConversationHistory } from '../components/ConversationHistory';
 import { SIDEBAR_WIDTH } from '../components/sidebar-constants';
 import { saveConversationToHistory } from '../utils/conversation-storage';

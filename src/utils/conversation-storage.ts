@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { ChatMessage } from '../components/AIChat';
+import type { ChatMessage } from '../types/chat-types';
 import type { SavedConversation } from '../types/conversation-types';
 
 export const CONVERSATION_STORAGE_KEY = 'ccf-saved-conversations';

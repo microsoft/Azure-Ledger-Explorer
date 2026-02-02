@@ -9,7 +9,7 @@ import { DATABASE_PATH } from '../constants';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 
-const log = (...args: unknown[]) => console.log('[DB Worker]', ...args);
+const log = (...args: unknown[]) => console.warn('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
 // Initialize the SQLite worker
