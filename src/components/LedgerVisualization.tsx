@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from "react-router-dom";
 import {
   makeStyles,
   Body1,
@@ -186,6 +187,8 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
   const [internalSelectedTypes, setInternalSelectedTypes] = useState<Set<TransactionType>>(new Set());
   const selectedTypes = selectedTypeFilters || internalSelectedTypes;
 
+  const navigate = useNavigate();
+
   // Toggle filter for a transaction type
   const toggleTypeFilter = (type: TransactionType) => {
     const newSelectedTypes = new Set(selectedTypes);
@@ -356,6 +359,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
                         <div><strong>View:</strong> {tx.view}</div>
                         <div><strong>Size:</strong> {tx.transaction.size} bytes</div>
                         <div><strong>Entry Type:</strong> {tx.transaction.entryType}</div>
+                        <div style={{ marginTop: '4px', fontSize: '11px', opacity: 0.8 }}>Click to view details</div>
                       </div>
                     }
                     relationship="description"
@@ -363,6 +367,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
                     <div
                       className={styles.transactionTile}
                       style={{ backgroundColor: TRANSACTION_TYPES[tx.type].color }}
+                      onClick={() => navigate(`/transaction/${tx.seqno}`)}
                     />
                   </Tooltip>
                 ))}
