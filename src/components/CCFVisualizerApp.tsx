@@ -590,17 +590,15 @@ export const CCFVisualizerApp: React.FC = () => {
           </div>
 
           {/* Visualization */}
-          {transactions && transactions.length > 0 && (
             <div className={styles.visualizationContainer}>
               <LedgerVisualization
-                transactions={transactions}
+                transactions={transactions ?? []}
                 isLoading={transactionsLoading}
                 maxTransactions={500}
                 selectedTypeFilters={selectedTypeFilters}
                 onFilterChange={setSelectedTypeFilters}
               />
             </div>
-          )}
 
           {/* Transaction Table */}
           <div className={styles.tableContainer}>

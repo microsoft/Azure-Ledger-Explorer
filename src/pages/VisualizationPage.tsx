@@ -3,13 +3,14 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { makeStyles, tokens, Text, Button, Checkbox, Tooltip, Spinner } from '@fluentui/react-components';
 import { ChartMultipleRegular, ArrowClockwiseRegular } from '@fluentui/react-icons';
 import { LedgerVisualization } from '../components/LedgerVisualization';
 import { useAllTransactions } from '../hooks/use-ccf-data';
 import { Sidebar } from '../components/Sidebar';
 import type { TransactionType } from '../utils/transaction-classification';
+import { classifyTransaction } from '../utils/transaction-classification';
 
 const TRANSACTION_TYPES: Record<TransactionType, { name: string; color: string; description: string }> = {
   signature: {
@@ -149,6 +150,17 @@ export const VisualizationPage: React.FC = () => {
     setSelectedTypes(new Set());
   };
 
+  // Calculate stats from full transaction list (not filtered) - stays stable during filtering
+  const stats = useMemo(() => {
+    const typeCounts = new Map<TransactionType, number>();
+    for (const tx of transactions) {
+      const type = classifyTransaction(tx);
+      const current = typeCounts.get(type) || 0;
+      typeCounts.set(type, current + 1);
+    }
+    return typeCounts;
+  }, [transactions]);
+
   const renderSidebarContent = () => {
     if (isLoading) {
       return (
@@ -235,6 +247,7 @@ export const VisualizationPage: React.FC = () => {
             maxTransactions={1000}
             selectedTypeFilters={selectedTypes}
             onFilterChange={setSelectedTypes}
+            stats={stats}
           />
         )}
       </div>

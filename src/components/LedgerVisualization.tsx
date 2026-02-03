@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from "react-router-dom";
 import {
   makeStyles,
   Body1,
@@ -153,6 +154,8 @@ interface LedgerVisualizationProps {
   maxTransactions?: number;
   selectedTypeFilters?: Set<TransactionType>;
   onFilterChange?: (selectedTypes: Set<TransactionType>) => void;
+  /** Pre-calculated stats from parent - stable counts that don't change with filtering */
+  stats?: Map<TransactionType, number>;
 }
 
 /**
@@ -179,12 +182,15 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
   maxTransactions = 1000,
   selectedTypeFilters,
   onFilterChange,
+  stats: externalStats,
 }) => {
   const styles = useStyles();
   
   // Use external filter state if provided, otherwise use internal state
   const [internalSelectedTypes, setInternalSelectedTypes] = useState<Set<TransactionType>>(new Set());
   const selectedTypes = selectedTypeFilters || internalSelectedTypes;
+
+  const navigate = useNavigate();
 
   // Toggle filter for a transaction type
   const toggleTypeFilter = (type: TransactionType) => {
@@ -240,17 +246,18 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
     return groupTransactionsByView(filteredTransactions);
   }, [filteredTransactions]);
 
-  // Calculate statistics
+  // Use external stats if provided, otherwise calculate from current transactions (fallback)
   const stats = useMemo(() => {
-    const typeCounts = new Map<TransactionType, number>();
+    if (externalStats) return externalStats;
     
-    for (const tx of filteredTransactions) {
+    // Fallback: calculate from classified transactions
+    const typeCounts = new Map<TransactionType, number>();
+    for (const tx of classifiedTransactions) {
       const current = typeCounts.get(tx.type) || 0;
       typeCounts.set(tx.type, current + 1);
     }
-    
     return typeCounts;
-  }, [filteredTransactions]);
+  }, [externalStats, classifiedTransactions]);
 
   if (isLoading) {
     return (
@@ -260,16 +267,6 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
             <Spinner size="tiny" />
             <span>Loading ledger visualization...</span>
           </div>
-        </MessageBar>
-      </div>
-    );
-  }
-
-  if (transactions.length === 0) {
-    return (
-      <div className={styles.container}>
-        <MessageBar intent="warning">
-          No transactions available for visualization. Upload a ledger file to get started.
         </MessageBar>
       </div>
     );
@@ -356,6 +353,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
                         <div><strong>View:</strong> {tx.view}</div>
                         <div><strong>Size:</strong> {tx.transaction.size} bytes</div>
                         <div><strong>Entry Type:</strong> {tx.transaction.entryType}</div>
+                        <div style={{ marginTop: '4px', fontSize: '11px', opacity: 0.8 }}>Click to view details</div>
                       </div>
                     }
                     relationship="description"
@@ -363,6 +361,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
                     <div
                       className={styles.transactionTile}
                       style={{ backgroundColor: TRANSACTION_TYPES[tx.type].color }}
+                      onClick={() => navigate(`/transaction/${tx.seqno}`)}
                     />
                   </Tooltip>
                 ))}
