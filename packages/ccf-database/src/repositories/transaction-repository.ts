@@ -83,6 +83,7 @@ export class TransactionRepository extends BaseRepository {
       writeCount: row.write_count as number,
       deleteCount: row.delete_count as number,
       mapName: (row.map_name as string) || undefined,
+      mapNames: (row.map_names as string) || undefined,
     }));
   }
 
@@ -117,6 +118,7 @@ export class TransactionRepository extends BaseRepository {
       writeCount: row.write_count as number,
       deleteCount: row.delete_count as number,
       mapName: row.map_name as string,
+      mapNames: (row.map_names as string) || undefined,
     }));
   }
 

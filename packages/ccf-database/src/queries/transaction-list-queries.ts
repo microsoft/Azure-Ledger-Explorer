@@ -34,7 +34,11 @@ const BASE_SELECT = `
     t.entry_type, t.tx_version, t.max_conflict_version, t.transaction_id as tx_id, tx_view,
     (SELECT COUNT(*) FROM kv_writes WHERE sequence_no = t.sequence_no) as write_count,
     (SELECT COUNT(*) FROM kv_deletes WHERE sequence_no = t.sequence_no) as delete_count,
-    (SELECT map_name FROM kv_writes WHERE sequence_no = t.sequence_no LIMIT 1) as map_name
+    (SELECT GROUP_CONCAT(DISTINCT map_name) FROM (
+      SELECT map_name FROM kv_writes WHERE sequence_no = t.sequence_no
+      UNION
+      SELECT map_name FROM kv_deletes WHERE sequence_no = t.sequence_no
+    )) as map_names
   FROM transactions t
   JOIN ledger_files f ON t.file_id = f.id
 `;

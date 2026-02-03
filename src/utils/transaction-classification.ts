@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-
+import type { TransactionRecord } from '@ccf/database';
 
 // Transaction type classification based on the Python script logic
 export type TransactionType = 
@@ -17,16 +17,10 @@ export type TransactionType =
   | 'userPrivate'
   | 'unknown';
 
-import type { TransactionRecord } from '@ccf/database';
-
 /**
- * Classify a transaction based on its properties and key-value data
- * This is a simplified version of the Python script logic
+ * Classify a single map name into a transaction type
  */
-export function classifyTransaction(transaction: TransactionRecord): TransactionType {
-  // Check if we have map_name data to help classify
-  const mapName = transaction.mapName || '';
-  
+function classifyMapName(mapName: string): TransactionType {
   // Signature table detection
   if (mapName.includes('signatures')) {
     return 'signature';
@@ -39,8 +33,6 @@ export function classifyTransaction(transaction: TransactionRecord): Transaction
   
   // Governance tables
   if (mapName.startsWith('public:ccf.gov.')) {
-    // Could be governance, new service, recovering service, or service open
-    // Without the full service info, we'll classify as governance
     return 'governance';
   }
   
@@ -49,14 +41,51 @@ export function classifyTransaction(transaction: TransactionRecord): Transaction
     return 'userPublic';
   }
 
-  // No public-domain writes/deletes recorded: likely private-domain only.
-  // Private-domain contents are encrypted, so we can't decode KV operations here.
-  if ((transaction.writeCount ?? 0) === 0 && (transaction.deleteCount ?? 0) === 0) {
-    return 'userPrivate';
-  }
-
-  // If we can't classify, mark as unknown
   return 'unknown';
+}
+
+/**
+ * Get all transaction types for a transaction based on all map names touched
+ * (writes and deletes combined)
+ */
+export function getTransactionTypes(transaction: TransactionRecord): TransactionType[] {
+  // Parse comma-separated map names
+  const mapNamesStr = transaction.mapNames || transaction.mapName || '';
+  const mapNames = mapNamesStr ? mapNamesStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+  
+  // No public-domain writes/deletes recorded: likely private-domain only.
+  if (mapNames.length === 0) {
+    if ((transaction.writeCount ?? 0) === 0 && (transaction.deleteCount ?? 0) === 0) {
+      return ['userPrivate'];
+    }
+    return ['unknown'];
+  }
+  
+  // Get unique types from all map names
+  const typesSet = new Set<TransactionType>();
+  for (const mapName of mapNames) {
+    typesSet.add(classifyMapName(mapName));
+  }
+  
+  // Convert to array and sort for consistent ordering
+  const types = Array.from(typesSet);
+  // Sort by a priority order for display (most important first)
+  const priorityOrder: TransactionType[] = [
+    'signature', 'governance', 'newService', 'recoveringService', 
+    'serviceOpen', 'internal', 'userPublic', 'userPrivate', 'unknown'
+  ];
+  types.sort((a, b) => priorityOrder.indexOf(a) - priorityOrder.indexOf(b));
+  
+  return types;
+}
+
+/**
+ * Classify a transaction based on its properties and key-value data
+ * Returns the primary (first) type when a single type is needed
+ */
+export function classifyTransaction(transaction: TransactionRecord): TransactionType {
+  const types = getTransactionTypes(transaction);
+  return types[0];
 }
 
 /**
@@ -71,7 +100,8 @@ export function filterTransactionsByTypes(
   }
   
   return transactions.filter(tx => {
-    const type = classifyTransaction(tx);
-    return selectedTypes.has(type);
+    const types = getTransactionTypes(tx);
+    // Include transaction if ANY of its types match the selected types
+    return types.some(type => selectedTypes.has(type));
   });
 }

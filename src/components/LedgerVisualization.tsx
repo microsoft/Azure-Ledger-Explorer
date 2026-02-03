@@ -22,7 +22,7 @@ import type {
   TransactionType, 
 } from '../utils/transaction-classification';
 import type { TransactionRecord } from '@ccf/database';
-import { classifyTransaction } from '../utils/transaction-classification';
+import { getTransactionTypes } from '../utils/transaction-classification';
 
 const useStyles = makeStyles({
   container: {
@@ -69,7 +69,7 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
   },
   transactionTile: {
-    width: '8px',
+    width: '10px',
     height: '16px',
     borderRadius: '1px',
     cursor: 'pointer',
@@ -143,6 +143,7 @@ const TRANSACTION_TYPES: Record<TransactionType, TransactionTypeInfo> = {
 interface ClassifiedTransaction {
   transaction: TransactionRecord;
   type: TransactionType;
+  types: TransactionType[];
   view: number;
   seqno: number;
 }
@@ -223,12 +224,16 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
   const classifiedTransactions = useMemo(() => {
     const classified: ClassifiedTransaction[] = transactions
       .slice(0, maxTransactions)
-      .map(tx => ({
-        transaction: tx,
-        type: classifyTransaction(tx),
-        view: tx.txView ?? 1,
-        seqno: tx.id, // Using transaction ID as sequence number
-      }));
+      .map(tx => {
+        const types = getTransactionTypes(tx);
+        return {
+          transaction: tx,
+          type: types[0], // Primary type for backward compatibility
+          types, // All types for display
+          view: tx.txView ?? 1,
+          seqno: tx.id, // Using transaction ID as sequence number
+        };
+      });
     
     return classified;
   }, [transactions, maxTransactions]);
@@ -238,7 +243,8 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
     if (selectedTypes.size === 0) {
       return classifiedTransactions; // Show all if no filters selected
     }
-    return classifiedTransactions.filter(tx => selectedTypes.has(tx.type));
+    // Include transaction if ANY of its types match the selected types
+    return classifiedTransactions.filter(tx => tx.types.some(t => selectedTypes.has(t)));
   }, [classifiedTransactions, selectedTypes]);
 
   // Group by view
@@ -343,12 +349,22 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
                 View {view}:
               </Caption1>
               <div className={styles.transactionStrip}>
-                {sortedTransactions.map((tx, index) => (
+                {sortedTransactions.map((tx, index) => {
+                  // Generate background: single color for one type, gradient for multiple
+                  const bgStyle = tx.types.length === 1
+                    ? { backgroundColor: TRANSACTION_TYPES[tx.types[0]].color }
+                    : {
+                        background: `linear-gradient(to right, ${tx.types.map((t, i) => 
+                          `${TRANSACTION_TYPES[t].color} ${(i / tx.types.length) * 100}%, ${TRANSACTION_TYPES[t].color} ${((i + 1) / tx.types.length) * 100}%`
+                        ).join(', ')})`
+                      };
+                  
+                  return (
                   <Tooltip
                     key={`${view}-${tx.seqno}-${index}`}
                     content={
                       <div>
-                        <div><strong>Type:</strong> {TRANSACTION_TYPES[tx.type].name}</div>
+                        <div><strong>Type{tx.types.length > 1 ? 's' : ''}:</strong> {tx.types.map(t => TRANSACTION_TYPES[t].name).join(', ')}</div>
                         <div><strong>Sequence:</strong> {tx.seqno}</div>
                         <div><strong>View:</strong> {tx.view}</div>
                         <div><strong>Size:</strong> {tx.transaction.size} bytes</div>
@@ -360,11 +376,12 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
                   >
                     <div
                       className={styles.transactionTile}
-                      style={{ backgroundColor: TRANSACTION_TYPES[tx.type].color }}
+                      style={bgStyle}
                       onClick={() => navigate(`/transaction/${tx.seqno}`)}
                     />
                   </Tooltip>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
