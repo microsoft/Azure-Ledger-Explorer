@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import {
   makeStyles,
@@ -154,6 +154,8 @@ interface LedgerVisualizationProps {
   maxTransactions?: number;
   selectedTypeFilters?: Set<TransactionType>;
   onFilterChange?: (selectedTypes: Set<TransactionType>) => void;
+  /** Pre-calculated stats from parent - stable counts that don't change with filtering */
+  stats?: Map<TransactionType, number>;
 }
 
 /**
@@ -180,6 +182,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
   maxTransactions = 1000,
   selectedTypeFilters,
   onFilterChange,
+  stats: externalStats,
 }) => {
   const styles = useStyles();
   
@@ -243,25 +246,18 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
     return groupTransactionsByView(filteredTransactions);
   }, [filteredTransactions]);
 
-  // Calculate statistics - use ref to store initial counts so they don't change when filters applied
-  const initialStatsRef = useRef<Map<TransactionType, number> | null>(null);
-  
+  // Use external stats if provided, otherwise calculate from current transactions (fallback)
   const stats = useMemo(() => {
-    const typeCounts = new Map<TransactionType, number>();
+    if (externalStats) return externalStats;
     
+    // Fallback: calculate from classified transactions
+    const typeCounts = new Map<TransactionType, number>();
     for (const tx of classifiedTransactions) {
       const current = typeCounts.get(tx.type) || 0;
       typeCounts.set(tx.type, current + 1);
     }
-    
-    // Capture initial stats when we first have data (no filters applied)
-    if (initialStatsRef.current === null && classifiedTransactions.length > 0 && selectedTypes.size === 0) {
-      initialStatsRef.current = new Map(typeCounts);
-    }
-    
-    // Return initial stats if available, otherwise current calculation
-    return initialStatsRef.current || typeCounts;
-  }, [classifiedTransactions, selectedTypes.size]);
+    return typeCounts;
+  }, [externalStats, classifiedTransactions]);
 
   if (isLoading) {
     return (
