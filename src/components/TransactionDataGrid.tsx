@@ -172,17 +172,7 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
       items={transactions}
       columns={columns}
       sortable
-      selectionMode="single"
-      onSelectionChange={(_, data) => {
-        if (data.selectedItems.size > 0) {
-          const selectedItems = Array.from(data.selectedItems);
-          const rowIndex = parseInt(selectedItems[0] as string);
-          const selectedTransaction = transactions[rowIndex];
-          if (selectedTransaction) {
-            onTransactionClick(selectedTransaction.id);
-          }
-        }
-      }}
+      resizableColumns
       className={styles.dataGrid}
     >
       <DataGridHeader>
@@ -194,7 +184,11 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
       </DataGridHeader>
       <DataGridBody<TransactionRow>>
         {({ item, rowId }) => (
-          <DataGridRow<TransactionRow> key={rowId} className={styles.row}>
+          <DataGridRow<TransactionRow> 
+            key={rowId} 
+            className={styles.row}
+            onClick={() => onTransactionClick(item.id)}
+          >
             {({ renderCell }) => (
               <DataGridCell>
                 {renderCell(item)}
