@@ -17,27 +17,13 @@ export type TransactionType =
   | 'userPrivate'
   | 'unknown';
 
-// Transaction type returned by getAllTransactions
-export type TransactionQueryResult = {
-  id: number;
-  fileId: number;
-  fileName: string;
-  version: number;
-  flags: number;
-  size: number;
-  entryType: number;
-  txVersion: number;
-  maxConflictVersion: number;
-  writeCount?: number;
-  deleteCount?: number;
-  mapName?: string;
-};
+import type { TransactionRecord } from '@ccf/database';
 
 /**
  * Classify a transaction based on its properties and key-value data
  * This is a simplified version of the Python script logic
  */
-export function classifyTransaction(transaction: TransactionQueryResult): TransactionType {
+export function classifyTransaction(transaction: TransactionRecord): TransactionType {
   // Check if we have map_name data to help classify
   const mapName = transaction.mapName || '';
   
@@ -77,9 +63,9 @@ export function classifyTransaction(transaction: TransactionQueryResult): Transa
  * Filter transactions by selected types
  */
 export function filterTransactionsByTypes(
-  transactions: TransactionQueryResult[], 
+  transactions: TransactionRecord[], 
   selectedTypes: Set<TransactionType>
-): TransactionQueryResult[] {
+): TransactionRecord[] {
   if (selectedTypes.size === 0) {
     return transactions; // Show all if no filters selected
   }
