@@ -19,8 +19,8 @@ import {
 import { ChevronRight24Regular } from '@fluentui/react-icons';
 import type { 
   TransactionType, 
-  TransactionQueryResult 
 } from '../utils/transaction-classification';
+import type { TransactionRecord } from '@ccf/database';
 import { classifyTransaction } from '../utils/transaction-classification';
 
 const useStyles = makeStyles({
@@ -140,14 +140,14 @@ const TRANSACTION_TYPES: Record<TransactionType, TransactionTypeInfo> = {
 };
 
 interface ClassifiedTransaction {
-  transaction: TransactionQueryResult;
+  transaction: TransactionRecord;
   type: TransactionType;
   view: number;
   seqno: number;
 }
 
 interface LedgerVisualizationProps {
-  transactions: TransactionQueryResult[];
+  transactions: TransactionRecord[];
   isLoading?: boolean;
   onRefresh?: () => void;
   maxTransactions?: number;
@@ -220,7 +220,7 @@ export const LedgerVisualization: React.FC<LedgerVisualizationProps> = ({
       .map(tx => ({
         transaction: tx,
         type: classifyTransaction(tx),
-        view: tx.version, // Using version as a proxy for view
+        view: tx.txView ?? 1,
         seqno: tx.id, // Using transaction ID as sequence number
       }));
     
