@@ -9,7 +9,6 @@ import {
   Button,
   Input,
   Field,
-  Textarea,
   Card,
   CardHeader,
   Text,
@@ -390,37 +389,6 @@ export const ConfigPage: React.FC = () => {
                 )}
               </Field>
 
-              <Field label="System prompt">
-                <Textarea
-                  resize='vertical'
-                  placeholder="Enter system prompt"
-                  rows={10}
-                  value={config.systemPrompt}
-                  onChange={(_, data) => setConfig(prev => ({ ...prev, systemPrompt: data.value }))} />
-              </Field>
-              {/* add a note if systemPrompt is different from defaultSystemPrompt */}
-              {config.systemPrompt !== config.defaultSystemPrompt && (
-                <div className={styles.actionButtons}>
-                  <Text size={200} style={{ color: tokens.colorStatusWarningForeground1 }}>
-                    Note: You have modified the system prompt from the default.
-                  </Text>
-                  <Button
-                    appearance="secondary"
-                    size="small"
-                    onClick={() => setConfig(prev => ({
-                      ...prev,
-                      systemPrompt: prev.defaultSystemPrompt,
-                    }))}
-                  >
-                    Reset to default
-                  </Button>
-                </div>
-              )}
-              {config.systemPrompt === config.defaultSystemPrompt && (
-                <Text size={200} style={{ color: tokens.colorStatusSuccessForeground1 }}>
-                  Using latest version of prompt.
-                </Text>
-              )}
             </div>
           </Card> }
         </div>
