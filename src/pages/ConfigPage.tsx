@@ -32,7 +32,6 @@ import {
   DocumentAdd24Regular,
   ErrorCircle16Regular,
 } from '@fluentui/react-icons';
-import defaultSystemPrompt from '../assets/defaultSystemPrompt.md?raw';
 import { 
   useAllTransactionsCount,
   useStats, 
@@ -111,25 +110,16 @@ const useStyles = makeStyles({
 
 interface AppConfig {
   baseUrl: string;
-  systemPrompt: string;
-  defaultSystemPrompt: string;
 }
 
 // Custom hook for managing configuration state
 export const useConfig = () => {
   const [config, setConfig] = useState<AppConfig>({
     baseUrl: localStorage.getItem('chat_base_url') || '',
-    systemPrompt: localStorage.getItem('chat_system_prompt') || defaultSystemPrompt,
-    defaultSystemPrompt: defaultSystemPrompt,
   });
 
   useEffect(() => {
     localStorage.setItem('chat_base_url', config.baseUrl);
-    if (config.systemPrompt) {
-      localStorage.setItem('chat_system_prompt', config.systemPrompt);
-    } else {
-      localStorage.setItem('chat_system_prompt', defaultSystemPrompt);
-    }
   }, [config]);
 
   return { config, setConfig };

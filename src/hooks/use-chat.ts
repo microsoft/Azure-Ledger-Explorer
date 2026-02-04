@@ -23,10 +23,6 @@ initializeActions();
 export interface UseChatConfig {
   /** Base URL for the chat API */
   baseUrl?: string;
-  /** System prompt to use */
-  systemPrompt?: string;
-  /** Additional context to append to system prompt */
-  additionalContext?: string;
   /** Initial messages to load */
   initialMessages?: ChatMessage[];
   /** Action context dependencies */
@@ -65,8 +61,6 @@ export interface UseChatReturn {
 export function useChat(config: UseChatConfig): UseChatReturn {
   const { 
     baseUrl, 
-    systemPrompt = '', 
-    additionalContext = '',
     initialMessages,
     actionContext = {},
   } = config;
@@ -125,10 +119,6 @@ export function useChat(config: UseChatConfig): UseChatReturn {
     };
   }, []);
 
-  const getFullSystemPrompt = useCallback(() => {
-    return systemPrompt + additionalContext;
-  }, [systemPrompt, additionalContext]);
-
   const processJsonResponses = useCallback(async (
     actions: UIAction[], 
     userMessage: string
@@ -179,7 +169,6 @@ export function useChat(config: UseChatConfig): UseChatReturn {
       {
         message: userMessageContent,
         previousMessages,
-        systemPrompt: getFullSystemPrompt(),
         signal,
       },
       {
@@ -237,7 +226,7 @@ export function useChat(config: UseChatConfig): UseChatReturn {
     );
 
     return fullText;
-  }, [getFullSystemPrompt]);
+  }, []);
 
   const postprocessResponse = useCallback(async (
     message: string,

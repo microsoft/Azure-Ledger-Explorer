@@ -105,15 +105,6 @@ export const AIChat: React.FC<AIChatProps> = ({
     }
   }, [database]);
 
-  // Build additional context for system prompt
-  const getImportedDataStatus = () => {
-    if (allTransactionsCount && allTransactionsCount > 0) {
-      return `\n## State of SQLite database\n\nSQLite database exists and has transactions, it is safe to use action:runsql if necessary. There is no need to import ledger data.\n`;
-    } else {
-      return `\n## State of SQLite database\n\nLedger data was not imported and querying SQLite database using action:runsql is not possible. Do not attempt to query the ledger and suggest the user to import the data if the question is asking for it.\n`;
-    }
-  };
-
   // Use the chat hook for all chat state management
   const {
     messages,
@@ -127,8 +118,6 @@ export const AIChat: React.FC<AIChatProps> = ({
     getAnnotationUrl,
   } = useChat({
     baseUrl: config.baseUrl,
-    systemPrompt: config.systemPrompt || '',
-    additionalContext: getImportedDataStatus(),
     initialMessages: loadedMessages,
     actionContext: {
       database,
@@ -173,6 +162,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   };
 
   const handleNewConversation = () => {
+    console.log('Starting new conversation');
     onSaveConversation?.(messages);
     clearChatFunction?.();
   };

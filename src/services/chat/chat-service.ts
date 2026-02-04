@@ -12,7 +12,6 @@ import { parseSSEChunk } from './sse-parser';
  */
 export interface ChatServiceConfig {
   baseUrl: string;
-  systemPrompt?: string;
 }
 
 /**
@@ -136,7 +135,7 @@ export class ChatService {
       return null;
     }
     
-    const prompt = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and answer the user's question: ${userQuestion}.
+    const queryToSimplifyDBOutput = `Please analyze and summarize this JSON response from a ${actionName} action. Make it more readable and highlight the key information in a clear, structured format. Focus on the most important data points and answer the user's question: ${userQuestion}.
 
 JSON to analyze:
 ${jsonString}
@@ -144,7 +143,7 @@ ${jsonString}
 Please provide a clean, human-readable summary that captures the essential information without overwhelming technical details.`;
     
     const result = await this.sendMessage(
-      prompt
+      queryToSimplifyDBOutput
     );
     
     return result?.text || null;
