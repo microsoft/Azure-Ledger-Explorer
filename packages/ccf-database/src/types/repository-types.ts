@@ -48,6 +48,8 @@ export interface TransactionRecord {
   writeCount?: number;
   deleteCount?: number;
   mapName?: string;
+  /** Comma-separated list of all map names touched by writes and deletes */
+  mapNames?: string;
   fileSize?: number;
 }
 

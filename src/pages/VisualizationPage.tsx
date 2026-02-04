@@ -10,7 +10,7 @@ import { LedgerVisualization } from '../components/LedgerVisualization';
 import { useAllTransactions } from '../hooks/use-ccf-data';
 import { Sidebar } from '../components/Sidebar';
 import type { TransactionType } from '../utils/transaction-classification';
-import { classifyTransaction } from '../utils/transaction-classification';
+import { getTransactionTypes } from '../utils/transaction-classification';
 
 const TRANSACTION_TYPES: Record<TransactionType, { name: string; color: string; description: string }> = {
   signature: {
@@ -151,12 +151,15 @@ export const VisualizationPage: React.FC = () => {
   };
 
   // Calculate stats from full transaction list (not filtered) - stays stable during filtering
+  // For multi-type transactions, each type is counted once per transaction
   const stats = useMemo(() => {
     const typeCounts = new Map<TransactionType, number>();
     for (const tx of transactions) {
-      const type = classifyTransaction(tx);
-      const current = typeCounts.get(type) || 0;
-      typeCounts.set(type, current + 1);
+      const types = getTransactionTypes(tx);
+      for (const type of types) {
+        const current = typeCounts.get(type) || 0;
+        typeCounts.set(type, current + 1);
+      }
     }
     return typeCounts;
   }, [transactions]);

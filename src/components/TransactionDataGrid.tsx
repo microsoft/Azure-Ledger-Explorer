@@ -13,6 +13,7 @@ import {
   DataGridCell,
   DataGridBody,
   Badge,
+  Tooltip,
   createTableColumn,
   tokens,
 } from '@fluentui/react-components';
@@ -59,6 +60,13 @@ const useStyles = makeStyles({
     whiteSpace: 'nowrap',
     color: tokens.colorNeutralForeground1,
   },
+  mapTooltipContent: {
+    maxWidth: '300px',
+  },
+  mapTooltipItem: {
+    fontFamily: 'monospace',
+    fontSize: '12px',
+  },
   typeBadge: {
     fontSize: tokens.fontSizeBase100,
     fontFamily: 'var(--font-mono)',
@@ -87,6 +95,8 @@ export type TransactionRow = {
   writeCount?: number;
   deleteCount?: number;
   mapName?: string;
+  /** Comma-separated list of all map names from writes and deletes */
+  mapNames?: string;
 };
 
 interface TransactionDataGridProps {
@@ -157,13 +167,38 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
     }),
     createTableColumn<TransactionRow>({
       columnId: 'map',
-      compare: (a, b) => (a.mapName || '').localeCompare(b.mapName || ''),
-      renderHeaderCell: () => <span className={styles.headerCell}>Map</span>,
-      renderCell: (item) => (
-        <span className={styles.mapNameCell}>
-          {item.mapName || '—'}
-        </span>
-      ),
+      compare: (a, b) => (a.mapNames || a.mapName || '').localeCompare(b.mapNames || b.mapName || ''),
+      renderHeaderCell: () => <span className={styles.headerCell}>Map(s)</span>,
+      renderCell: (item) => {
+        const maps = item.mapNames || item.mapName || '';
+        const mapList = maps ? maps.split(',').map(m => m.trim()).filter(Boolean) : [];
+        
+        if (mapList.length === 0) {
+          return <span className={styles.mapNameCell}>—</span>;
+        }
+        
+        if (mapList.length === 1) {
+          return <span className={styles.mapNameCell}>{mapList[0]}</span>;
+        }
+        
+        // Multiple maps: show count with tooltip
+        return (
+          <Tooltip
+            content={
+              <div className={styles.mapTooltipContent}>
+                {mapList.map((m, i) => (
+                  <div key={i} className={styles.mapTooltipItem}>{m}</div>
+                ))}
+              </div>
+            }
+            relationship="description"
+          >
+            <span className={styles.mapNameCell}>
+              {mapList.length} maps
+            </span>
+          </Tooltip>
+        );
+      },
     }),
   ];
 
@@ -172,17 +207,7 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
       items={transactions}
       columns={columns}
       sortable
-      selectionMode="single"
-      onSelectionChange={(_, data) => {
-        if (data.selectedItems.size > 0) {
-          const selectedItems = Array.from(data.selectedItems);
-          const rowIndex = parseInt(selectedItems[0] as string);
-          const selectedTransaction = transactions[rowIndex];
-          if (selectedTransaction) {
-            onTransactionClick(selectedTransaction.id);
-          }
-        }
-      }}
+      resizableColumns
       className={styles.dataGrid}
     >
       <DataGridHeader>
@@ -194,7 +219,11 @@ export const TransactionDataGrid: React.FC<TransactionDataGridProps> = ({
       </DataGridHeader>
       <DataGridBody<TransactionRow>>
         {({ item, rowId }) => (
-          <DataGridRow<TransactionRow> key={rowId} className={styles.row}>
+          <DataGridRow<TransactionRow> 
+            key={rowId} 
+            className={styles.row}
+            onClick={() => onTransactionClick(item.id)}
+          >
             {({ renderCell }) => (
               <DataGridCell>
                 {renderCell(item)}
