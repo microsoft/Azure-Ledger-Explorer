@@ -55,6 +55,13 @@ export default tseslint.config([
       ],
       '@typescript-eslint/consistent-type-imports': 'warn',
       '@typescript-eslint/no-empty-object-type': 'warn',
+      '@typescript-eslint/explicit-module-boundary-types': [
+        'error',
+        {
+          allowArgumentsExplicitlyTypedAsAny: true,
+          allowOverloadFunctions: true,
+        },
+      ],
 
       // General rules
       'no-empty': ['error', { allowEmptyCatch: true }],
@@ -73,6 +80,14 @@ export default tseslint.config([
     files: ['src/parser/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // Relaxed rules for hooks using TanStack Query (return types inferred from generics)
+  {
+    files: ['src/hooks/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
 
