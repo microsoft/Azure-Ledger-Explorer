@@ -1,121 +1,53 @@
 # CCF Ledger Explorer
 
-A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with AI-powered querying capabilities.
+A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with querying capabilities.
 
 ## Features
 
 - **Ledger File Parsing**: Import and parse CCF ledger files with full transaction details
 - **Transaction Visualization**: Browse transactions with detailed information and search capabilities
-- **Sage AI Assistant**: Natural language querying using OpenAI integration with automatic SQL generation
 - **Azure Integration**: Direct import from Azure File Shares using SAS tokens
-- **Persistent Storage**: Client-side SQLite database using sql.js with OPFS VFS
+- **Persistent Storage**: Client-side SQLite database with OPFS VFS
 - **Progressive Web App**: Install to your device, work offline, and get automatic updates
-- **Modern UI**: Built with FluentUI React components and responsive design
+- **Clean UI**: Built with FluentUI React components and responsive design
 - **State Management**: Efficient data handling with TanStack Query and optimistic updates
 
 ## Quick Start
 
-### Installation
+### Local Development
 
-```bash
-npm install
-npm run dev
-```
+1. Clone the repository `git clone $REPOSITORY_URL ccf-ledger-explorer && cd ccf-ledger-explorer`
+2. Install dependencies `npm install`
+3. Start the development server `npm run dev`
+4. Open `http://localhost:5173` in your browser
 
 ### Usage
 
-1. **Upload Files**: Drag and drop CCF ledger files or connect to Azure File Share
-2. **Browse Data**: Explore transactions, key-value operations, and statistics
-3. **AI Queries**: Ask natural language questions about your data
-4. **Search & Filter**: Find specific transactions and analyze patterns
+1. Upload ledger files: 
+    - Option 1: drag and drop CCF ledger files that you already obtained, find sample files in the `e2e` tests folder
+    - Option 2: backup CCF ledger to Azure File Share and provide a SAS token in the import dialog
+    - Option 3: download files from a known Microsoft's Signing Transparency ledger, i.e. provide a known domain name in the import dialog    
+2. Verify ledger integrity after importing the files 
+3. Explore transactions, key-value operations, and statistics. Find specific transactions and analyze patterns.
 
-## 🚀 Deployment
-
-### Azure Static Web Apps Deployment
-
-The project includes an automated PowerShell deployment script (`deploy-to-azure.ps1`) for deploying to Azure Static Web Apps.
-
-#### Prerequisites
-
-- **Azure CLI**: Install from [Microsoft Docs](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-- **Azure Subscription**: authenticate using `az login --use-device-code`
-- **PowerShell**
-
-**Using the script**
-
-- (Windows) `./deploy-to-azure.ps1 ...` used in examples below
-- (Linux) `pwsh deploy-to-azure.ps1 ...`
-
-#### Deployment Options (on Linux use pwsh)
-
-**First-time deployment (creates resources and deploys):**
-
-```powershell
-./deploy-to-azure.ps1 -CreateResources -BuildFirst
-```
-
-**Deploy to existing Static Web App:**
-
-```powershell
-./deploy-to-azure.ps1 -BuildFirst
-```
-
-**Deploy to preview environment:**
-
-```powershell
-# Deploy to auto-generated preview environment
-./deploy-to-azure.ps1 -DeployToPreview -BuildFirst
-
-# Deploy to named preview environment
-./deploy-to-azure.ps1 -DeployToPreview -PreviewEnvironment "feature-testing" -BuildFirst
-```
-
-**Deploy with Sage features disabled (sets VITE_DISABLE_SAGE=true during build):**
-
-```powershell
-# Disable Sage in a production build
-./deploy-to-azure.ps1 -BuildFirst -DisableSage -ResourceGroupName "ccfexplorer-demo-rg"
-
-# Disable Sage in a preview build
-./deploy-to-azure.ps1 -BuildFirst -DeployToPreview -DisableSage
-```
-
-#### Script Parameters
-
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `-ResourceGroupName` | Azure resource group name | `ccfexplorer-demo-rg` |
-| `-StaticWebAppName` | Static Web App name | `ccfledgerexplorer` |
-| `-Location` | Azure region | `eastus` |
-| `-CreateResources` | Create Azure resources if they don't exist | `false` |
-| `-BuildFirst` | Build the application before deployment | `false` |
-| `-DisableSage` | Temporarily set VITE_DISABLE_SAGE=true for the build (requires -BuildFirst) | `false` |
-| `-DeployToPreview` | Deploy to preview environment | `false` |
-| `-PreviewEnvironment` | Custom preview environment name | Auto-generated |
-
-## 📚 Documentation
+## Documentation
 
 **IMPORTANT**: Before contributing to this project, you MUST read the documentation in the `/docs` folder:
 
-### 🚨 Essential Reading
+### Essential Reading
 
-- **[📋 Documentation Index](./docs/README.md)** - Start here for navigation
-- **[📜 Code Standards](./docs/CODE_STANDARDS.md)** - **MANDATORY** - Required patterns and TanStack Query usage
-- **[🏗️ Architecture Overview](./docs/ARCHITECTURE_README.md)** - System design and component relationships
+- **[Documentation Index](./docs/README.md)**
+- **[Code Standards](./docs/CODE_STANDARDS.md)**
+- **[Architecture Overview](./docs/ARCHITECTURE_README.md)**
 
-### 📖 Component Documentation
+### Development Guides
 
-- **[🔧 Parser System](./docs/PARSER_README.md)** - CCF file parsing and binary data handling
-- **[🗄️ Database & Persistence](./docs/DATABASE_README.md)** - SQL.js integration and storage patterns
-- **[🌐 External Services](./docs/EXTERNAL_SERVICES_README.md)** - OpenAI and Azure integrations
-- **[🤖 AI Assistant](./docs/AI_ASSISTANT_README.md)** - Natural language query interface
+- **[Testing Guide](./docs/TESTING_README.md)**
+- **[Deployment Guide](./docs/DEPLOYMENT_README.md)**
 
-## Technology Stack
+### Component Documentation
 
-- **Frontend**: React 19 + TypeScript + Vite
-- **UI Framework**: FluentUI React components
-- **Database**: sql.js with OPFS VFS for persistent browser storage
-- **State Management**: TanStack Query for server state and caching
-- **Parser**: Custom CCF ledger parser (ported from C#)
-- **AI Integration**: OpenAI API for natural language processing
-- **Cloud Storage**: Azure File Share integration
+- **[Parser System](./docs/PARSER_README.md)**
+- **[Database & Persistence](./docs/DATABASE_README.md)**
+- **[External Services](./docs/EXTERNAL_SERVICES_README.md)**
+- **[AI Assistant](./docs/AI_ASSISTANT_README.md)**
