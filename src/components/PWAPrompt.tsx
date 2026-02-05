@@ -10,20 +10,21 @@ import { MessageBar, MessageBarBody, MessageBarActions, Button } from '@fluentui
 /**
  * PWAPrompt - Component to handle Progressive Web App service worker updates
  * 
- * Displays a prompt when a new version of the app is available,
- * allowing users to update immediately or continue using the current version.
+ * With autoUpdate enabled, the service worker automatically updates on page load.
+ * This component shows a brief notification when the app is ready for offline use.
  */
 export function PWAPrompt(): React.ReactElement | null {
-  const [showReload, setShowReload] = useState(false);
+  const [showOfflineReady, setShowOfflineReady] = useState(false);
 
   const {
     offlineReady: [offlineReady, setOfflineReady],
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
-      // Check for updates every hour
+      // Check for updates immediately on registration and periodically
       if (registration) {
+        // Check immediately
+        registration.update();
+        // Then check every hour
         setInterval(() => {
           registration.update();
         }, 60 * 60 * 1000);
@@ -36,27 +37,22 @@ export function PWAPrompt(): React.ReactElement | null {
 
   useEffect(() => {
     if (offlineReady) {
-      // App is ready to work offline
+      setShowOfflineReady(true);
+      // Auto-dismiss after 3 seconds
+      const timer = setTimeout(() => {
+        setShowOfflineReady(false);
+        setOfflineReady(false);
+      }, 3000);
+      return () => clearTimeout(timer);
     }
-  }, [offlineReady]);
-
-  useEffect(() => {
-    if (needRefresh) {
-      setShowReload(true);
-    }
-  }, [needRefresh]);
+  }, [offlineReady, setOfflineReady]);
 
   const handleClose = () => {
     setOfflineReady(false);
-    setNeedRefresh(false);
-    setShowReload(false);
+    setShowOfflineReady(false);
   };
 
-  const handleUpdate = () => {
-    updateServiceWorker(true);
-  };
-
-  if (!offlineReady && !showReload) {
+  if (!showOfflineReady) {
     return null;
   }
 
@@ -68,34 +64,16 @@ export function PWAPrompt(): React.ReactElement | null {
       zIndex: 9999,
       maxWidth: '400px'
     }}>
-      {offlineReady && !showReload && (
-        <MessageBar intent="success">
-          <MessageBarBody>
-            App ready to work offline
-          </MessageBarBody>
-          <MessageBarActions>
-            <Button appearance="transparent" onClick={handleClose}>
-              Dismiss
-            </Button>
-          </MessageBarActions>
-        </MessageBar>
-      )}
-
-      {showReload && (
-        <MessageBar intent="info">
-          <MessageBarBody>
-            New version available! Click reload to update.
-          </MessageBarBody>
-          <MessageBarActions>
-            <Button appearance="primary" onClick={handleUpdate}>
-              Reload
-            </Button>
-            <Button appearance="transparent" onClick={handleClose}>
-              Later
-            </Button>
-          </MessageBarActions>
-        </MessageBar>
-      )}
+      <MessageBar intent="success">
+        <MessageBarBody>
+          App ready to work offline
+        </MessageBarBody>
+        <MessageBarActions>
+          <Button appearance="transparent" onClick={handleClose}>
+            Dismiss
+          </Button>
+        </MessageBarActions>
+      </MessageBar>
     </div>
   );
 }

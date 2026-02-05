@@ -29,9 +29,9 @@ The PWA uses **Workbox** (via `vite-plugin-pwa`) with the following configuratio
   - **OPFS Files**: Excluded from caching (managed by SQLite OPFS VFS)
 
 #### Update Behavior
-- **Register Type**: `prompt` - Users are notified when updates are available
-- **Update Check**: Automatic hourly checks while app is open
-- **Update Flow**: User-initiated via update prompt (non-intrusive)
+- **Register Type**: `autoUpdate` - App automatically updates on launch
+- **Update Check**: Immediate check on registration, then hourly while app is open
+- **Update Flow**: Automatic - new service worker activates immediately without user intervention
 
 ### File Structure
 
@@ -64,7 +64,7 @@ The Vite PWA plugin is configured with:
 
 ```typescript
 VitePWA({
-  registerType: 'prompt',                    // User-initiated updates
+  registerType: 'autoUpdate',                // Auto-update on launch
   includeAssets: ['**/*.md', 'src/assets/ccf.svg'],
   manifest: { /* app metadata */ },
   workbox: {

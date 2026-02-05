@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['**/*.md', 'src/assets/ccf.svg'],
       manifest: {
         name: 'CCF Ledger Explorer',
