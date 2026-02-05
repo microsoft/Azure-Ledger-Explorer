@@ -9,13 +9,13 @@ import {
   makeStyles,
   Body1,
   Caption1,
+  Caption2,
   Spinner,
   MessageBar,
   SearchBox,
   Tree,
   TreeItem,
   TreeItemLayout,
-  Badge,
   Button,
   Tooltip,
   tokens,
@@ -156,26 +156,28 @@ const useStyles = makeStyles({
     cursor: 'pointer',
   },
   fileTreeItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
+    display: 'grid',
+    gridTemplateColumns: '1fr auto',
     alignItems: 'center',
+    gap: '8px',
     width: '100%',
   },
   fileNameContainer: {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    maxWidth: '150px',
   },
-  badge: {
-    marginLeft: '8px',
+  fileSizeText: {
     whiteSpace: 'nowrap',
+    color: tokens.colorNeutralForeground3,
+    minWidth: '52px',
+    textAlign: 'right',
   },
   processingIndicator: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    marginLeft: '8px',
+    justifyContent: 'flex-end',
   },
   completedBadge: {
     color: tokens.colorPaletteGreenForeground1,
@@ -469,9 +471,9 @@ export const CCFVisualizerApp: React.FC = () => {
                             title="Not verified" 
                           />
                         )}
-                        <Badge appearance="outline" size="small" className={styles.badge}>
+                        <Caption2 className={styles.fileSizeText}>
                           {formatBytes(file.fileSize)}
-                        </Badge>
+                        </Caption2>
                       </div>
                     </div>
                   </TreeItemLayout>
