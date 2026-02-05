@@ -10,12 +10,13 @@ import { fileURLToPath } from 'node:url';
 const testfilepath = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DOMAIN = 'test-ledger.confidential-ledger.azure.com';
 
+// Helper function to navigate to the config page
+const goToConfigPage = async (page: Page) => {
+  await page.getByRole('tab', { name: 'Configuration' }).click();
+  await expect(page.getByText('Ledger data configuration')).toBeVisible();
+};
+
 test.describe('Configuration Page - Domain Persistence', () => {
-  // Helper function to navigate to the config page
-  const goToConfigPage = async (page: Page) => {
-    await page.getByRole('tab', { name: 'Configuration' }).click();
-    await expect(page.getByText('Ledger data configuration')).toBeVisible();
-  };
 
   // Before each test, start from the home page
   test.beforeEach(async ({ page }) => {
@@ -102,5 +103,75 @@ test.describe('Configuration Page - Domain Persistence', () => {
     // Go to config page and verify fallback message is shown (no domain since it was manual upload)
     await goToConfigPage(page);
     await expect(page.getByText('No ledger domain information available')).toBeVisible();
+  });
+});
+
+
+test.describe('Configuration Page - agent configuration', () => {
+  const TEST_BASE_URL = 'https://api.example.test/health';
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+  });
+
+  test('should display base url from localStorage on load', async ({ page }) => {
+    await page.addInitScript(({ baseUrl }) => {
+      localStorage.setItem('chat_base_url', baseUrl);
+    }, { baseUrl: TEST_BASE_URL });
+
+    await page.goto('/');
+    await goToConfigPage(page);
+
+    const input = page.getByLabel('Base URL for chat integration');
+    await expect(input).toHaveValue(TEST_BASE_URL);
+  });
+
+  test('should persist base url to localStorage when updated', async ({ page }) => {
+    await page.goto('/');
+    await goToConfigPage(page);
+
+    const input = page.getByLabel('Base URL for chat integration');
+    await input.fill(TEST_BASE_URL);
+
+    await page.waitForFunction((baseUrl) => {
+      return localStorage.getItem('chat_base_url') === baseUrl;
+    }, TEST_BASE_URL);
+  });
+
+  test('should show api health status for a successful response', async ({ page }) => {
+    await page.route(TEST_BASE_URL, async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', configured: true }),
+      });
+    });
+
+    await page.goto('/');
+    await goToConfigPage(page);
+
+    const input = page.getByLabel('Base URL for chat integration');
+    await input.fill(TEST_BASE_URL);
+
+    await expect(page.getByText('Status: ok • Configured: yes')).toBeVisible();
+  });
+
+  test('should show api health error on failed response', async ({ page }) => {
+    await page.route(TEST_BASE_URL, async route => {
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'error' }),
+      });
+    });
+
+    await page.goto('/');
+    await goToConfigPage(page);
+
+    const input = page.getByLabel('Base URL for chat integration');
+    await input.fill(TEST_BASE_URL);
+
+    await expect(page.getByText(/Failed to fetch health status: Failed to fetch health:/)).toBeVisible();
   });
 });
