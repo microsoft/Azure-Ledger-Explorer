@@ -47,6 +47,6 @@ describe('AIChat component', () => {
 
     localStorage.setItem('chat_base_url', 'http://example.com');
     render(<QueryClientProvider client={new QueryClient()}><AIChat loadedMessages={[testMsg]}  /></QueryClientProvider>);
-    expect((screen.getAllByRole('link').at(0) as HTMLAnchorElement).href).toBe('http://example.com/docs/file/download/fileidxxxx');
+    expect((screen.getAllByRole('link').at(0) as HTMLAnchorElement).href).toBe('http://example.com/docs/file/download/ZmlsZW5hbWUudHh0');
   });
 });

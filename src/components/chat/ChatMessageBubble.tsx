@@ -16,7 +16,7 @@ interface ChatMessageBubbleProps {
   /** The message to display */
   message: ChatMessage;
   /** Function to get URL for an annotation file */
-  getAnnotationUrl: (fileId: string) => string | null;
+  getAnnotationUrl: (filename: string) => string | null;
 }
 
 /**

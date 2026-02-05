@@ -52,7 +52,7 @@ export interface UseChatReturn {
   /** Clear the current error */
   clearError: () => void;
   /** Get annotation URL for a file */
-  getAnnotationUrl: (fileId: string) => string | null;
+  getAnnotationUrl: (filename: string) => string | null;
 }
 
 /**
@@ -90,7 +90,7 @@ export function useChat(config: UseChatConfig): UseChatReturn {
   // Create chat service instance (memoized based on baseUrl)
   const chatServiceRef = useRef<ReturnType<typeof createChatService> | null>(null);
   if (baseUrl && (!chatServiceRef.current || 
-      chatServiceRef.current.getAnnotationUrl('test') !== `${baseUrl.replace(/\/+$/, '')}/docs/file/download/test`)) {
+      chatServiceRef.current.getAnnotationUrl('test') !== `${baseUrl.replace(/\/+$/, '')}/docs/file/download/dGVzdA==`)) {
     chatServiceRef.current = createChatService(baseUrl);
   }
 
@@ -314,11 +314,11 @@ export function useChat(config: UseChatConfig): UseChatReturn {
     setError(null);
   }, []);
 
-  const getAnnotationUrl = useCallback((fileId: string): string | null => {
+  const getAnnotationUrl = useCallback((filename: string): string | null => {
     if (!chatServiceRef.current) {
       return null;
     }
-    return chatServiceRef.current.getAnnotationUrl(fileId);
+    return chatServiceRef.current.getAnnotationUrl(filename);
   }, []);
 
   return {
