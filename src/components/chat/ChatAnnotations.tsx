@@ -12,7 +12,7 @@ interface ChatAnnotationsProps {
   /** Annotations to display */
   annotations: Record<string, ChatAnnotation>;
   /** Function to get URL for an annotation file */
-  getAnnotationUrl: (fileId: string) => string | null;
+  getAnnotationUrl: (filename: string) => string | null;
 }
 
 /**
@@ -36,8 +36,8 @@ export const ChatAnnotations: React.FC<ChatAnnotationsProps> = ({
           const refsText = annotation.refs && annotation.refs.length > 0 
             ? annotation.refs.map(r => `[${r}]`).join(', ') + ' ' 
             : '';
-          const annotationUrl = annotation.file_id 
-            ? getAnnotationUrl(annotation.file_id) 
+          const annotationUrl = annotation.filename 
+            ? getAnnotationUrl(annotation.filename) 
             : null;
           const displayName = annotation.filename || annotation.file_id || 'Referenced file';
 

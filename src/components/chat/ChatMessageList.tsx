@@ -15,7 +15,7 @@ interface ChatMessageListProps {
   /** Whether currently loading a response */
   isLoading: boolean;
   /** Function to get URL for an annotation file */
-  getAnnotationUrl: (fileId: string) => string | null;
+  getAnnotationUrl: (filename: string) => string | null;
 }
 
 /**

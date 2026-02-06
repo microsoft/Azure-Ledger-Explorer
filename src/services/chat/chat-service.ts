@@ -152,8 +152,10 @@ Please provide a clean, human-readable summary that captures the essential infor
   /**
    * Build the annotation download URL
    */
-  getAnnotationUrl(fileId: string): string {
-    return `${this.baseUrl}/docs/file/download/${encodeURIComponent(fileId)}`;
+  getAnnotationUrl(filename: string): string {
+    // Base64 encode the filename
+    const encodedFilename = btoa(filename);
+    return `${this.baseUrl}/docs/file/download/${encodedFilename}`;
   }
   
   /**
