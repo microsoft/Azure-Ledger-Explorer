@@ -104,12 +104,3 @@ The existing tests only exercise `WriteSetWithCommitEvidenceAndClaims` (entry ty
 
 </details>
 
----
-
-## Open Questions for CCF Repo Owners
-
-1. **Licensing / redistribution** — Can we copy a subset of `tests/testdata` ledger files into the Ledger Explorer repo as test fixtures, or should we reference them via a git submodule / CI fetch?
-2. **Stability** — Are these testdata files considered stable across CCF releases, or might their binary format change?
-3. **Snapshot support** — The parser currently throws on `EntryType.Snapshot` (type 1). Are there test ledgers with snapshot entries we should plan for?
-4. **Private domain** — Our parser only reads the public domain. Do any of these test ledgers contain non-empty private domains that we should be aware of?
-5. **Additional testdata** — Are there test ledgers with `WriteSetWithClaims` (type 2) that we could use for full entry-type coverage?
