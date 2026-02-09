@@ -4,7 +4,6 @@
  */
 
 import { decode } from 'cbor2';
-import { Buffer } from 'buffer';
 
 const COSE_SIGN1_TAG = 18;
 const COSE_HEADER_PARAM_CWT_CLAIMS = 15;
@@ -66,7 +65,11 @@ export function extractCoseSignatureTimeFromCcfValue(valueBytes: Uint8Array): Co
 
   let coseBytes: Uint8Array;
   try {
-    coseBytes = new Uint8Array(Buffer.from(base64, 'base64'));
+    const binaryStr = atob(base64);
+    coseBytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      coseBytes[i] = binaryStr.charCodeAt(i);
+    }
   } catch {
     return null;
   }

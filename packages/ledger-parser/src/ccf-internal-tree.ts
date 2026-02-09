@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { toHexStringLower } from './merkle-tree';
+import { toHexStringLower } from './merkle-tree.js';
 
 const HASH_SIZE_BYTES = 32;
 

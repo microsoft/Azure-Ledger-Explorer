@@ -4,10 +4,10 @@
  */
 
 // Main parser class
-export { LedgerChunkV2 } from './ledger-chunk';
+export { LedgerChunkV2 } from './ledger-chunk.js';
 
 // CBOR utilities
-export { cborArrayToText, uint8ArrayToHexString, uint8ArrayToB64String } from './cbor-utils';
+export { cborArrayToText, uint8ArrayToHexString, uint8ArrayToB64String } from './cbor-utils.js';
 
 // Merkle tree utilities
 export { 
@@ -15,7 +15,7 @@ export {
   toHexStringLower, 
   areByteArraysEqual, 
   hexStringToBytes 
-} from './merkle-tree';
+} from './merkle-tree.js';
 
 // Ledger validation utilities
 export {
@@ -24,23 +24,23 @@ export {
   analyzeLedgerSequence,
   formatFileSize,
   formatDate,
-} from './ledger-validation';
+} from './ledger-validation.js';
 
 // CCF internal tree utilities (merklecpp serialisation)
 export {
   decodeCcfInternalTree,
   computeCcfInternalTreeRoot,
   formatCcfInternalTreeSummary,
-} from './ccf-internal-tree';
+} from './ccf-internal-tree.js';
 
-export type { CcfInternalTreeDecode } from './ccf-internal-tree';
+export type { CcfInternalTreeDecode } from './ccf-internal-tree.js';
 
 // COSE signature utilities
 export {
   extractCoseSignatureTimeFromCcfValue,
-} from './cose-signature-time';
+} from './cose-signature-time.js';
 
-export type { CoseSignatureTimeResult } from './cose-signature-time';
+export type { CoseSignatureTimeResult } from './cose-signature-time.js';
 
 // Types
 export type {
@@ -51,17 +51,17 @@ export type {
   LedgerKeyValue,
   LedgerConstants,
   ChunkVerificationResult,
-} from './types';
+} from './types.js';
 
 export type {
   LedgerFileInfo,
   SequenceGap,
   RangeGroup,
   LedgerSequenceAnalysis,
-} from './ledger-validation';
+} from './ledger-validation.js';
 
 export {
   EntryType,
   LEDGER_CONSTANTS,
   entryTypeHelpers,
-} from './types';
+} from './types.js';

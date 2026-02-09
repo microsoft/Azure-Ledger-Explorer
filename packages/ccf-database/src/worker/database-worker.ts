@@ -133,7 +133,7 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'insertLedgerFile': {
         // Import LedgerChunkV2 dynamically in the worker
-        const { LedgerChunkV2, MerkleTree } = await import('@ccf/ledger-parser');
+        const { LedgerChunkV2, MerkleTree } = await import('@microsoft/ccf-ledger-parser');
 
         const { filename, fileSize, arrayBuffer, shouldVerify } = payload;
 
@@ -198,7 +198,7 @@ self.onmessage = async (event: MessageEvent) => {
         }
 
         // Import CBOR decoder
-        const { cborArrayToText } = await import('@ccf/ledger-parser');
+        const { cborArrayToText } = await import('@microsoft/ccf-ledger-parser');
 
         // Collect all data in memory first for bulk insert
         const txBinds: unknown[][] = [];

@@ -33,7 +33,7 @@ import {
 import { useVerification } from '../hooks/use-verification';
 import { useLedgerFiles } from '../hooks/use-ccf-data';
 import type { VerificationConfig } from '../types/verification-types';
-import type { LedgerFile } from '@ccf/database';
+import type { LedgerFile } from '@microsoft/ccf-database';
 
 const useStyles = makeStyles({
   container: {

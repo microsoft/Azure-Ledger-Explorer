@@ -22,7 +22,7 @@ import {
   ErrorCircle16Regular,
   Info16Regular,
 } from '@fluentui/react-icons';
-import { analyzeLedgerSequence, type SequenceGap, type RangeGroup } from '@ccf/ledger-parser';
+import { analyzeLedgerSequence, type SequenceGap, type RangeGroup } from '@microsoft/ccf-ledger-parser';
 import type { ChunkFileInfo } from '../types/chunk-types';
 
 const useStyles = makeStyles({

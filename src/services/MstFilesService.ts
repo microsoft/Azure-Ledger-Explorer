@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import { parseLedgerFilename, type LedgerFileInfo } from '@microsoft/ccf-ledger-parser';
 
 export interface DownloadProgress {
   currentFile: number;

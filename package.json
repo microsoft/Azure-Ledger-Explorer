@@ -14,19 +14,19 @@
   "scripts": {
     "dev": "npm run build:packages && vite",
     "build": "npm run build:packages && tsc -b && vite build",
-    "build:packages": "npm run build -w @ccf/ledger-parser && npm run build -w @ccf/database",
-    "build:parser": "npm run build -w @ccf/ledger-parser",
-    "build:database": "npm run build -w @ccf/database",
+    "build:packages": "npm run build -w @microsoft/ccf-ledger-parser && npm run build -w @microsoft/ccf-database",
+    "build:parser": "npm run build -w @microsoft/ccf-ledger-parser",
+    "build:database": "npm run build -w @microsoft/ccf-database",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:parser": "npm run test -w @ccf/ledger-parser"
+    "test:parser": "npm run test -w @microsoft/ccf-ledger-parser"
   },
   "dependencies": {
     "@azure-rest/confidential-ledger": "1.1.2-beta.3",
     "@azure/storage-file-share": "^12.30.0",
-    "@ccf/database": "*",
-    "@ccf/ledger-parser": "*",
+    "@microsoft/ccf-database": "*",
+    "@microsoft/ccf-ledger-parser": "*",
     "@fluentui/react-components": "^9.72.2",
     "@fluentui/react-icons": "^2.0.318",
     "@monaco-editor/react": "^4.7.0",

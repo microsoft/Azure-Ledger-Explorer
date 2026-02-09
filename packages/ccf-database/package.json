@@ -1,5 +1,5 @@
 {
-  "name": "@ccf/database",
+  "name": "@microsoft/ccf-database",
   "version": "1.0.0",
   "description": "SQLite database layer for CCF Ledger Explorer with OPFS persistence",
   "license": "Apache-2.0",
@@ -30,7 +30,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@ccf/ledger-parser": "*",
+    "@microsoft/ccf-ledger-parser": "*",
     "@sqlite.org/sqlite-wasm": "^3.50.1-build1"
   },
   "devDependencies": {

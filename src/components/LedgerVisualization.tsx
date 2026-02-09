@@ -21,7 +21,7 @@ import { ChevronRight24Regular } from '@fluentui/react-icons';
 import type { 
   TransactionType, 
 } from '../utils/transaction-classification';
-import type { TransactionRecord } from '@ccf/database';
+import type { TransactionRecord } from '@microsoft/ccf-database';
 import { getTransactionTypes } from '../utils/transaction-classification';
 
 const useStyles = makeStyles({

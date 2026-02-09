@@ -4,7 +4,7 @@
  */
 
 import {ShareClient } from '@azure/storage-file-share';
-import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import { parseLedgerFilename, type LedgerFileInfo } from '@microsoft/ccf-ledger-parser';
 
 export interface DownloadProgress {
   currentFile: number;

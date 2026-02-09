@@ -20,7 +20,7 @@ import {
   DocumentAdd24Regular,
 } from '@fluentui/react-icons';
 import { useFileDrop, useLedgerFiles, useClearAllData } from '../hooks/use-ccf-data';
-import { parseLedgerFilename } from '@ccf/ledger-parser';
+import { parseLedgerFilename } from '@microsoft/ccf-ledger-parser';
 import type { ChunkFileInfo } from '../types/chunk-types';
 import { ChunkSelector } from './ChunkSelector';
 import { type ImportMode } from './ReplaceDataConfirmDialog';

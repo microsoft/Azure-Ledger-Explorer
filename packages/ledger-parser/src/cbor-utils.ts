@@ -4,7 +4,6 @@
  */
 
 import { decode, diagnose } from 'cbor2';
-import { Buffer } from "buffer";
 
 /** CBOR values can be primitives, arrays, maps, or binary data */
 type CborValue = unknown;
@@ -355,7 +354,11 @@ export function uint8ArrayToHexString(uint8Array: Uint8Array): string {
  * Converts a Uint8Array to a base64-encoded string
  */
 export function uint8ArrayToB64String(uint8Array: Uint8Array): string {
-    return Buffer.from(uint8Array).toString('base64');
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+        binary += String.fromCharCode(uint8Array[i]);
+    }
+    return btoa(binary);
 }
 
 function prettyPrintCosePayload(input: Uint8Array): CborValue {

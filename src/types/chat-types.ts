@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { CCFDatabase as CCFDatabaseType } from '@ccf/database';
+import type { CCFDatabase as CCFDatabaseType } from '@microsoft/ccf-database';
 
 /**
  * Chat message states during the conversation lifecycle

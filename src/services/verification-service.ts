@@ -11,7 +11,7 @@ import type {
   VerificationTransaction,
   ChunkVerificationResult,
 } from '../types/verification-types';
-import type { CCFDatabase } from '@ccf/database';
+import type { CCFDatabase } from '@microsoft/ccf-database';
 import { getDatabase } from '../hooks/use-ccf-data';
 
 export interface VerificationServiceEvents {

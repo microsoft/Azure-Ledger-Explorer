@@ -18,7 +18,7 @@ import {
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
   extractCoseSignatureTimeFromCcfValue,
-} from '@ccf/ledger-parser';
+} from '@microsoft/ccf-ledger-parser';
 
 import { MerkleTreeGraph } from './MerkleTreeGraph';
 

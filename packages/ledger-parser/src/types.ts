@@ -42,8 +42,10 @@ export interface PublicDomain {
   maxConflictVersion: number;
   writes: LedgerKeyValue[];
   deletes: LedgerKeyValue[];
-  mapName: string;
-  mapVersion: number;
+  /** @deprecated Map name is now stored on individual writes/deletes. Always undefined for new transactions. */
+  mapName?: string;
+  /** @deprecated Map version is now stored on individual writes/deletes. Always undefined for new transactions. */
+  mapVersion?: number;
 }
 
 /**

@@ -5,7 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useSyncExternalStore } from 'react';
-import { CCFDatabase, DATABASE_FILENAME } from '@ccf/database';
+import { CCFDatabase, DATABASE_FILENAME } from '@microsoft/ccf-database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
 
@@ -25,7 +25,7 @@ export const initializeDatabase = async (): Promise<void> => {
     return; // Already initialized
   }
   
-  // Note: The actual filename is defined in @ccf/database constants
+  // Note: The actual filename is defined in @microsoft/ccf-database constants
   dbInstance = new CCFDatabase({
     filename: DATABASE_FILENAME,
     useOpfs: true,

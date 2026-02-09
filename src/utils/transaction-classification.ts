@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { TransactionRecord } from '@ccf/database';
+import type { TransactionRecord } from '@microsoft/ccf-database';
 
 // Transaction type classification based on the Python script logic
 export type TransactionType = 

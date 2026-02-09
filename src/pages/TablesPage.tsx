@@ -41,7 +41,7 @@ import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, Chevr
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import { Sidebar } from '../components/Sidebar';
 import { SchemaViewerDialog } from '../components/SchemaViewerDialog';
-import { getDatabaseSchema, type DatabaseSchema, type TableKeyValue } from '@ccf/database';
+import { getDatabaseSchema, type DatabaseSchema, type TableKeyValue } from '@microsoft/ccf-database';
 
 const SORTABLE_COLUMNS: TableLatestStateSortColumn[] = ['sequence', 'transactionId', 'keyName', 'value'];
 const DEFAULT_SORT_COLUMN: TableLatestStateSortColumn = 'sequence';

@@ -4,7 +4,7 @@
  */
 
 import { BaseRepository } from './base-repository';
-import type { LedgerKeyValue } from '@ccf/ledger-parser';
+import type { LedgerKeyValue } from '@microsoft/ccf-ledger-parser';
 import type { TransactionRecord, SearchResult } from '../types/repository-types';
 import {
   buildAllTransactionsCountQuery,

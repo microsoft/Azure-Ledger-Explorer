@@ -10,18 +10,18 @@ import type {
   PublicDomain, 
   LedgerKeyValue,
   ChunkVerificationResult,
-} from './types';
+} from './types.js';
 import { 
   EntryType,
   LEDGER_CONSTANTS,
   entryTypeHelpers
-} from './types';
+} from './types.js';
 import { 
   MerkleTree, 
   areByteArraysEqual, 
   toHexStringLower,
   hexStringToBytes 
-} from './merkle-tree';
+} from './merkle-tree.js';
 
 /**
  * Parser for CCF LedgerChunkV2 format files.
@@ -103,8 +103,8 @@ export class LedgerChunkV2 {
         publicDomain,
         txDigest,
       };
-    } catch (error) {
-      console.error('Error reading transaction:', error);
+    } catch {
+      // Corrupted or truncated transaction data — signal end of readable content
       return null;
     }
   }
@@ -248,8 +248,6 @@ export class LedgerChunkV2 {
       maxConflictVersion,
       writes,
       deletes,
-      mapName: '', // Deprecated: mapName is now stored in individual writes/deletes
-      mapVersion: 0, // Deprecated: mapVersion is now stored in individual writes/deletes
     };
   }
 
@@ -307,9 +305,9 @@ export class LedgerChunkV2 {
       const finalDigestBuffer = await crypto.subtle.digest('SHA-256', finalData);
       return new Uint8Array(finalDigestBuffer);
     } catch (error) {
-      console.error('Error calculating transaction digest:', error);
-      // Fallback to empty hash if calculation fails
-      return new Uint8Array(LEDGER_CONSTANTS.SHA256_HASH_SIZE);
+      throw new Error(
+        `Failed to calculate transaction digest: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
@@ -317,7 +315,7 @@ export class LedgerChunkV2 {
    * Async iterator to read all transactions
    */
   async *readAllTransactions(): AsyncGenerator<Transaction, void, unknown> {
-    while (this.offset < this.buffer.byteLength) {
+    while (this.offset < this._fileSize) {
       const transaction = await this.readSingleTransaction();
       if (transaction) {
         yield transaction;

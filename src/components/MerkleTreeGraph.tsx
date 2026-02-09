@@ -11,7 +11,7 @@ import {
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
   toHexStringLower,
-} from '@ccf/ledger-parser';
+} from '@microsoft/ccf-ledger-parser';
 
 type NodeId = string;
 

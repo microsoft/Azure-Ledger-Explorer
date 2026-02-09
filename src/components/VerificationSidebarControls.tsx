@@ -23,7 +23,7 @@ import {
   Clock16Regular,
 } from '@fluentui/react-icons';
 import { useVerification } from '../hooks/use-verification';
-import type { LedgerFile } from '@ccf/database';
+import type { LedgerFile } from '@microsoft/ccf-database';
 
 const useStyles = makeStyles({
   container: {

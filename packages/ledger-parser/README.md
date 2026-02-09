@@ -1,11 +1,11 @@
-# @ccf/ledger-parser
+# @microsoft/ccf-ledger-parser
 
 A TypeScript parser for CCF (Confidential Consortium Framework) ledger chunk files in the LedgerChunkV2 format.
 
 ## Installation
 
 ```bash
-npm install @ccf/ledger-parser
+npm install @microsoft/ccf-ledger-parser
 ```
 
 ## Usage
@@ -13,7 +13,7 @@ npm install @ccf/ledger-parser
 ### Parsing a Ledger File
 
 ```typescript
-import { LedgerChunkV2 } from '@ccf/ledger-parser';
+import { LedgerChunkV2 } from '@microsoft/ccf-ledger-parser';
 
 // Read a ledger file
 const file = await fetch('ledger_1-100.committed');
@@ -50,7 +50,7 @@ while (chunk.hasMore) {
 The package includes utilities for decoding CBOR-encoded data, particularly COSE Sign1 structures:
 
 ```typescript
-import { cborArrayToText, uint8ArrayToHexString } from '@ccf/ledger-parser';
+import { cborArrayToText, uint8ArrayToHexString } from '@microsoft/ccf-ledger-parser';
 
 // Decode a COSE Sign1 structure to readable JSON
 const readable = cborArrayToText(coseData);
@@ -65,7 +65,7 @@ const hex = uint8ArrayToHexString(binaryData);
 Extract timestamps from CCF's internal COSE signatures:
 
 ```typescript
-import { extractCoseSignatureTimeFromCcfValue } from '@ccf/ledger-parser';
+import { extractCoseSignatureTimeFromCcfValue } from '@microsoft/ccf-ledger-parser';
 
 // Parse COSE signature time from ccf.internal.cose_signatures value
 const result = extractCoseSignatureTimeFromCcfValue(valueBytes);
@@ -84,7 +84,7 @@ import {
   decodeCcfInternalTree, 
   computeCcfInternalTreeRoot,
   formatCcfInternalTreeSummary 
-} from '@ccf/ledger-parser';
+} from '@microsoft/ccf-ledger-parser';
 
 // Decode the serialized tree
 const decoded = decodeCcfInternalTree(treeBytes);

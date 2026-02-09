@@ -1,5 +1,5 @@
 {
-  "name": "@ccf/ledger-parser",
+  "name": "@microsoft/ccf-ledger-parser",
   "version": "1.0.0",
   "description": "Parser for CCF ledger chunk files (LedgerChunkV2 format)",
   "license": "Apache-2.0",
@@ -15,7 +15,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "!src/__tests__"
   ],
   "scripts": {
     "build": "tsc",
@@ -26,7 +27,6 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "buffer": "^6.0.3",
     "cbor2": "^2.0.1"
   },
   "devDependencies": {

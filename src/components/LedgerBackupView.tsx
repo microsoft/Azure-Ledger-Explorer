@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { AzureFileShareService, type DownloadProgress } from '../services/AzureFileShareService';
-import { parseLedgerFilename, type LedgerFileInfo } from '@ccf/ledger-parser';
+import { parseLedgerFilename, type LedgerFileInfo } from '@microsoft/ccf-ledger-parser';
 import type { ChunkFileInfo } from '../types/chunk-types';
 import {
   makeStyles,

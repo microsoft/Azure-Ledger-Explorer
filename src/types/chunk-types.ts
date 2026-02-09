@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { LedgerFileInfo } from '@ccf/ledger-parser';
+import type { LedgerFileInfo } from '@microsoft/ccf-ledger-parser';
 
 /**
  * Extended file info with additional metadata for UI display and selection.

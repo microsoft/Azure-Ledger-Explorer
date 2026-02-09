@@ -3,8 +3,8 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import type { LedgerFile } from '@ccf/database';
-import type { LedgerFileInfo } from '@ccf/ledger-parser';
+import type { LedgerFile } from '@microsoft/ccf-database';
+import type { LedgerFileInfo } from '@microsoft/ccf-ledger-parser';
 import type { ChunkFileInfo } from './chunk-types';
 
 // Re-export types for convenience

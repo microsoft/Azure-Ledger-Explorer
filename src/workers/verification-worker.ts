@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '@ccf/ledger-parser';
+import { MerkleTree, toHexStringLower, areByteArraysEqual, hexStringToBytes } from '@microsoft/ccf-ledger-parser';
 import type { 
   WorkerInMessage, 
   WorkerOutMessage,
