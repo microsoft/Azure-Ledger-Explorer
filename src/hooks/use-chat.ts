@@ -4,25 +4,40 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { ChatMessage, UIAction } from '../types/chat-types';
-import { MESSAGES_STORAGE_KEY } from '../constants/chat';
+import type { ChatMessage, UIAction, ChatProvider } from '../types/chat-types';
+import type { DatabaseSchema } from '@microsoft/ccf-database';
+import { MESSAGES_STORAGE_KEY, OPENAI_MESSAGES_STORAGE_KEY } from '../constants/chat';
 import { 
   createChatService, 
+  createOpenAIChatService,
   extractActions, 
   executeActions,
   initializeActions,
 } from '../services/chat';
 import type { ActionContext } from '../services/chat';
+import type { ChatService } from '../services/chat';
+import type { OpenAIChatService } from '../services/chat';
 
 // Initialize action handlers once at module load
 initializeActions();
+
+/** Union type for both chat service implementations */
+type AnyChatService = ChatService | OpenAIChatService;
 
 /**
  * Configuration for the useChat hook
  */
 export interface UseChatConfig {
-  /** Base URL for the chat API */
+  /** Base URL for the Sage chat API */
   baseUrl?: string;
+  /** OpenAI API key for BYOK mode */
+  openaiApiKey?: string;
+  /** OpenAI model name */
+  openaiModel?: string;
+  /** Database schema for OpenAI system prompt */
+  databaseSchema?: DatabaseSchema;
+  /** Active chat provider */
+  provider?: ChatProvider;
   /** Initial messages to load */
   initialMessages?: ChatMessage[];
   /** Action context dependencies */
@@ -60,18 +75,23 @@ export interface UseChatReturn {
  */
 export function useChat(config: UseChatConfig): UseChatReturn {
   const { 
-    baseUrl, 
+    baseUrl,
+    openaiApiKey,
+    openaiModel = 'gpt-4o-mini',
+    databaseSchema,
+    provider = 'sage',
     initialMessages,
     actionContext = {},
   } = config;
 
-  // Messages state with localStorage persistence
+  // Messages state with localStorage persistence (separate per provider)
+  const storageKey = provider === 'openai' ? OPENAI_MESSAGES_STORAGE_KEY : MESSAGES_STORAGE_KEY;
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (initialMessages && initialMessages.length > 0) {
       return initialMessages;
     }
     try {
-      const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
+      const raw = localStorage.getItem(storageKey);
       return raw 
         ? JSON.parse(raw).map((m: ChatMessage) => ({ 
             ...m, 
@@ -87,21 +107,50 @@ export function useChat(config: UseChatConfig): UseChatReturn {
   const [error, setError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Create chat service instance (memoized based on baseUrl)
-  const chatServiceRef = useRef<ReturnType<typeof createChatService> | null>(null);
-  if (baseUrl && (!chatServiceRef.current || 
-      chatServiceRef.current.getAnnotationUrl('test') !== `${baseUrl.replace(/\/+$/, '')}/docs/file/download/dGVzdA==`)) {
-    chatServiceRef.current = createChatService(baseUrl);
+  // Create chat service instance based on provider
+  const chatServiceRef = useRef<AnyChatService | null>(null);
+  const lastProviderRef = useRef<string>('');
+  const lastKeyRef = useRef<string>('');
+  const lastBaseUrlRef = useRef<string>('');
+
+  // Re-create the service when provider, key, baseUrl, or schema changes
+  if (provider === 'openai' && openaiApiKey) {
+    if (
+      lastProviderRef.current !== 'openai' ||
+      lastKeyRef.current !== openaiApiKey
+    ) {
+      chatServiceRef.current = createOpenAIChatService({
+        apiKey: openaiApiKey,
+        model: openaiModel,
+        databaseSchema,
+      });
+      lastProviderRef.current = 'openai';
+      lastKeyRef.current = openaiApiKey;
+      lastBaseUrlRef.current = '';
+    } else if (chatServiceRef.current && 'updateSchema' in chatServiceRef.current && databaseSchema) {
+      // Update schema on the existing OpenAI service
+      (chatServiceRef.current as OpenAIChatService).updateSchema(databaseSchema);
+    }
+  } else if (provider === 'sage' && baseUrl) {
+    if (
+      lastProviderRef.current !== 'sage' ||
+      lastBaseUrlRef.current !== baseUrl
+    ) {
+      chatServiceRef.current = createChatService(baseUrl);
+      lastProviderRef.current = 'sage';
+      lastBaseUrlRef.current = baseUrl;
+      lastKeyRef.current = '';
+    }
   }
 
-  // Persist messages to localStorage
+  // Persist messages to localStorage (provider-aware key)
   useEffect(() => {
     try {
-      localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages));
+      localStorage.setItem(storageKey, JSON.stringify(messages));
     } catch (err) {
       console.error('Failed to save messages:', err);
     }
-  }, [messages]);
+  }, [messages, storageKey]);
 
   // Sync externally loaded messages
   useEffect(() => {
@@ -150,7 +199,7 @@ export function useChat(config: UseChatConfig): UseChatReturn {
     signal: AbortSignal
   ): Promise<string> => {
     if (!chatServiceRef.current) {
-      throw new Error('Base URL is required to send the request');
+      throw new Error('Chat service is not configured. Please set up a Base URL or OpenAI API key in Configuration.');
     }
 
     // Create assistant message placeholder

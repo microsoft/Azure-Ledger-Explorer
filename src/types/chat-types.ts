@@ -63,6 +63,11 @@ export interface ChatMessage {
 }
 
 /**
+ * Chat provider types
+ */
+export type ChatProvider = 'sage' | 'openai';
+
+/**
  * Props for the AIChat component
  */
 export interface AIChatProps {

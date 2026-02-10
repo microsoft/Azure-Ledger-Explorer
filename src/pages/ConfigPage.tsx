@@ -24,6 +24,8 @@ import {
   DialogActions,
   Caption1,
   Spinner,
+  Dropdown,
+  Option,
 } from '@fluentui/react-components';
 import {
   Settings24Regular,
@@ -31,6 +33,8 @@ import {
   DatabaseArrowDownRegular,
   DocumentAdd24Regular,
   ErrorCircle16Regular,
+  Checkmark16Regular,
+  Key24Regular,
 } from '@fluentui/react-icons';
 import { 
   useAllTransactionsCount,
@@ -40,6 +44,8 @@ import {
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from '../components/AddFilesWizard';
 import { useApiHealth } from '../hooks/use-api-health';
+import { useOpenAIKeyValidation } from '../hooks/use-openai-key-validation';
+import { OPENAI_MODELS, DEFAULT_OPENAI_MODEL, OPENAI_API_KEY_STORAGE_KEY, OPENAI_MODEL_STORAGE_KEY } from '../constants/chat';
 import { 
   getLedgerDomain, 
   clearLedgerDomain 
@@ -110,6 +116,8 @@ const useStyles = makeStyles({
 
 interface AppConfig {
   baseUrl: string;
+  openaiApiKey: string;
+  openaiModel: string;
 }
 
 interface UseConfigResult {
@@ -121,10 +129,14 @@ interface UseConfigResult {
 export const useConfig = (): UseConfigResult => {
   const [config, setConfig] = useState<AppConfig>({
     baseUrl: localStorage.getItem('chat_base_url') || '',
+    openaiApiKey: localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || '',
+    openaiModel: localStorage.getItem(OPENAI_MODEL_STORAGE_KEY) || DEFAULT_OPENAI_MODEL,
   });
 
   useEffect(() => {
     localStorage.setItem('chat_base_url', config.baseUrl);
+    localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, config.openaiApiKey);
+    localStorage.setItem(OPENAI_MODEL_STORAGE_KEY, config.openaiModel);
   }, [config]);
 
   return { config, setConfig };
@@ -143,6 +155,7 @@ export const ConfigPage: React.FC = () => {
   
   // Fetch API health status when baseUrl changes
   const { data: apiHealthData, isLoading: isLoadingApiHealth, error: apiHealthError } = useApiHealth(config.baseUrl);
+  const { data: keyValidation, isLoading: isValidatingKey } = useOpenAIKeyValidation(config.openaiApiKey);
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
@@ -386,6 +399,95 @@ export const ConfigPage: React.FC = () => {
 
             </div>
           </Card> }
+
+          <Card>
+            <CardHeader
+              header={
+                <div className={styles.configHeader}>
+                  <Key24Regular />
+                  <Text weight="semibold">CCF Ledger Chat (Bring Your Own Key)</Text>
+                </div>
+              }
+            />
+            <div className={styles.configContent}>
+              <Text size={200}>
+                Use your own OpenAI API key to chat with your loaded ledger data.
+                Questions are translated into SQL queries, executed locally, and results
+                are summarized in natural language. No data leaves your browser except
+                the questions themselves.
+              </Text>
+
+              <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                ⚠️ Your API key is stored locally in your browser and sent directly to
+                OpenAI. It is never sent to any other server.
+              </Caption1>
+
+              <Field label="OpenAI API Key">
+                <Input
+                  type="password"
+                  placeholder="sk-..."
+                  value={config.openaiApiKey}
+                  onChange={(_, data) =>
+                    setConfig(prev => ({ ...prev, openaiApiKey: data.value }))
+                  }
+                />
+
+                {config.openaiApiKey && (
+                  <>
+                    {isValidatingKey && (
+                      <div className={styles.statusMessage}>
+                        <Spinner size="tiny" />
+                        <Caption1>Validating API key...</Caption1>
+                      </div>
+                    )}
+
+                    {keyValidation && !isValidatingKey && keyValidation.valid && (
+                      <div className={styles.statusMessage}>
+                        <Checkmark16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
+                        <Caption1 style={{ color: tokens.colorPaletteGreenForeground1 }}>
+                          API key is valid
+                        </Caption1>
+                      </div>
+                    )}
+
+                    {keyValidation && !isValidatingKey && !keyValidation.valid && (
+                      <div className={styles.statusMessage}>
+                        <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
+                        <Caption1 style={{ color: tokens.colorPaletteRedForeground1 }}>
+                          {keyValidation.error || 'Invalid API key'}
+                        </Caption1>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Field>
+
+              <Field label="Model">
+                <Dropdown
+                  value={OPENAI_MODELS.find(m => m.key === (config.openaiModel || DEFAULT_OPENAI_MODEL))?.label || ''}
+                  selectedOptions={[config.openaiModel || DEFAULT_OPENAI_MODEL]}
+                  onOptionSelect={(_, data) => {
+                    if (data.optionValue) {
+                      setConfig(prev => ({ ...prev, openaiModel: data.optionValue as string }));
+                    }
+                  }}
+                >
+                  {OPENAI_MODELS.map(m => (
+                    <Option key={m.key} value={m.key}>
+                      {m.label}
+                    </Option>
+                  ))}
+                </Dropdown>
+              </Field>
+
+              {config.openaiApiKey && keyValidation?.valid && config.baseUrl && (
+                <Caption1 style={{ color: tokens.colorPaletteMarigoldForeground1 }}>
+                  ℹ️ Both Sage (base URL) and CCF Ledger Chat (OpenAI key) are configured.
+                  The chat page will use CCF Ledger Chat when ledger data is loaded.
+                </Caption1>
+              )}
+            </div>
+          </Card>
         </div>
       </div>
     </div>
