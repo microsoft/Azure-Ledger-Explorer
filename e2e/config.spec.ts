@@ -107,7 +107,11 @@ test.describe('Configuration Page - Domain Persistence', () => {
 });
 
 
-test.describe('Configuration Page - agent configuration', () => {
+test.describe('Configuration Page - Sage agent configuration', () => {
+  // These tests require VITE_ENABLE_SAGE=true at build time so the Sage config card is visible.
+  // Skip when running against a default (CCF Ledger Chat) build.
+  test.skip(!process.env.VITE_ENABLE_SAGE, 'Sage UI is not enabled in this build');
+
   const TEST_BASE_URL = 'https://api.example.test/health';
 
   test.beforeEach(async ({ page }) => {
