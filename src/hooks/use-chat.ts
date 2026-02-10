@@ -278,7 +278,7 @@ export function useChat(config: UseChatConfig): UseChatReturn {
     );
 
     return fullText;
-  }, []);
+  }, [provider]);
 
   const postprocessResponse = useCallback(async (
     message: string,
