@@ -127,7 +127,7 @@ test.describe('Configuration Page - Sage agent configuration', () => {
     await page.goto('/');
     await goToConfigPage(page);
 
-    const input = page.getByLabel('Base URL for chat integration');
+    const input = page.getByLabel('Sage Base URL');
     await expect(input).toHaveValue(TEST_BASE_URL);
   });
 
@@ -135,7 +135,7 @@ test.describe('Configuration Page - Sage agent configuration', () => {
     await page.goto('/');
     await goToConfigPage(page);
 
-    const input = page.getByLabel('Base URL for chat integration');
+    const input = page.getByLabel('Sage Base URL');
     await input.fill(TEST_BASE_URL);
 
     await page.waitForFunction((baseUrl) => {
@@ -155,7 +155,7 @@ test.describe('Configuration Page - Sage agent configuration', () => {
     await page.goto('/');
     await goToConfigPage(page);
 
-    const input = page.getByLabel('Base URL for chat integration');
+    const input = page.getByLabel('Sage Base URL');
     await input.fill(TEST_BASE_URL);
 
     await expect(page.getByText('Status: ok • Configured: yes')).toBeVisible();
@@ -173,7 +173,7 @@ test.describe('Configuration Page - Sage agent configuration', () => {
     await page.goto('/');
     await goToConfigPage(page);
 
-    const input = page.getByLabel('Base URL for chat integration');
+    const input = page.getByLabel('Sage Base URL');
     await input.fill(TEST_BASE_URL);
 
     await expect(page.getByText(/Failed to fetch health status: Failed to fetch health:/)).toBeVisible();

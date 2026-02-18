@@ -33,6 +33,8 @@ import {
 import { 
   useStats,
 } from '../hooks/use-ccf-data';
+import { useConfig } from '../pages/ConfigPage';
+import { useOpenAIKeyValidation } from '../hooks/use-openai-key-validation';
 import ccfLogo from '../assets/ccf.svg';
 
 const useStyles = makeStyles({
@@ -89,8 +91,18 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   const styles = useStyles();
   const navigate = useNavigate();
   const { data: stats } = useStats();
+  const { config } = useConfig();
+  const { data: keyValidation } = useOpenAIKeyValidation(config.openaiApiKey);
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
+  
+  // For SAGE builds: always show chat tab
+  // For non-SAGE builds: only show if chat is enabled and API key is valid
+  const isSageBuild = import.meta.env.VITE_ENABLE_SAGE === 'true';
+  const showChatTab = isSageBuild || 
+                      (config.chatEnabled && 
+                       config.openaiApiKey && 
+                       keyValidation?.valid);
 
   const handleTabChange = (tabValue: string) => {
     if (tabValue === 'files') {
@@ -132,9 +144,11 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       <div className={styles.navigation}>
         {/* Navigation Tabs */}
           <TabList onTabSelect={(_, data) => handleTabChange(data.value as string)} >
-            <Tab value="chat" icon={<Bot24Regular />}>
-              Chat
-            </Tab>
+            {showChatTab && (
+              <Tab value="chat" icon={<Bot24Regular />}>
+                Chat
+              </Tab>
+            )}
             <Tab value="files" icon={<FolderRegular />}>
               Files
             </Tab>

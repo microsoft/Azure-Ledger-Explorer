@@ -21,6 +21,9 @@ export const OPENAI_API_KEY_STORAGE_KEY = 'openai_api_key';
 /** LocalStorage key for OpenAI model selection */
 export const OPENAI_MODEL_STORAGE_KEY = 'openai_model';
 
+/** LocalStorage key for chat enabled setting */
+export const CHAT_ENABLED_STORAGE_KEY = 'chat_enabled';
+
 /** Default OpenAI model */
 export const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 
