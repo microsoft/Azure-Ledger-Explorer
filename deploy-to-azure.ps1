@@ -34,7 +34,7 @@ param(
     [switch]$DeployToPreview = $false,
 
     [Parameter(Mandatory=$false)]
-    [switch]$DisableSage = $false # When used WITH -BuildFirst, sets VITE_DISABLE_SAGE=true for the build only
+    [switch]$EnableSage = $false # When used WITH -BuildFirst, sets VITE_ENABLE_SAGE=true to use Sage instead of CCF Ledger Chat
 )
 
 # Parameter validation
@@ -112,14 +112,14 @@ if ($BuildFirst -or (-not (Test-Path "dist"))) {
     Write-Info "Building the application..."
 
     # Handle optional Sage disabling (only valid if -BuildFirst explicitly provided)
-    $restoreDisableSage = $false
-    if ($DisableSage) {
+    $restoreEnableSage = $false
+    if ($EnableSage) {
         if (-not $BuildFirst) {
-            Write-Warning "-DisableSage specified but -BuildFirst not provided. Ignoring -DisableSage."
+            Write-Warning "-EnableSage specified but -BuildFirst not provided. Ignoring -EnableSage."
         } else {
-            Write-Info "Disabling Sage features for this build (setting VITE_DISABLE_SAGE=true)"
-            $env:VITE_DISABLE_SAGE = "true"
-            $restoreDisableSage = $true
+            Write-Info "Enabling Sage features for this build (setting VITE_ENABLE_SAGE=true)"
+            $env:VITE_ENABLE_SAGE = "true"
+            $restoreEnableSage = $true
         }
     }
 
@@ -143,9 +143,9 @@ if ($BuildFirst -or (-not (Test-Path "dist"))) {
 
         Write-Success "Application built successfully"
     } finally {
-        if ($restoreDisableSage) {
+        if ($restoreEnableSage) {
             # Clean up the temporary environment variable
-            Remove-Item Env:VITE_DISABLE_SAGE -ErrorAction SilentlyContinue
+            Remove-Item Env:VITE_ENABLE_SAGE -ErrorAction SilentlyContinue
         }
     }
 }

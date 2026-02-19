@@ -8,7 +8,8 @@ import { MAX_INPUT_LENGTH, MAX_OUTPUT_TOKENS } from '../../constants/chat';
 import { parseSSEChunk } from './sse-parser';
 
 /**
- * Configuration for the chat service
+ * Configuration for hosted agent based chat service.
+ * Reach out to Azure rep if you want access.
  */
 export interface ChatServiceConfig {
   baseUrl: string;

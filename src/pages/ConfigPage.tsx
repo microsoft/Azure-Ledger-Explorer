@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 /* eslint-disable react-refresh/only-export-components */
 import {
   Button,
@@ -24,6 +25,9 @@ import {
   DialogActions,
   Caption1,
   Spinner,
+  Dropdown,
+  Option,
+  Switch,
 } from '@fluentui/react-components';
 import {
   Settings24Regular,
@@ -31,6 +35,8 @@ import {
   DatabaseArrowDownRegular,
   DocumentAdd24Regular,
   ErrorCircle16Regular,
+  Checkmark16Regular,
+  Key24Regular,
 } from '@fluentui/react-icons';
 import { 
   useAllTransactionsCount,
@@ -40,6 +46,8 @@ import {
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from '../components/AddFilesWizard';
 import { useApiHealth } from '../hooks/use-api-health';
+import { useOpenAIKeyValidation } from '../hooks/use-openai-key-validation';
+import { OPENAI_MODELS, DEFAULT_OPENAI_MODEL, OPENAI_API_KEY_STORAGE_KEY, OPENAI_MODEL_STORAGE_KEY, CHAT_ENABLED_STORAGE_KEY } from '../constants/chat';
 import { 
   getLedgerDomain, 
   clearLedgerDomain 
@@ -110,6 +118,9 @@ const useStyles = makeStyles({
 
 interface AppConfig {
   baseUrl: string;
+  openaiApiKey: string;
+  openaiModel: string;
+  chatEnabled: boolean;
 }
 
 interface UseConfigResult {
@@ -121,17 +132,41 @@ interface UseConfigResult {
 export const useConfig = (): UseConfigResult => {
   const [config, setConfig] = useState<AppConfig>({
     baseUrl: localStorage.getItem('chat_base_url') || '',
+    openaiApiKey: localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY) || '',
+    openaiModel: localStorage.getItem(OPENAI_MODEL_STORAGE_KEY) || DEFAULT_OPENAI_MODEL,
+    chatEnabled: localStorage.getItem(CHAT_ENABLED_STORAGE_KEY) === 'true',
   });
 
   useEffect(() => {
     localStorage.setItem('chat_base_url', config.baseUrl);
+    localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, config.openaiApiKey);
+    localStorage.setItem(OPENAI_MODEL_STORAGE_KEY, config.openaiModel);
+    localStorage.setItem(CHAT_ENABLED_STORAGE_KEY, String(config.chatEnabled));
+    
+    // Dispatch custom event to sync config across components
+    window.dispatchEvent(new CustomEvent('configChanged', { detail: config }));
   }, [config]);
+
+  useEffect(() => {
+    // Listen for config changes from other components
+    const handleConfigChange = (e: Event) => {
+      const customEvent = e as CustomEvent<AppConfig>;
+      if (customEvent.detail) {
+        setConfig(customEvent.detail);
+      }
+    };
+
+    window.addEventListener('configChanged', handleConfigChange);
+    return () => window.removeEventListener('configChanged', handleConfigChange);
+  }, []);
 
   return { config, setConfig };
 };
 
 export const ConfigPage: React.FC = () => {
   const styles = useStyles();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { config, setConfig } = useConfig();
   const { data: allTransactionsCount } = useAllTransactionsCount();
   const [showUploadDialog, setShowUploadDialog] = React.useState(false);
@@ -143,8 +178,17 @@ export const ConfigPage: React.FC = () => {
   
   // Fetch API health status when baseUrl changes
   const { data: apiHealthData, isLoading: isLoadingApiHealth, error: apiHealthError } = useApiHealth(config.baseUrl);
+  const { data: keyValidation, isLoading: isValidatingKey } = useOpenAIKeyValidation(config.openaiApiKey);
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
+
+  const handleChatToggle = (checked: boolean) => {
+    setConfig(prev => ({ ...prev, chatEnabled: checked }));
+    // If disabling chat while on chat page, navigate to files page
+    if (!checked && location.pathname === '/chat') {
+      navigate('/files');
+    }
+  };
 
   const handleClearAllData = async () => {
     try {
@@ -330,21 +374,21 @@ export const ConfigPage: React.FC = () => {
           </Card>
 
 
-          { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Card>
+          { import.meta.env.VITE_ENABLE_SAGE === 'true' && <Card>
             <CardHeader
               header={
                 <div className={styles.configHeader}>
                   <Settings24Regular />
-                  <Text weight="semibold">Agent configuration</Text>
+                  <Text weight="semibold">Sage configuration</Text>
                 </div>
               }
             />
             <div className={styles.configContent}>
               <Text size={200}>
-                Configuration for the AI chat. Set the base URL for the OpenAI API.
+                Configuration for the Sage AI agent. Set the base URL for the Sage backend.
               </Text>
 
-              <Field label="Base URL for chat integration">
+              <Field label="Sage Base URL">
                 <Input
                   type="url"
                   placeholder="https://sageendpoint.com/"
@@ -382,6 +426,130 @@ export const ConfigPage: React.FC = () => {
                     )}
                   </>
                 )}
+              </Field>
+
+            </div>
+          </Card> }
+
+          { import.meta.env.VITE_ENABLE_SAGE !== 'true' && <Card>
+            <CardHeader
+              header={
+                <div className={styles.configHeader}>
+                  <Key24Regular />
+                  <Text weight="semibold">CCF Ledger Chat (Bring Your Own Key)</Text>
+                </div>
+              }
+            />
+            <div className={styles.configContent}>
+              <Text size={200}>
+                Use your own OpenAI API key to chat with your loaded ledger data.
+                Questions are translated into SQL queries, executed locally, and results
+                are summarized in natural language. No data leaves your browser except
+                the questions themselves.
+              </Text>
+
+              <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                ⚠️ Your API key is stored locally in your browser and sent directly to
+                OpenAI. It is never sent to any other server.
+              </Caption1>
+
+              <Field label="Enable Chat Experience (Bring your own key)">
+                <Switch
+                  checked={config.chatEnabled}
+                  onChange={(_, data) => handleChatToggle(data.checked)}
+                  label={config.chatEnabled ? 'Enabled' : 'Disabled'}
+                />
+              </Field>
+
+              {config.chatEnabled && (
+                <div style={{
+                  backgroundColor: tokens.colorNeutralBackground3,
+                  padding: tokens.spacingVerticalM,
+                  borderRadius: tokens.borderRadiusMedium,
+                  marginTop: tokens.spacingVerticalS,
+                }}>
+                  <Text size={200} weight="semibold" block>
+                    Current Settings:
+                  </Text>
+                  <div style={{ marginTop: tokens.spacingVerticalXS }}>
+                    <Caption1 block>
+                      API Key: {config.openaiApiKey ? '••••••••' + config.openaiApiKey.slice(-4) : 'Not set'}
+                    </Caption1>
+                    <Caption1 block>
+                      Model: {OPENAI_MODELS.find(m => m.key === config.openaiModel)?.label || config.openaiModel}
+                    </Caption1>
+                    {keyValidation && config.openaiApiKey && (
+                      <Caption1
+                        block
+                        style={{
+                          color: keyValidation.valid
+                            ? tokens.colorPaletteGreenForeground1
+                            : tokens.colorPaletteRedForeground1
+                        }}
+                      >
+                        Status: {keyValidation.valid ? 'Valid ✓' : 'Invalid ✗'}
+                      </Caption1>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <Field label="OpenAI API Key">
+                <Input
+                  type="password"
+                  placeholder="sk-..."
+                  value={config.openaiApiKey}
+                  onChange={(_, data) =>
+                    setConfig(prev => ({ ...prev, openaiApiKey: data.value }))
+                  }
+                />
+
+                {config.openaiApiKey && (
+                  <>
+                    {isValidatingKey && (
+                      <div className={styles.statusMessage}>
+                        <Spinner size="tiny" />
+                        <Caption1>Validating API key...</Caption1>
+                      </div>
+                    )}
+
+                    {keyValidation && !isValidatingKey && keyValidation.valid && (
+                      <div className={styles.statusMessage}>
+                        <Checkmark16Regular primaryFill={tokens.colorPaletteGreenForeground1} />
+                        <Caption1 style={{ color: tokens.colorPaletteGreenForeground1 }}>
+                          API key is valid
+                        </Caption1>
+                      </div>
+                    )}
+
+                    {keyValidation && !isValidatingKey && !keyValidation.valid && (
+                      <div className={styles.statusMessage}>
+                        <ErrorCircle16Regular primaryFill={tokens.colorPaletteRedForeground1} />
+                        <Caption1 style={{ color: tokens.colorPaletteRedForeground1 }}>
+                          {keyValidation.error || 'Invalid API key'}
+                        </Caption1>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Field>
+
+              <Field label="Model">
+                <Dropdown
+                  value={OPENAI_MODELS.find(m => m.key === (config.openaiModel || DEFAULT_OPENAI_MODEL))?.label || ''}
+                  selectedOptions={[config.openaiModel || DEFAULT_OPENAI_MODEL]}
+                  onOptionSelect={(_, data) => {
+                    if (data.optionValue) {
+                      setConfig(prev => ({ ...prev, openaiModel: data.optionValue as string }));
+                    }
+                  }}
+                >
+                  {OPENAI_MODELS.map(m => (
+                    <Option key={m.key} value={m.key}>
+                      {m.label}
+                    </Option>
+                  ))}
+                </Dropdown>
               </Field>
 
             </div>

@@ -101,12 +101,16 @@ export const StartPage: React.FC = () => {
         <div className={styles.cardsContainer}>
 
           {/* Automated Way Card */}
-          { import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Card className={styles.card} onClick={handleAutomatedClick}>
+          <Card className={styles.card} onClick={handleAutomatedClick}>
             <div className={styles.cardContent}>
               <Bot24Filled className={styles.cardIcon} />
-              <Text className={styles.cardTitle}>Automated Analysis</Text>
+              <Text className={styles.cardTitle}>
+                {import.meta.env.VITE_ENABLE_SAGE === 'true' ? 'Automated Analysis' : 'CCF Ledger Chat'}
+              </Text>
               <Text className={styles.cardDescription}>
-                Let agent guide you through your analysis. Ask questions in natural language and get instant insights.
+                {import.meta.env.VITE_ENABLE_SAGE === 'true'
+                  ? 'Let agent guide you through your analysis. Ask questions in natural language and get instant insights.'
+                  : 'Chat with your ledger data using natural language. Bring your own OpenAI key to query and explore.'}
               </Text>
             </div>
             <CardFooter className={styles.cardFooter}>
@@ -114,7 +118,7 @@ export const StartPage: React.FC = () => {
                 Start Chat
               </Button>
             </CardFooter>
-          </Card> }
+          </Card>
 
           {/* Manual Way Card */}
           <Card className={styles.card} onClick={handleManualClick}>

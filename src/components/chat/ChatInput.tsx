@@ -118,7 +118,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <div className={styles.inputTextareaContainer}>
           <textarea
             ref={textareaRef}
-            placeholder="Message Sage..."
+            placeholder={import.meta.env.VITE_ENABLE_SAGE === 'true' ? 'Message Sage...' : 'Ask about your ledger data...'}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyPress}
