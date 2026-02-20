@@ -134,10 +134,10 @@ export const MenuBar: React.FC<MenuBarProps> = ({
   return (
     <header className={styles.header}>
       <div className={styles.headerContent}>
-        <a className={styles.logo} href="/" title='CCF Ledger Explorer'>
+        <a className={styles.logo} href="/" title='Ledger Explorer'>
           <img height={30} src={ccfLogo} alt="CCF Logo" />
         </a>
-        <span className={styles.title}>CCF Ledger Explorer</span>
+        <span className={styles.title}>Ledger Explorer</span>
       </div>
 
       {/* Navigation and Header Actions */}
