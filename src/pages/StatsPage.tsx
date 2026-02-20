@@ -23,10 +23,8 @@ import {
   DeleteRegular,
   DatabaseRegular,
   KeyRegular,
-  ClockRegular,
   DataUsageRegular,
-  PersonRegular,
-  CalendarRegular
+  PersonRegular
 } from '@fluentui/react-icons';
 import { useEnhancedStats } from '../hooks/use-ccf-data';
 
@@ -162,17 +160,6 @@ const StatsPage: React.FC = () => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatDate = (date: Date | null): string => {
-    if (!date) return 'N/A';
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const formatNumber = (num: number): string => {
