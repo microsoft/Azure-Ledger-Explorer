@@ -23,10 +23,8 @@ import {
   DeleteRegular,
   DatabaseRegular,
   KeyRegular,
-  ClockRegular,
   DataUsageRegular,
-  PersonRegular,
-  CalendarRegular
+  PersonRegular
 } from '@fluentui/react-icons';
 import { useEnhancedStats } from '../hooks/use-ccf-data';
 
@@ -162,17 +160,6 @@ const StatsPage: React.FC = () => {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatDate = (date: Date | null): string => {
-    if (!date) return 'N/A';
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const formatNumber = (num: number): string => {
@@ -435,44 +422,6 @@ const StatsPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Timeline Statistics */}
-        <Text className={classes.sectionTitle}>
-          <CalendarRegular className={classes.sectionIcon} />
-          Timeline
-        </Text>
-        <div className={classes.detailsGrid}>
-          <Card className={classes.detailCard}>
-            <CardHeader
-              header={
-                <div className={classes.statCardHeader}>
-                  <ClockRegular className={classes.statIcon} />
-                  <div>
-                    <div className={classes.timelineValue}>
-                      {formatDate(stats.oldestTransaction)}
-                    </div>
-                    <div className={classes.detailLabel}>Oldest Transaction</div>
-                  </div>
-                </div>
-              }
-            />
-          </Card>
-
-          <Card className={classes.detailCard}>
-            <CardHeader
-              header={
-                <div className={classes.statCardHeader}>
-                  <ClockRegular className={classes.statIcon} />
-                  <div>
-                    <div className={classes.timelineValue}>
-                      {formatDate(stats.newestTransaction)}
-                    </div>
-                    <div className={classes.detailLabel}>Newest Transaction</div>
-                  </div>
-                </div>
-              }
-            />
-          </Card>
-        </div>
       </div>
     </div>
   );

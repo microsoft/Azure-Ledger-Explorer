@@ -192,8 +192,8 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
               className={styles.tabList}
             >
               <Tab value="azure" icon={<CloudArrowUp20Regular />}>
-                <Tooltip content="Azure Confidential Ledger" relationship="label">
-                  <Text size={200}>Azure Ledger</Text>
+                <Tooltip content="Azure Confidential Ledger Backup" relationship="label">
+                  <Text size={200}>Azure Ledger Backup</Text>
                 </Tooltip>
               </Tab>
               <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
@@ -202,8 +202,8 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
                 </Tooltip>
               </Tab>
               <Tab value="local" icon={<Folder20Regular />}>
-                <Tooltip content="Upload Local Files" relationship="label">
-                  <Text size={200}>Local Files</Text>
+                <Tooltip content="Upload Audit Ledger Files" relationship="label">
+                  <Text size={200}>Audit Ledger Files</Text>
                 </Tooltip>
               </Tab>
             </TabList>

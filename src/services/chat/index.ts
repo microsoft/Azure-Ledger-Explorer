@@ -11,6 +11,9 @@ export type {
   ChatResponse 
 } from './chat-service';
 
+export { OpenAIChatService, createOpenAIChatService } from './openai-chat-service';
+export type { OpenAIChatServiceConfig } from './openai-chat-service';
+
 export { parseSSEChunk, createSSEReader } from './sse-parser';
 export type { SSEParseResult, SSEEventType } from './sse-parser';
 

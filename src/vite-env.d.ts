@@ -8,7 +8,7 @@
 
 // Vite environment variables
 interface ImportMetaEnv {
-  readonly VITE_DISABLE_SAGE: string;
+  readonly VITE_ENABLE_SAGE: string;
 }
 
 interface ImportMeta {

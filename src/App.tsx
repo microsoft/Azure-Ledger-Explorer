@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FluentProvider, webLightTheme, webDarkTheme } from '@fluentui/react-components';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { CCFVisualizerApp } from './components/CCFVisualizerApp';
 import { TransactionDetailsPage } from './pages/TransactionDetailsPage';
 import TablesPage from './pages/TablesPage';
@@ -92,8 +92,12 @@ function App(): React.ReactElement {
             <GridLayout.Main>
               <PageTransition>
                 <Routes>
-                  <Route path="/" element={<StartPage />} />
-                  {import.meta.env.VITE_DISABLE_SAGE !== 'true' && <Route
+                  <Route path="/" element={
+                    import.meta.env.VITE_ENABLE_SAGE === 'true'
+                      ? <StartPage />
+                      : <Navigate to="/files" replace />
+                  } />
+                  <Route
                     path="/chat"
                     element={
                       <AIPage
@@ -102,7 +106,7 @@ function App(): React.ReactElement {
                         clearChatFunction={clearChatFunction}
                       />
                     }
-                  />}
+                  />
                   <Route path="/files" element={<CCFVisualizerApp />} />
                   <Route path="/tables" element={<TablesPage />} />
                   <Route path="/tables/:tableName" element={<TablesPage />} />

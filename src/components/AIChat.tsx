@@ -4,7 +4,7 @@
  */
 
 /**
- * AIChat Component - Main chat interface for the Sage AI assistant.
+ * AIChat Component - Main chat interface.
  *
  * This component orchestrates the chat experience using sub-components:
  * - ChatMessageList: Renders the scrollable message history
@@ -12,6 +12,8 @@
  * - ChatStarterTemplates: Shows initial prompt suggestions
  *
  * State management is handled by the useChat hook.
+ * The active provider (Sage or CCF Ledger Chat) is determined by the
+ * VITE_ENABLE_SAGE build flag.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -22,6 +24,7 @@ import { useVerification } from '../hooks/use-verification';
 import { getDatabase } from '../hooks/use-ccf-data';
 import { useDownloadMstFiles } from './MstLedgerImportView';
 import { useChat } from '../hooks/use-chat';
+import { getDatabaseSchema } from '@microsoft/ccf-database';
 
 // Chat sub-components
 import { ChatMessageList } from './chat/ChatMessageList';
@@ -30,7 +33,8 @@ import { ChatStarterTemplates } from './chat/ChatStarterTemplates';
 
 // Types
 import type { AIChatProps } from '../types/chat-types';
-
+import type { ChatProvider } from '../types/chat-types';
+import type { DatabaseSchema } from '@microsoft/ccf-database';
 // Re-export ChatMessage for backward compatibility
 export type { ChatMessage } from '../types/chat-types';
 
@@ -55,7 +59,7 @@ const useStyles = makeStyles({
     justifyContent: 'flex-start',
     alignItems: 'center',
   },
-  sageTitle: {
+  chatTitle: {
     fontSize: '48px',
     fontWeight: '600',
     color: tokens.colorNeutralForeground1,
@@ -67,7 +71,7 @@ const useStyles = makeStyles({
 /**
  * AIChat - Main chat interface component
  *
- * Renders the Sage AI chat experience with:
+ * Renders the chat experience with:
  * - Welcome screen with starter templates when no messages
  * - Message history with streaming responses
  * - Input area with send/stop functionality
@@ -90,6 +94,10 @@ export const AIChat: React.FC<AIChatProps> = ({
 
   // Track transaction count for system prompt context
   const [allTransactionsCount, setAllTransactionsCount] = useState(0);
+
+  // Database schema for OpenAI system prompt
+  const [dbSchema, setDbSchema] = useState<DatabaseSchema | undefined>(undefined);
+
   useEffect(() => {
     if (database) {
       database.transactions
@@ -101,8 +109,27 @@ export const AIChat: React.FC<AIChatProps> = ({
           console.error('Failed to get transaction count:', error);
           setAllTransactionsCount(0);
         });
+
+      // Fetch schema only when using OpenAI provider (CCF Ledger Chat)
+      if (import.meta.env.VITE_ENABLE_SAGE !== 'true') {
+        getDatabaseSchema((sql: string) => database.executeQuery(sql))
+          .then((schema) => {
+            setDbSchema(schema);
+          })
+          .catch((error: Error) => {
+            console.error('Failed to get database schema:', error);
+          });
+      }
     }
   }, [database]);
+
+  // Determine the active chat provider from build flag
+  const activeProvider: ChatProvider =
+    import.meta.env.VITE_ENABLE_SAGE === 'true' ? 'sage' : 'openai';
+
+  // The chat is enabled if the active provider is configured
+  const isChatEnabled =
+    activeProvider === 'openai' ? !!config.openaiApiKey : !!config.baseUrl;
 
   // Use the chat hook for all chat state management
   const {
@@ -117,6 +144,10 @@ export const AIChat: React.FC<AIChatProps> = ({
     getAnnotationUrl,
   } = useChat({
     baseUrl: config.baseUrl,
+    openaiApiKey: config.openaiApiKey,
+    openaiModel: config.openaiModel,
+    databaseSchema: dbSchema,
+    provider: activeProvider,
     initialMessages: loadedMessages,
     actionContext: {
       database,
@@ -172,8 +203,8 @@ export const AIChat: React.FC<AIChatProps> = ({
     handleSendMessage(text);
   };
 
-  // Build starter templates based on available data
-  const starterTemplates = [
+  // Build starter templates based on available data and active provider
+  const sageTemplates = [
     { show: true, group: 'Azure Attestation', text: "How does MAA's SGX attestation work?" },
     { show: true, group: 'Azure Attestation', text: 'How can I trust MAA?' },
     { show: true, group: 'Transparency', text: 'Can you verify that MAA is transparent right now?' },
@@ -187,6 +218,26 @@ export const AIChat: React.FC<AIChatProps> = ({
     { show: allTransactionsCount > 0, group: 'Ledger', text: 'Find transactions with specific keys' },
   ];
 
+  const openaiTemplates = [
+    {
+      show: allTransactionsCount > 0,
+      group: 'Overview',
+      text: 'How many transactions are in the database?',
+    },
+    { show: allTransactionsCount > 0, group: 'Overview', text: 'Show me a summary of all loaded ledger files' },
+    { show: allTransactionsCount > 0, group: 'Explore', text: 'What CCF tables (map names) exist in the data?' },
+    { show: allTransactionsCount > 0, group: 'Explore', text: 'Show me the most recent transactions' },
+    {
+      show: allTransactionsCount > 0,
+      group: 'Query',
+      text: 'Find all key-value writes for the governance tables',
+    },
+    { show: allTransactionsCount > 0, group: 'Query', text: 'Which map has the most writes?' },
+  ];
+
+  const starterTemplates = activeProvider === 'openai' ? openaiTemplates : sageTemplates;
+  const chatTitle = activeProvider === 'openai' ? 'CCF Ledger Chat' : 'Sage';
+
   return (
     <>
       <div
@@ -196,7 +247,7 @@ export const AIChat: React.FC<AIChatProps> = ({
         }
       >
         {/* Title - visible when no messages */}
-        {!hasMessages && <div className={styles.sageTitle}>Sage</div>}
+        {!hasMessages && <div className={styles.chatTitle}>{chatTitle}</div>}
 
         {/* Input Area */}
         <ChatInput
@@ -208,7 +259,7 @@ export const AIChat: React.FC<AIChatProps> = ({
           isLoading={isLoading}
           error={error}
           hasMessages={hasMessages}
-          disabled={!config.baseUrl}
+          disabled={!isChatEnabled}
           messages={messages}
           sidebarWidth={sidebarWidth}
         />

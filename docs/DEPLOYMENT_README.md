@@ -39,12 +39,15 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 ./deploy-to-azure.ps1 -DeployToPreview -PreviewEnvironment "feature-testing" -BuildFirst
 ```
 
-**Deploy with AI chat features disabled (sets VITE_DISABLE_SAGE=true during build):**
+**Deploy with Sage instead of CCF Ledger Chat (sets VITE_ENABLE_SAGE=true during build):**
 
 ```powershell
-# Disable Sage in a production build
-./deploy-to-azure.ps1 -BuildFirst -DisableSage -ResourceGroupName "ccfexplorer-demo-rg"
+# Use Sage in a production build
+./deploy-to-azure.ps1 -BuildFirst -EnableSage -ResourceGroupName "ccfexplorer-demo-rg"
 
-# Disable Sage in a preview build
-./deploy-to-azure.ps1 -BuildFirst -DeployToPreview -DisableSage
+# Use Sage in a preview build
+./deploy-to-azure.ps1 -BuildFirst -DeployToPreview -EnableSage
 ```
+
+> **Note:** Sage and CCF Ledger Chat are mutually exclusive. When `-EnableSage` is set,
+> the build uses the Sage provider. Otherwise it defaults to CCF Ledger Chat (BYOK OpenAI).
