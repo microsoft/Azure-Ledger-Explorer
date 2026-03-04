@@ -10,18 +10,18 @@ import type {
   PublicDomain, 
   LedgerKeyValue,
   ChunkVerificationResult,
-} from './types.js';
+} from './types';
 import { 
   EntryType,
   LEDGER_CONSTANTS,
   entryTypeHelpers
-} from './types.js';
+} from './types';
 import { 
   MerkleTree, 
   areByteArraysEqual, 
   toHexStringLower,
   hexStringToBytes 
-} from './merkle-tree.js';
+} from './merkle-tree';
 
 /**
  * Parser for CCF LedgerChunkV2 format files.
