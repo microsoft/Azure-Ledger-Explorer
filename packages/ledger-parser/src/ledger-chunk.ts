@@ -22,6 +22,7 @@ import {
   toHexStringLower,
   hexStringToBytes 
 } from './merkle-tree';
+import { CCF_INTERNAL_TABLES } from './table-names';
 
 /**
  * Parser for CCF LedgerChunkV2 format files.
@@ -371,7 +372,7 @@ export class LedgerChunkV2 {
       for (let i = transactions.length - 1; i >= 0; i--) {
         const transaction = transactions[i];
         const signatureWrite = transaction.publicDomain.writes.find(write => 
-          write.mapName?.includes('public:ccf.internal.signatures')
+          write.mapName?.includes(CCF_INTERNAL_TABLES.SIGNATURES)
         );
 
         if (signatureWrite && signatureWrite.value.length > 0) {

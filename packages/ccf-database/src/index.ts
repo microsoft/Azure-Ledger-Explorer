@@ -9,6 +9,16 @@ export { CCFDatabase } from './ccf-database';
 // Constants
 export { DATABASE_FILENAME, DATABASE_PATH } from './constants';
 
+// Table name constants (re-exported from ledger-parser)
+export {
+  CCF_TABLE_PREFIXES,
+  CCF_GOV_TABLES,
+  CCF_INTERNAL_TABLES,
+  SCITT_TABLES,
+  CCF_LEGACY_TABLES,
+  TABLE_DESCRIPTIONS,
+} from '@microsoft/ccf-ledger-parser';
+
 export type { DatabaseConfig, DatabaseTransaction } from './types/database-types';
 
 export type {

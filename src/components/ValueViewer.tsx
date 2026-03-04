@@ -18,6 +18,9 @@ import {
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
   extractCoseSignatureTimeFromCcfValue,
+  CCF_GOV_TABLES,
+  CCF_INTERNAL_TABLES,
+  CCF_LEGACY_TABLES,
 } from '@microsoft/ccf-ledger-parser';
 
 import { MerkleTreeGraph } from './MerkleTreeGraph';
@@ -79,44 +82,44 @@ interface ValueViewerProps {
 // Table name to content type mapping
 const TABLE_CONTENT_TYPE_MAP: Record<string, ContentType> = {
   // JavaScript/TypeScript related tables
-  'public:ccf.governance.modules': 'javascript',
-  'public:ccf.governance.js_modules': 'javascript',
-  'public:ccf.governance.constitution': 'javascript',
-  'public:ccf.gov.modules': 'javascript',
-  'public:ccf.gov.js_modules': 'javascript',
-  'public:ccf.gov.constitution': 'javascript',
+  [CCF_LEGACY_TABLES.GOVERNANCE_MODULES]: 'javascript',
+  [CCF_LEGACY_TABLES.GOVERNANCE_JS_MODULES]: 'javascript',
+  [CCF_LEGACY_TABLES.GOVERNANCE_CONSTITUTION]: 'javascript',
+  [CCF_GOV_TABLES.MODULES]: 'javascript',
+  [CCF_LEGACY_TABLES.GOV_JS_MODULES]: 'javascript',
+  [CCF_GOV_TABLES.CONSTITUTION]: 'javascript',
   
   // Certificate related tables
-  'public:ccf.nodes.info': 'x509',
-  'public:ccf.gov.tls_ca_cert_bundles': 'x509',
-  'public:ccf.gov.service_certificate': 'x509',
-  'public:ccf.gov.network_cert': 'x509',
-  'public:ccf.nodes.endorsed_certificates': 'x509',
-  'public:ccf.nodes.self_signed_node_certificate': 'x509',
+  [CCF_LEGACY_TABLES.NODES_INFO]: 'x509',
+  [CCF_LEGACY_TABLES.GOV_TLS_CA_CERT_BUNDLES]: 'x509',
+  [CCF_LEGACY_TABLES.GOV_SERVICE_CERTIFICATE]: 'x509',
+  [CCF_LEGACY_TABLES.GOV_NETWORK_CERT]: 'x509',
+  [CCF_LEGACY_TABLES.NODES_ENDORSED_CERTIFICATES]: 'x509',
+  [CCF_LEGACY_TABLES.NODES_SELF_SIGNED_NODE_CERTIFICATE]: 'x509',
   
   // JSON configuration tables
-  'public:ccf.governance.service_config': 'json',
-  'public:ccf.governance.jwt_issuers': 'json',
-  'public:ccf.governance.recovery_shares': 'json',
-  'public:ccf.gov.service_configuration': 'json',
-  'public:ccf.gov.jwt_issuers': 'json',
-  'public:ccf.gov.jwt_public_signing_keys': 'json',
-  'public:ccf.gov.jwt_public_signing_key_issuer': 'json',
-  'public:ccf.gov.nodes.info': 'json',
-  'public:ccf.gov.users.info': 'json',
-  'public:ccf.gov.members.info': 'json',
-  'public:ccf.gov.service_info': 'json',
-  'public:ccf.internal.nodes': 'json',
-  'public:ccf.internal.consensus': 'json',
+  [CCF_LEGACY_TABLES.GOVERNANCE_SERVICE_CONFIG]: 'json',
+  [CCF_LEGACY_TABLES.GOVERNANCE_JWT_ISSUERS]: 'json',
+  [CCF_LEGACY_TABLES.GOVERNANCE_RECOVERY_SHARES]: 'json',
+  [CCF_LEGACY_TABLES.GOV_SERVICE_CONFIGURATION]: 'json',
+  [CCF_LEGACY_TABLES.GOV_JWT_ISSUERS]: 'json',
+  [CCF_LEGACY_TABLES.GOV_JWT_PUBLIC_SIGNING_KEYS]: 'json',
+  [CCF_LEGACY_TABLES.GOV_JWT_PUBLIC_SIGNING_KEY_ISSUER]: 'json',
+  [CCF_GOV_TABLES.NODES_INFO]: 'json',
+  [CCF_GOV_TABLES.USERS_INFO]: 'json',
+  [CCF_GOV_TABLES.MEMBERS_INFO]: 'json',
+  [CCF_LEGACY_TABLES.GOV_SERVICE_INFO]: 'json',
+  [CCF_LEGACY_TABLES.INTERNAL_NODES]: 'json',
+  [CCF_LEGACY_TABLES.INTERNAL_CONSENSUS]: 'json',
 
   // CCF internal merkle tree
-  'public:ccf.internal.tree': 'merkletree',
+  [CCF_INTERNAL_TABLES.TREE]: 'merkletree',
   
   // Add more mappings as needed
 };
 
-const CCF_INTERNAL_TREE_TABLE = 'public:ccf.internal.tree';
-const CCF_COSE_SIGNATURES_TABLE = 'public:ccf.internal.cose_signatures';
+const CCF_INTERNAL_TREE_TABLE = CCF_INTERNAL_TABLES.TREE;
+const CCF_COSE_SIGNATURES_TABLE = CCF_INTERNAL_TABLES.COSE_SIGNATURES;
 
 export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableName }) => {
   const styles = useStyles();

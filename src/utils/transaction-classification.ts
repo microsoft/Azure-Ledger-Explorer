@@ -4,6 +4,7 @@
  */
 
 import type { TransactionRecord } from '@microsoft/ccf-database';
+import { CCF_TABLE_PREFIXES } from '@microsoft/ccf-database';
 
 // Transaction type classification based on the Python script logic
 export type TransactionType = 
@@ -27,17 +28,17 @@ function classifyMapName(mapName: string): TransactionType {
   }
   
   // Internal CCF tables
-  if (mapName.startsWith('public:ccf.internal.')) {
+  if (mapName.startsWith(CCF_TABLE_PREFIXES.INTERNAL)) {
     return 'internal';
   }
   
   // Governance tables
-  if (mapName.startsWith('public:ccf.gov.')) {
+  if (mapName.startsWith(CCF_TABLE_PREFIXES.GOV)) {
     return 'governance';
   }
   
   // User public tables (anything else that's public but not internal/gov)
-  if (mapName.startsWith('public:')) {
+  if (mapName.startsWith(CCF_TABLE_PREFIXES.PUBLIC)) {
     return 'userPublic';
   }
 

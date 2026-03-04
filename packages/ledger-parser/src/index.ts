@@ -65,3 +65,13 @@ export {
   LEDGER_CONSTANTS,
   entryTypeHelpers,
 } from './types';
+
+// Table name constants
+export {
+  CCF_TABLE_PREFIXES,
+  CCF_GOV_TABLES,
+  CCF_INTERNAL_TABLES,
+  SCITT_TABLES,
+  CCF_LEGACY_TABLES,
+  TABLE_DESCRIPTIONS,
+} from './table-names';

@@ -6,6 +6,7 @@
 import { BaseRepository } from './base-repository';
 import type { LedgerKeyValue } from '@microsoft/ccf-ledger-parser';
 import type { TransactionRecord, SearchResult } from '../types/repository-types';
+import { CCF_INTERNAL_TABLES } from '@microsoft/ccf-ledger-parser';
 import {
   buildAllTransactionsCountQuery,
   buildAllTransactionsListQuery,
@@ -315,7 +316,7 @@ export class TransactionRepository extends BaseRepository {
        FROM kv_writes w
        JOIN transactions t ON w.sequence_no = t.sequence_no
        WHERE t.file_id = ?
-         AND w.map_name LIKE '%public:ccf.internal.signatures%'
+         AND w.map_name LIKE '%${CCF_INTERNAL_TABLES.SIGNATURES}%'
          AND w.value_text IS NOT NULL
        ORDER BY w.sequence_no DESC
        LIMIT 1`,

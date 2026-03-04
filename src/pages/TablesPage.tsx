@@ -42,71 +42,13 @@ import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, Chevr
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import { Sidebar } from '../components/Sidebar';
 import { SchemaViewerDialog } from '../components/SchemaViewerDialog';
-import { getDatabaseSchema, type DatabaseSchema, type TableKeyValue } from '@microsoft/ccf-database';
+import { getDatabaseSchema, TABLE_DESCRIPTIONS, CCF_TABLE_PREFIXES, SCITT_TABLES, type DatabaseSchema, type TableKeyValue } from '@microsoft/ccf-database';
 
 const SORTABLE_COLUMNS: TableLatestStateSortColumn[] = ['sequence', 'transactionId', 'keyName', 'value'];
 const DEFAULT_SORT_COLUMN: TableLatestStateSortColumn = 'sequence';
 const DEFAULT_SORT_DIRECTION: TableLatestStateSortDirection = 'asc';
 
-/**
- * Descriptions of CCF built-in maps (tables).
- * Based on https://microsoft.github.io/CCF/main/audit/builtin_maps.html
- */
-const TABLE_DESCRIPTIONS: Record<string, string> = {
-    // Governance tables (public:ccf.gov.*)
-    'public:ccf.gov.members.certs': 'X509 certificates of all members in the consortium. Key: Member ID (SHA-256 fingerprint). Value: PEM-encoded certificate.',
-    'public:ccf.gov.members.encryption_public_keys': 'Public encryption keys submitted by members. Used to encrypt recovery shares for each member. Key: Member ID. Value: PEM-encoded public key.',
-    'public:ccf.gov.members.info': 'Participation status and auxiliary information attached to a member. Key: Member ID. Value: JSON with status (ACCEPTED/ACTIVE), member_data, and optional recovery_role.',
-    'public:ccf.gov.members.acks': 'Member acknowledgements of the ledger state, containing signatures over the Merkle root at a particular sequence number. Key: Member ID. Value: JSON with state digest and signed request.',
-    'public:ccf.gov.users.certs': 'X509 certificates of all network users. Key: User ID (SHA-256 fingerprint). Value: PEM-encoded certificate.',
-    'public:ccf.gov.users.info': 'Auxiliary information attached to a user, such as role information. Key: User ID. Value: JSON with user_data.',
-    'public:ccf.gov.nodes.info': 'Identity, status and attestations of the nodes hosting the network. Key: Node ID (SHA-256 of public key). Value: JSON with quote_info, encryption_pub_key, status, etc.',
-    'public:ccf.gov.nodes.endorsed_certificates': 'Service-endorsed certificates for nodes. Key: Node ID. Value: PEM-encoded certificate.',
-    'public:ccf.gov.nodes.code_ids': 'DEPRECATED. Previously contained allowed code versions for SGX hardware. Key: MRENCLAVE (hex). Value: JSON status.',
-    'public:ccf.gov.nodes.virtual.host_data': 'Map mimicking SNP host_data for virtual nodes, restricting which host_data values may be presented by new joining nodes.',
-    'public:ccf.gov.nodes.virtual.measurements': 'Trusted virtual measurements for nodes joining the network. Warning: Should be empty in production (no TEE protection).',
-    'public:ccf.gov.nodes.snp.host_data': 'Trusted attestation report host data for SNP nodes joining the network. Key: Host data. Value: Platform-specific metadata.',
-    'public:ccf.gov.nodes.snp.measurements': 'Trusted SNP measurements for new nodes joining the network. Key: Measurement (hex). Value: JSON status.',
-    'public:ccf.gov.nodes.snp.uvm_endorsements': 'For Confidential ACI deployments, trusted UVM endorsements for SNP nodes. Key: Trusted endorser DID. Value: JSON map of issuer feed to SVN.',
-    'public:ccf.gov.nodes.snp.tcb_versions': 'Minimum trusted TCB version for SNP nodes. Key: AMD CPUID (hex). Value: Minimum TCB version.',
-    'public:ccf.gov.service.info': 'Service identity and status. Key: Sentinel value 0. Value: JSON with cert, status (OPENING/OPEN/RECOVERING), recovery_count, etc.',
-    'public:ccf.gov.service.config': 'Service configuration. Key: Sentinel value 0. Value: JSON with maximum_node_certificate_validity_days, recent_cose_proposals_window_size.',
-    'public:ccf.gov.service.previous_service_identity': 'PEM identity of previous service (for recovery). Key: Sentinel value 0. Value: PEM-encoded JSON.',
-    'public:ccf.gov.proposals': 'Governance proposals. Key: Proposal ID (SHA-256 of proposal). Value: Raw proposal as submitted.',
-    'public:ccf.gov.proposals_info': 'Status, proposer ID and ballots for proposals. Key: Proposal ID. Value: JSON with proposer_id, state (OPEN/ACCEPTED/REJECTED/etc), ballots.',
-    'public:ccf.gov.modules': 'JavaScript modules accessible by endpoint functions. Key: Module name. Value: Module contents.',
-    'public:ccf.gov.modules_quickjs_bytecode': 'JavaScript engine module cache. Key: Module name. Value: Compiled bytecode.',
-    'public:ccf.gov.modules_quickjs_version': 'JavaScript engine version of the module cache. Key: Sentinel value 0. Value: QuickJS version string.',
-    'public:ccf.gov.js_runtime_options': 'QuickJS runtime options for configuring JS runtimes. Key: Sentinel value 0. Value: JSON with heap size, stack size, execution time limits.',
-    'public:ccf.gov.interpreter.flush': 'Signals the interpreter cache to flush existing instances. Key: Sentinel value 0. Value: Boolean.',
-    'public:ccf.gov.endpoints': 'JavaScript endpoint definitions. Key: HTTP method + endpoint path. Value: JSON with mode, forwarding policy, authentication, JS module/function.',
-    'public:ccf.gov.tls.ca_cert_bundles': 'CA cert bundles for authenticating JWT issuer connections. Key: Bundle name. Value: PEM-encoded cert bundle.',
-    'public:ccf.gov.jwt.issuers': 'JWT issuers configuration. Key: Issuer URL. Value: JSON with ca_cert_bundle_name and auto_refresh flag.',
-    'public:ccf.gov.jwt.public_signing_keys': 'JWT signing keys (used until 5.0). Key: JWT Key ID. Value: DER-encoded key or certificate.',
-    'public:ccf.gov.jwt.public_signing_key_issuer': 'JWT signing key to issuer mapping (used until 5.0). Key: JWT Key ID. Value: Issuer URL.',
-    'public:ccf.gov.jwt.public_signing_keys_metadata': 'JWT signing keys (used until 6.0). Key: JWT Key ID. Value: JSON list of certificate, issuer, constraint.',
-    'public:ccf.gov.jwt.public_signing_keys_metadata_v2': 'JWT signing keys (from 6.0). Key: JWT Key ID. Value: JSON list of public key, issuer, constraint.',
-    'public:ccf.gov.constitution': 'Service constitution: JavaScript module exporting validate(), resolve() and apply() functions. Key: Sentinel value 0. Value: JS module string.',
-    'public:ccf.gov.history': 'Governance history capturing signed governance requests submitted by members. Key: Member ID. Value: JSON SignedReq.',
-    'public:ccf.gov.cose_history': 'Governance history capturing COSE Sign1 governance requests submitted by members. Key: Member ID. Value: COSE Sign1.',
-    'public:ccf.gov.cose_recent_proposals': 'Window of recent COSE signed proposals for replay prevention. Key: Timestamp + SHA-256 of COSE Sign1. Value: Proposal ID.',
-    // Internal tables (public:ccf.internal.*)
-    'public:ccf.internal.historical_encrypted_ledger_secret': 'On each rekey, stores the old ledger secret encrypted with the new secret. Public for recovery bootstrap access.',
-    'public:ccf.internal.encrypted_ledger_secrets': 'Used to broadcast ledger secrets between nodes during recovery and ledger rekey. Public for recovery bootstrap access.',
-    'public:ccf.internal.tree': 'Serialized Merkle Tree for the ledger between signatures. Used to generate receipts for historical transactions.',
-    'public:ccf.internal.signatures': 'Signatures emitted by the primary node over the Merkle Tree root. Key: Sentinel value 0. Value: seqno, view, root hash, node cert.',
-    'public:ccf.internal.cose_signatures': 'COSE signatures emitted by the primary node over the Merkle Tree root. Key: Sentinel value 0. Value: Raw COSE Sign1 message.',
-    'public:ccf.internal.recovery_shares': "Members' recovery shares encrypted by keys in members.encryption_public_keys. Public for recovery bootstrap access.",
-    'public:ccf.internal.snapshot_evidence': 'Evidence inserted by a primary producing a snapshot to establish provenance. Key: Sentinel value 0. Value: Snapshot hash and version.',
-    'public:ccf.internal.encrypted_submitted_shares': 'Used to persist submitted shares during recovery. Public for recovery bootstrap access.',
-    'public:ccf.internal.previous_service_identity_endorsement': 'COSE Sign1 endorsement of previous service identity. Key: Sentinel value 0. Value: Raw COSE Sign1 message.',
-    'public:ccf.internal.previous_service_last_signed_root': 'Last signed Merkle root of previous service instance. Key: Sentinel value 0. Value: Hex-encoded root hash.',
-    'public:ccf.internal.last_recovery_type': 'The mechanism by which the ledger secret was recovered (NONE/RECOVERY_SHARES/LOCAL_UNSEALING).',
-    // SCITT tables
-    'public:scitt.entry': 'SCITT (Supply Chain Integrity, Transparency and Trust) entries. Contains signed statements with issuer, subject, and timestamp claims.',
-    'public:ccf.gov.scitt.configuration': 'Service configuration including the registration policy and trusted issuers for SCITT entries.',
-    'public:scitt.operations': 'Shows the status of SCITT entry registration.',
-};
+
 
 type ColumnId = 'sequence' | 'transactionId' | 'keyName' | 'value' | 'issuer' | 'subject' | 'signedAt' | 'actions';
 type TableLatestStateRow = TableKeyValue;
@@ -379,7 +321,7 @@ const TablesPage: React.FC = () => {
     const [isExecutingSql, setIsExecutingSql] = useState(false);
     const itemsPerPage = 50;
     const offset = (currentPage - 1) * itemsPerPage;
-    const isScittEntryTable = tableName === 'public:scitt.entry';
+    const isScittEntryTable = tableName === SCITT_TABLES.ENTRY;
     const utf8Decoder = useMemo(() => new TextDecoder('utf-8', { fatal: false }), []);
     const columnSizingOptions = useMemo<TableColumnSizingOptions>(() => ({
         sequence: { defaultWidth: 120, minWidth: 80 },
@@ -677,8 +619,8 @@ const TablesPage: React.FC = () => {
 
     // Group tables by prefix for sidebar
     const { governanceTables, internalTables, otherTables } = useMemo(() => {
-        const govPrefix = 'public:ccf.gov';
-        const internalPrefix = 'public:ccf.internal';
+        const govPrefix = CCF_TABLE_PREFIXES.GOV;
+        const internalPrefix = CCF_TABLE_PREFIXES.INTERNAL;
         const governance: string[] = [];
         const internal: string[] = [];
         const others: string[] = [];

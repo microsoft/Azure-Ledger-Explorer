@@ -4,6 +4,7 @@
  */
 
 import { toHexStringLower } from './merkle-tree';
+import { CCF_INTERNAL_TABLES } from './table-names';
 
 const HASH_SIZE_BYTES = 32;
 
@@ -182,7 +183,7 @@ export const formatCcfInternalTreeSummary = (
   root: Uint8Array | null
 ): string => {
   const lines: string[] = [];
-  lines.push('=== CCF Serialised Merkle Tree (public:ccf.internal.tree) ===');
+  lines.push(`=== CCF Serialised Merkle Tree (${CCF_INTERNAL_TABLES.TREE}) ===`);
   lines.push('Format: merklecpp Tree serialisation (big-endian u64 header + 32-byte hashes)');
   lines.push('');
   lines.push(`min_index (num_flushed): ${decoded.minIndex.toString()}`);
