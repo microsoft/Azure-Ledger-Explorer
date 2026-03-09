@@ -18,7 +18,6 @@ import {
   decodeCcfInternalTree,
   formatCcfInternalTreeSummary,
   extractCoseSignatureTimeFromCcfValue,
-  cborArrayToText,
   CCF_GOV_TABLES,
   CCF_INTERNAL_TABLES,
   CCF_LEGACY_TABLES,
@@ -323,68 +322,14 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
       }
       
       case 'cose': {
-        // The data may arrive in three forms:
-        // 1. Pre-decoded UTF-8 JSON text (from DB value_text for tables in DecodeCborTables)
-        // 2. A JSON-encoded base64 string wrapping COSE Sign1 bytes (cose_history, cose_signatures)
-        // 3. Raw CBOR bytes (from parser/TransactionViewer)
-
-        // Try UTF-8 decode first
-        let text: string | null = null;
+        // For scitt_entry and cose_history tables, the data is already decoded
+        // to JSON text in the DB (via DecodeCborTables). Just display it directly.
         try {
-          text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+          const text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+          const parsed = JSON.parse(text);
+          return { content: JSON.stringify(parsed, null, 2), language: 'json' };
         } catch {
-          // Not valid UTF-8
-        }
-
-        // Path 1: Already-decoded JSON object (from DB for scitt.entry)
-        if (text) {
-          try {
-            const parsed = JSON.parse(text);
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              return { content: JSON.stringify(parsed, null, 2), language: 'json' };
-            }
-          } catch {
-            // Not a JSON object
-          }
-        }
-
-        // Path 2: JSON-encoded base64 string (e.g. "0oRY..." for cose_history)
-        if (text) {
-          try {
-            let b64 = text.trim();
-            // Strip JSON string wrapper if present (starts and ends with ")
-            if (b64.startsWith('"') && b64.endsWith('"')) {
-              b64 = JSON.parse(b64) as string;
-            }
-            // Try base64 decode → CBOR
-            const binaryString = atob(b64);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-              bytes[i] = binaryString.charCodeAt(i);
-            }
-            const decoded = cborArrayToText(bytes);
-            try {
-              const parsed = JSON.parse(decoded);
-              return { content: JSON.stringify(parsed, null, 2), language: 'json' };
-            } catch {
-              return { content: decoded, language: 'plaintext' };
-            }
-          } catch {
-            // Not base64-encoded COSE
-          }
-        }
-
-        // Path 3: Raw CBOR bytes
-        try {
-          const decoded = cborArrayToText(data);
-          try {
-            const parsed = JSON.parse(decoded);
-            return { content: JSON.stringify(parsed, null, 2), language: 'json' };
-          } catch {
-            return { content: decoded, language: 'plaintext' };
-          }
-        } catch {
-          // Neither path worked — fall back to hex
+          // Fallback to hex if not valid JSON
           return { content: formatHex(data), language: 'plaintext' };
         }
       }

@@ -3,10 +3,11 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { SCITT_TABLES } from '@microsoft/ccf-ledger-parser';
+import { SCITT_TABLES, CCF_GOV_TABLES } from '@microsoft/ccf-ledger-parser';
 
 export const DecodeCborTables = [
   SCITT_TABLES.ENTRY,
+  CCF_GOV_TABLES.COSE_HISTORY,
 ] as const;
 
 export type DecodeCborTableName = (typeof DecodeCborTables)[number];
