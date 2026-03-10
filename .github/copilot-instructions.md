@@ -1,8 +1,11 @@
 # AI Contributor Guide
+## Project Overview
+CCF Ledger Explorer is a client-side React + TypeScript application for parsing, storing, and querying CCF (Confidential Consortium Framework) ledger files entirely within the browser. All data processing is local—no backend server is required. Key technologies: React, TanStack Query, Fluent UI v9, @sqlite.org/sqlite-wasm (OPFS-backed), Vite.
 ## Key References
 - docs/CODE_STANDARDS.md is the contract (TanStack Query, Fluent UI, strict TS).
 - docs/ARCHITECTURE_README.md + docs/DATABASE_README.md explain end-to-end flow and OPFS usage; consult before touching parser or database.
 - docs/PARSER_README.md & docs/EXTERNAL_SERVICES_README.md cover LedgerChunkV2 and integrations; keep them in sync.
+- docs/TESTING_README.md explains unit (Vitest) and e2e (Playwright) test infrastructure.
 ## Architecture
 - React shell in src/App.tsx uses FluentProvider + QueryClientProvider; navigation pods live in src/pages.
 - Data path: FileUploadArea -> useFileDrop (src/hooks/use-ccf-data.ts) -> CCFDatabase.insertLedgerFileWithData -> workers/database-worker.ts -> sqlite-wasm -> OPFS.
@@ -26,8 +29,13 @@
 - Verification and write-receipt workers share typed messages via src/types/verification-types.ts; extend types before adding commands.
 ## Workflows
 - Install/run via npm install && npm run dev; lint with npm run lint; build with npm run build.
+- Unit tests live in src/__tests__/; run with npm test (Vitest).
 - Playwright e2e lives in e2e/files.spec.ts using fixtures in e2e/test_files; execute with npx playwright test when touching ingestion flows.
 - deploy-to-azure.ps1 handles Azure Static Web Apps deployment; on Linux use pwsh deploy-to-azure.ps1 -BuildFirst [-DisableSage|-DeployToPreview].
+## Security
+- Only SELECT and WITH queries are permitted through CCFDatabase.executeQuery; never relax this constraint.
+- Never store API keys or SAS tokens in source code; they must come from user input at runtime and remain in browser memory only.
+- Validate all user-provided SQL with the existing whitelist check before executing; extend the whitelist carefully and document the reason.
 ## Guardrails
 - Mirror schema/query additions between CCFDatabase and hooks; update docs if tables or result shapes change.
 - Respect QueryClient staleTime/gcTime defaults set in src/App.tsx; long-running uploads depend on them.

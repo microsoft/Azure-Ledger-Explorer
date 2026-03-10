@@ -17,3 +17,7 @@ The AI Assistant is a powerful component that allows you to query your CCF (Conf
 1. **Configure API**: provide a base URL for OpenAI capable API which will be used to call `/v1/responses`.
 2. **Update your system prompt**: make sure to include the correct table names and schema in the system prompt for accurate SQL generation.
 
+## GitHub Copilot Coding Agent
+
+This repository is configured with Copilot coding agent instructions in [`.github/copilot-instructions.md`](../.github/copilot-instructions.md). These instructions guide the agent on repository conventions, architecture, build/test workflows, security requirements, and documentation standards. Consult that file when using Copilot to contribute to this codebase.
+
