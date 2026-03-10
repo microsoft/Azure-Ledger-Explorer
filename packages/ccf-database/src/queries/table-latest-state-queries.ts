@@ -57,7 +57,7 @@ const BASE_CTE = `
     FROM (
       SELECT
         *,
-        ROW_NUMBER() OVER (PARTITION BY key_name ORDER BY version DESC) as rn
+        ROW_NUMBER() OVER (PARTITION BY key_name ORDER BY version DESC, is_deleted DESC, sequence_no DESC) as rn
       FROM all_operations
     ) ao
     WHERE ao.rn = 1
