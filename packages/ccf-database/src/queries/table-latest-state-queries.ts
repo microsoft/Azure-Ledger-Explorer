@@ -10,20 +10,15 @@ function likePattern(query: string): string {
 }
 
 /**
- * Single-pass CTE using ROW_NUMBER() to find the latest version of each key.
+ * Single-pass CTE using MAX() window function to find the latest version of each key.
+ * Returns ALL rows where version equals the maximum version for that key.
  *
- * Old approach (2-pass):
- *   1. GROUP BY key_name + MAX(version) across UNION ALL
- *   2. Re-JOIN back to kv_writes and kv_deletes to fetch the full row
- *
- * New approach (1-pass):
- *   1. UNION ALL writes + deletes with all needed columns
- *   2. ROW_NUMBER() PARTITION BY key_name ORDER BY version DESC → rn=1 is latest
- *   3. JOIN transactions only for the filtered rows
+ * This preserves the original behavior where tables with multiple entries
+ * sharing the same key_name but same max version are all returned (e.g., SCITT entries
+ * that all have key_name='' and version=1).
  *
  * With covering indexes (map_name, key_name, version DESC, sequence_no, value_text)
- * both sides of the UNION ALL are satisfied by index-only scans, and the re-join
- * to the base tables is eliminated entirely.
+ * SQLite can resolve the query via index-only scans.
  *
  * Params: [mapName, mapName] (one per side of UNION ALL).
  */
@@ -57,10 +52,10 @@ const BASE_CTE = `
     FROM (
       SELECT
         *,
-        ROW_NUMBER() OVER (PARTITION BY key_name ORDER BY version DESC, is_deleted DESC, sequence_no DESC) as rn
+        MAX(version) OVER (PARTITION BY key_name) as max_version
       FROM all_operations
     ) ao
-    WHERE ao.rn = 1
+    WHERE ao.version = ao.max_version
   )
 `;
 
