@@ -37,6 +37,7 @@ import {
   ErrorCircle16Regular,
   Checkmark16Regular,
   Key24Regular,
+  DataTrending24Regular,
 } from '@fluentui/react-icons';
 import { 
   useAllTransactionsCount,
@@ -52,6 +53,7 @@ import {
   getLedgerDomain, 
   clearLedgerDomain 
 } from '../utils/ledger-domain-storage';
+import { useTelemetry } from '../services/telemetry';
 
 const useStyles = makeStyles({
   container: {
@@ -181,6 +183,10 @@ export const ConfigPage: React.FC = () => {
   const clearAllDataMutation = useClearAllData();
   const dropDatabaseMutation = useDropDatabase();
   
+  // Telemetry
+  const { isTelemetryEnabled, setTelemetryEnabled, trackEvent, TelemetryEvents } = useTelemetry();
+  const [telemetryEnabled, setTelemetryEnabledState] = React.useState(isTelemetryEnabled());
+  
   // Fetch API health status when baseUrl changes
   const { data: apiHealthData, isLoading: isLoadingApiHealth, error: apiHealthError } = useApiHealth(config.baseUrl);
   const { data: keyValidation, isLoading: isValidatingKey } = useOpenAIKeyValidation(config.openaiApiKey);
@@ -193,6 +199,12 @@ export const ConfigPage: React.FC = () => {
     if (!checked && location.pathname === '/chat') {
       navigate('/files');
     }
+  };
+
+  const handleTelemetryToggle = (checked: boolean) => {
+    setTelemetryEnabled(checked);
+    setTelemetryEnabledState(checked);
+    trackEvent(TelemetryEvents.TELEMETRY_TOGGLED, { enabled: checked });
   };
 
   const handleClearAllData = async () => {
@@ -559,6 +571,37 @@ export const ConfigPage: React.FC = () => {
 
             </div>
           </Card> }
+
+          <Card>
+            <CardHeader
+              header={
+                <div className={styles.configHeader}>
+                  <DataTrending24Regular />
+                  <Text weight="semibold">Telemetry</Text>
+                </div>
+              }
+            />
+            <div className={styles.configContent}>
+              <Text size={200}>
+                Help improve CCF Ledger Explorer by sharing anonymous usage data.
+                We collect page views and feature usage to understand how the application is used.
+                No personal data or ledger content is ever collected.
+              </Text>
+
+              <Field label="Share anonymous usage data">
+                <Switch
+                  checked={telemetryEnabled}
+                  onChange={(_, data) => handleTelemetryToggle(data.checked)}
+                  label={telemetryEnabled ? 'Enabled' : 'Disabled'}
+                />
+              </Field>
+
+              <Caption1 style={{ color: tokens.colorNeutralForeground3 }}>
+                Data collected: page views, feature usage (which pages/features you access).
+                No ledger data, file contents, or personal information is collected.
+              </Caption1>
+            </div>
+          </Card>
         </div>
       </div>
     </div>

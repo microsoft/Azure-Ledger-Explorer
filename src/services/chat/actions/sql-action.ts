@@ -4,6 +4,7 @@
  */
 
 import type { ActionHandler, ActionResult } from './action-registry';
+import { trackEvent, TelemetryEvents } from '../../telemetry';
 
 /**
  * Handler for SQL query execution
@@ -22,6 +23,7 @@ export const sqlActionHandler: ActionHandler = async (
   
   try {
     const result = await context.database.executeQuery(content);
+    trackEvent(TelemetryEvents.SQL_QUERY_EXECUTED);
     return { result };
   } catch (err) {
     return {

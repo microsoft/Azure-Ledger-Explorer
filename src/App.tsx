@@ -25,6 +25,7 @@ import { SplashScreen } from './components/SplashScreen';
 import { PWAPrompt } from './components/PWAPrompt';
 import { VerificationStatusIndicator } from './components/VerificationStatusIndicator';
 import { initializeDatabase, resetDatabase } from './hooks/use-ccf-data';
+import { TelemetryProvider } from './services/telemetry';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -82,47 +83,49 @@ function App(): React.ReactElement {
     <QueryClientProvider client={queryClient}>
       <FluentProvider theme={currentTheme}>
         <Router>
-          <GridLayout>
-            <GridLayout.Top>
-              <MenuBar
-                onToggleTheme={handleToggleTheme}
-                isDarkMode={isDarkMode}
-              />
-            </GridLayout.Top>
-            <GridLayout.Main>
-              <PageTransition>
-                <Routes>
-                  <Route path="/" element={
-                    import.meta.env.VITE_ENABLE_SAGE === 'true'
-                      ? <StartPage />
-                      : <Navigate to="/files" replace />
-                  } />
-                  <Route
-                    path="/chat"
-                    element={
-                      <AIPage
-                        onChatStateChange={setHasActiveChat}
-                        onRegisterClearChat={setClearChatFunction}
-                        clearChatFunction={clearChatFunction}
-                      />
-                    }
-                  />
-                  <Route path="/files" element={<CCFVisualizerApp />} />
-                  <Route path="/tables" element={<TablesPage />} />
-                  <Route path="/tables/:tableName" element={<TablesPage />} />
-                  <Route path="/stats" element={<StatsPage />} />
-                  <Route path="/verification" element={<VerificationPage />} />
-                  <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
-                  <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />
-                  <Route path="/cose-viewer" element={<CoseViewerPage />} />
-                  <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
-                  <Route path="/config" element={<ConfigPage />} />
-                </Routes>
-              </PageTransition>
-            </GridLayout.Main>
-          </GridLayout>
-          <PWAPrompt />
-          <VerificationStatusIndicator />
+          <TelemetryProvider>
+            <GridLayout>
+              <GridLayout.Top>
+                <MenuBar
+                  onToggleTheme={handleToggleTheme}
+                  isDarkMode={isDarkMode}
+                />
+              </GridLayout.Top>
+              <GridLayout.Main>
+                <PageTransition>
+                  <Routes>
+                    <Route path="/" element={
+                      import.meta.env.VITE_ENABLE_SAGE === 'true'
+                        ? <StartPage />
+                        : <Navigate to="/files" replace />
+                    } />
+                    <Route
+                      path="/chat"
+                      element={
+                        <AIPage
+                          onChatStateChange={setHasActiveChat}
+                          onRegisterClearChat={setClearChatFunction}
+                          clearChatFunction={clearChatFunction}
+                        />
+                      }
+                    />
+                    <Route path="/files" element={<CCFVisualizerApp />} />
+                    <Route path="/tables" element={<TablesPage />} />
+                    <Route path="/tables/:tableName" element={<TablesPage />} />
+                    <Route path="/stats" element={<StatsPage />} />
+                    <Route path="/verification" element={<VerificationPage />} />
+                    <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
+                    <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />
+                    <Route path="/cose-viewer" element={<CoseViewerPage />} />
+                    <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
+                    <Route path="/config" element={<ConfigPage />} />
+                  </Routes>
+                </PageTransition>
+              </GridLayout.Main>
+            </GridLayout>
+            <PWAPrompt />
+            <VerificationStatusIndicator />
+          </TelemetryProvider>
         </Router>
       </FluentProvider>
     </QueryClientProvider>

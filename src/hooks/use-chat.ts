@@ -17,6 +17,7 @@ import {
 import type { ActionContext } from '../services/chat';
 import type { ChatService } from '../services/chat';
 import type { OpenAIChatService } from '../services/chat';
+import { trackEvent, TelemetryEvents } from '../services/telemetry';
 
 // Initialize action handlers once at module load
 initializeActions();
@@ -309,6 +310,9 @@ export function useChat(config: UseChatConfig): UseChatReturn {
 
   const sendMessage = useCallback(async (content: string) => {
     if (isLoading || !content.trim()) return;
+
+    // Track chat message sent
+    trackEvent(TelemetryEvents.CHAT_MESSAGE_SENT);
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),

@@ -8,6 +8,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { CCFDatabase, DATABASE_FILENAME } from '@microsoft/ccf-database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
+import { trackEvent, TelemetryEvents } from '../services/telemetry';
 
 // Global database instance (singleton pattern)
 let dbInstance: CCFDatabase | null = null;
@@ -300,6 +301,9 @@ export const useUploadLedgerFile = () => {
       return result;
     },
     onSuccess: () => {
+      // Track file upload
+      trackEvent(TelemetryEvents.FILE_UPLOADED);
+      
       // Final comprehensive invalidation after upload completes
       queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats });
@@ -336,6 +340,9 @@ export const useDeleteLedgerFile = () => {
       await db.files.delete(fileId);
     },
     onSuccess: () => {
+      // Track file deletion
+      trackEvent(TelemetryEvents.FILE_DELETED);
+      
       // Invalidate all queries to refresh the UI
       queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
       queryClient.invalidateQueries({ queryKey: queryKeys.stats });

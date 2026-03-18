@@ -13,6 +13,7 @@ import type {
 } from '../types/verification-types';
 import type { CCFDatabase } from '@microsoft/ccf-database';
 import { getDatabase } from '../hooks/use-ccf-data';
+import { trackEvent, TelemetryEvents } from './telemetry';
 
 export interface VerificationServiceEvents {
   onProgress: (progress: VerificationProgress) => void;
@@ -132,6 +133,7 @@ export class VerificationService {
         config: fullConfig
       };
 
+      trackEvent(TelemetryEvents.VERIFICATION_STARTED);
       this.worker.postMessage(startMessage);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -269,6 +271,11 @@ export class VerificationService {
 
       case 'completed':
         this.clearSavedProgress();
+        trackEvent(TelemetryEvents.VERIFICATION_COMPLETED, {
+          success: message.data.success,
+          totalChunks: message.data.totalChunks,
+          verifiedChunks: message.data.verifiedChunks,
+        });
         this.events.onCompleted?.(message.data);
         this.cleanup();
         break;
