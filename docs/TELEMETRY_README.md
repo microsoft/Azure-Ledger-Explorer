@@ -19,18 +19,18 @@ When telemetry is enabled, we collect:
 ### What is NOT Collected
 
 - **No ledger data**: File contents, transaction data, keys, or values are never collected
+- **No IP addresses**: Client IP addresses are stripped before telemetry is sent
 - **No query content**: We track that a query ran, not what the query was
 - **No message content**: We track chat usage, not what you typed
 
 ### Platform-Level Data
 
-Azure Application Insights may collect additional metadata at the platform level, including:
+Azure Application Insights collects some metadata for session analysis:
 
 - **Session identifiers**: Anonymous session/client IDs via cookies
-- **Network metadata**: IP addresses (typically anonymized on ingestion depending on Azure tenant settings)
 - **Browser/device info**: Browser type, OS, screen resolution
 
-This data is standard for Application Insights and helps with session analysis and debugging. If you require stricter privacy controls, consult your Azure tenant settings or disable telemetry entirely.
+We explicitly strip IP addresses from telemetry using a client-side telemetry initializer before data is sent to Azure.
 
 ## Opting Out
 

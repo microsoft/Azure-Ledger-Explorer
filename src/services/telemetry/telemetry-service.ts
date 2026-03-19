@@ -95,7 +95,30 @@ export function initializeTelemetry(): boolean {
         disableCookiesUsage: false, // Allow cookies for session tracking
         enableSessionStorageBuffer: true, // Buffer events in session storage
         maxBatchInterval: 15000, // Batch events every 15 seconds
+        isStorageUseDisabled: false, // Allow localStorage for retry buffer
+        isBrowserLinkTrackingEnabled: false, // Disable browser link tracking
+        enableRequestHeaderTracking: false, // Don't track request headers
+        enableResponseHeaderTracking: false, // Don't track response headers
       },
+    });
+
+    // Disable IP address collection by adding a telemetry initializer
+    // This removes the client IP before telemetry is sent
+    appInsights.addTelemetryInitializer((envelope) => {
+      if (envelope.tags) {
+        // Remove client IP tag
+        delete envelope.tags['ai.location.ip'];
+      }
+      // Also clear any location data that might contain IP-derived info
+      if (envelope.data) {
+        const baseData = envelope.data as Record<string, unknown>;
+        if (baseData['baseData'] && typeof baseData['baseData'] === 'object') {
+          const data = baseData['baseData'] as Record<string, unknown>;
+          delete data['clientIP'];
+          delete data['ip'];
+        }
+      }
+      return true; // Continue sending the telemetry
     });
 
     appInsights.loadAppInsights();
