@@ -29,6 +29,7 @@ import {
   Settings24Regular,
   Wrench24Regular,
   ChevronDown20Regular,
+  Shield24Regular,
 } from '@fluentui/react-icons';
 import { 
   useStats,
@@ -128,6 +129,8 @@ export const MenuBar: React.FC<MenuBarProps> = ({
       navigate('/mst-receipt');
     } else if (toolValue === 'cose-viewer') {
       navigate('/cose-viewer');
+    } else if (toolValue === 'blob-app') {
+      navigate('/blob-app');
     }
   };
 
@@ -208,6 +211,12 @@ export const MenuBar: React.FC<MenuBarProps> = ({
                 onClick={() => handleToolsMenuSelect('cose-viewer')}
               >
                 COSE/CBOR Viewer
+              </MenuItem>
+              <MenuItem 
+                icon={<Shield24Regular />}
+                onClick={() => handleToolsMenuSelect('blob-app')}
+              >
+                Blob Managed App Explorer
               </MenuItem>
             </MenuList>
           </MenuPopover>

@@ -17,6 +17,7 @@ import { VerificationPage } from './pages/VerificationPage';
 import { WriteReceiptVerificationPage } from './pages/WriteReceiptVerificationPage';
 import { MstReceiptVerificationPage } from './pages/MstReceiptVerificationPage';
 import { CoseViewerPage } from './pages/CoseViewerPage';
+import { BlobAppPage } from './pages/BlobAppPage';
 import { MenuBar } from './components/MenuBar';
 import { PageTransition } from './components/PageTransition';
 import GridLayout from './components/AppLayout';
@@ -117,6 +118,7 @@ function App(): React.ReactElement {
                     <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
                     <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />
                     <Route path="/cose-viewer" element={<CoseViewerPage />} />
+                    <Route path="/blob-app" element={<BlobAppPage />} />
                     <Route path="/transaction/:transactionId" element={<TransactionDetailsPage />} />
                     <Route path="/config" element={<ConfigPage />} />
                   </Routes>
