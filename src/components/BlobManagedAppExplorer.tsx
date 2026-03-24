@@ -12,7 +12,6 @@ import {
   Button,
   Input,
   Field,
-  Spinner,
   Badge,
   makeStyles,
   tokens,
@@ -36,7 +35,6 @@ import {
 import {
   CloudArrowUp24Regular,
   Search24Regular,
-  ArrowSync24Regular,
   Shield24Regular,
   ShieldCheckmark24Regular,
   Warning24Regular,
@@ -46,19 +44,147 @@ import {
   ArrowDownload24Regular,
   Info16Regular,
   Eye24Regular,
-  PlugConnectedRegular,
 } from '@fluentui/react-icons';
 import {
   useBlobAppConfig,
   useTriggerAudit,
-  useAuditBlobs,
-  useDownloadAuditResult,
 } from '../hooks/use-blob-app';
 import type { AuditBlob, AuditRecord, AuditResult } from '../types/blob-app-types';
 import type { TableColumnDefinition, DataGridProps } from '@fluentui/react-components';
-import { useStorageConnection } from '../hooks/use-storage-connection';
-import { StorageConnectionForm } from './storage-connection/StorageConnectionForm';
-import { GeneratedScripts } from './storage-connection/GeneratedScripts';
+
+// ── Demo Constants ──
+const DEMO_STORAGE_ACCOUNT = 'acldgdemo';
+const DEMO_CONTAINER = 'dg-data';
+
+/** Hardcoded demo audit blobs representing the DataGuardian event audit */
+const DEMO_AUDIT_BLOBS: AuditBlob[] = [
+  {
+    name: `${DEMO_STORAGE_ACCOUNT}/${DEMO_CONTAINER}/audit_2026-03-24T10-00-00Z.json`,
+    lastModified: '2026-03-24T10:05:00Z',
+    contentLength: '4096',
+  },
+];
+
+/** Hardcoded demo audit result with hashes for the 6 DataGuardian event files */
+const DEMO_AUDIT_RESULT: AuditResult = {
+  fileName: `${DEMO_STORAGE_ACCOUNT}/${DEMO_CONTAINER}/audit_2026-03-24T10-00-00Z.json`,
+  lastModified: '2026-03-24T10:05:00Z',
+  rawContent: JSON.stringify([
+    {
+      first_tracked_blob_timestamp: '2023-10-01T12:00:00Z',
+      current_audit_timestamp: '2026-03-24T10:00:00Z',
+    },
+    {
+      block_id: 'block_id_0',
+      blobs_in_block: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_PrivilegedAccessGranted_1.json', insert_time: '2023-10-01T12:00:00Z' }],
+      recalculated_digest: 'a3f7b2c1d8e4f56a7b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1',
+      ledger_digest: 'a3f7b2c1d8e4f56a7b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1',
+      is_match: true,
+    },
+    {
+      block_id: 'block_id_1',
+      blobs_in_block: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_PriviledgedAccessActivity_2.json', insert_time: '2023-10-01T13:00:00Z' }],
+      recalculated_digest: 'b4e8c3d2a9f5067b8c0d1e2f3b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3',
+      ledger_digest: 'b4e8c3d2a9f5067b8c0d1e2f3b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3',
+      is_match: true,
+    },
+    {
+      block_id: 'block_id_2',
+      blobs_in_block: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionStarted_3.json', insert_time: '2023-10-01T14:00:00Z' }],
+      recalculated_digest: 'c5f9d4e3b0a6178c9d1e2f3c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5',
+      ledger_digest: 'c5f9d4e3b0a6178c9d1e2f3c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5',
+      is_match: true,
+    },
+    {
+      block_id: 'block_id_3',
+      blobs_in_block: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionAccepted_4.json', insert_time: '2023-10-01T14:05:00Z' }],
+      recalculated_digest: 'd6a0e5f4c1b7289d0e2f3d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7',
+      ledger_digest: 'd6a0e5f4c1b7289d0e2f3d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7',
+      is_match: true,
+    },
+    {
+      block_id: 'block_id_4',
+      blobs_in_block: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionTerminated_5.json', insert_time: '2023-10-01T16:05:00Z' }],
+      recalculated_digest: 'e7b1f6a5d2c8390e1f3e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9',
+      ledger_digest: 'e7b1f6a5d2c8390e1f3e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9',
+      is_match: true,
+    },
+    {
+      block_id: 'block_id_5',
+      blobs_in_block: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_PrivilegedAccessRevoked_6.json', insert_time: '2023-10-01T17:00:00Z' }],
+      recalculated_digest: 'f8c2a7b6e3d940f2a4f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1',
+      ledger_digest: 'f8c2a7b6e3d940f2a4f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1',
+      is_match: true,
+    },
+  ], null, 2),
+  records: [
+    {
+      blockId: 'block_id_0',
+      blobsInBlock: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_PrivilegedAccessGranted_1.json', insert_time: '2023-10-01T12:00:00Z' }],
+      blobName: '123e4567-e89b-12d3-a456-426614174000_PrivilegedAccessGranted_1.json',
+      recalculatedDigest: 'a3f7b2c1d8e4f56a7b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1',
+      ledgerDigest: 'a3f7b2c1d8e4f56a7b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1',
+      isMatch: true,
+      isTampered: false,
+      user: { upn: 'admin@contoso.com', oid: '123e4567-e89b-12d3-a456-426614174000' },
+    },
+    {
+      blockId: 'block_id_1',
+      blobsInBlock: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_PriviledgedAccessActivity_2.json', insert_time: '2023-10-01T13:00:00Z' }],
+      blobName: '123e4567-e89b-12d3-a456-426614174000_PriviledgedAccessActivity_2.json',
+      recalculatedDigest: 'b4e8c3d2a9f5067b8c0d1e2f3b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3',
+      ledgerDigest: 'b4e8c3d2a9f5067b8c0d1e2f3b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3',
+      isMatch: true,
+      isTampered: false,
+      user: { upn: 'admin@contoso.com', oid: '123e4567-e89b-12d3-a456-426614174000' },
+    },
+    {
+      blockId: 'block_id_2',
+      blobsInBlock: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionStarted_3.json', insert_time: '2023-10-01T14:00:00Z' }],
+      blobName: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionStarted_3.json',
+      recalculatedDigest: 'c5f9d4e3b0a6178c9d1e2f3c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5',
+      ledgerDigest: 'c5f9d4e3b0a6178c9d1e2f3c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5',
+      isMatch: true,
+      isTampered: false,
+      user: { upn: 'admin@contoso.com', oid: '123e4567-e89b-12d3-a456-426614174000' },
+    },
+    {
+      blockId: 'block_id_3',
+      blobsInBlock: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionAccepted_4.json', insert_time: '2023-10-01T14:05:00Z' }],
+      blobName: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionAccepted_4.json',
+      recalculatedDigest: 'd6a0e5f4c1b7289d0e2f3d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7',
+      ledgerDigest: 'd6a0e5f4c1b7289d0e2f3d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7',
+      isMatch: true,
+      isTampered: false,
+      user: { upn: 'admin@contoso.com', oid: '123e4567-e89b-12d3-a456-426614174000' },
+    },
+    {
+      blockId: 'block_id_4',
+      blobsInBlock: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionTerminated_5.json', insert_time: '2023-10-01T16:05:00Z' }],
+      blobName: '123e4567-e89b-12d3-a456-426614174000_DataGuardianSessionTerminated_5.json',
+      recalculatedDigest: 'e7b1f6a5d2c8390e1f3e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9',
+      ledgerDigest: 'e7b1f6a5d2c8390e1f3e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9',
+      isMatch: true,
+      isTampered: false,
+      user: { upn: 'admin@contoso.com', oid: '123e4567-e89b-12d3-a456-426614174000' },
+    },
+    {
+      blockId: 'block_id_5',
+      blobsInBlock: [{ blob_name: '123e4567-e89b-12d3-a456-426614174000_PrivilegedAccessRevoked_6.json', insert_time: '2023-10-01T17:00:00Z' }],
+      blobName: '123e4567-e89b-12d3-a456-426614174000_PrivilegedAccessRevoked_6.json',
+      recalculatedDigest: 'f8c2a7b6e3d940f2a4f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1',
+      ledgerDigest: 'f8c2a7b6e3d940f2a4f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1',
+      isMatch: true,
+      isTampered: false,
+      user: { upn: 'admin@contoso.com', oid: '123e4567-e89b-12d3-a456-426614174000' },
+    },
+  ],
+  hasTamperedBlobs: false,
+  validityPeriod: {
+    firstTrackedBlobTimestamp: '2023-10-01T12:00:00Z',
+    currentAuditTimestamp: '2026-03-24T10:00:00Z',
+  },
+};
 
 const useStyles = makeStyles({
   configContent: {
@@ -99,12 +225,6 @@ const useStyles = makeStyles({
     flexWrap: 'wrap',
     flex: 1,
   },
-  resultCard: {
-    padding: '16px',
-    backgroundColor: tokens.colorNeutralBackground3,
-    borderRadius: tokens.borderRadiusMedium,
-    marginTop: '8px',
-  },
   statusBadge: {
     display: 'flex',
     alignItems: 'center',
@@ -137,11 +257,6 @@ const useStyles = makeStyles({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-  },
-  recordRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
   },
   digestText: {
     fontFamily: 'monospace',
@@ -182,35 +297,25 @@ const useStyles = makeStyles({
 });
 
 /**
- * BlobManagedAppExplorer – a self-contained Card component that provides
- * configuration, audit triggering, and audit result viewing for
- * the Azure Blob Storage digest managed application.
+ * BlobManagedAppExplorer – Demo-ready version with pre-populated data
+ * for the DataGuardian scenario using acldgdemo / dg-data.
  */
 export const BlobManagedAppExplorer: React.FC = () => {
   const styles = useStyles();
   const { config, updateConfig, validation } = useBlobAppConfig();
 
-  // Audit trigger state
-  const [auditStorageAccount, setAuditStorageAccount] = useState('');
-  const [auditContainer, setAuditContainer] = useState('');
-  const [includeUsers, setIncludeUsers] = useState(false);
+  // Audit trigger state — pre-populated for demo
+  const [auditStorageAccount, setAuditStorageAccount] = useState(DEMO_STORAGE_ACCOUNT);
+  const [auditContainer, setAuditContainer] = useState(DEMO_CONTAINER);
+  const [includeUsers, setIncludeUsers] = useState(true);
   const triggerAuditMutation = useTriggerAudit(config);
 
-  // Audit results browsing state
-  const [browseStorageAccount, setBrowseStorageAccount] = useState('');
-  const [browseContainer, setBrowseContainer] = useState('');
-  const [shouldFetchBlobs, setShouldFetchBlobs] = useState(false);
+  // Audit results browsing state — pre-populated for demo
+  const [browseStorageAccount, setBrowseStorageAccount] = useState(DEMO_STORAGE_ACCOUNT);
+  const [browseContainer, setBrowseContainer] = useState(DEMO_CONTAINER);
+  const [demoBlobs, setDemoBlobs] = useState<AuditBlob[] | null>(null);
   const [selectedResult, setSelectedResult] = useState<AuditResult | null>(null);
   const [showRawContent, setShowRawContent] = useState(false);
-
-  const {
-    data: auditBlobs,
-    isLoading: isLoadingBlobs,
-    error: blobsError,
-    refetch: refetchBlobs,
-  } = useAuditBlobs(config, browseStorageAccount || undefined, browseContainer || undefined, shouldFetchBlobs);
-
-  const downloadAuditResultMutation = useDownloadAuditResult(config);
 
   const handleTriggerAudit = useCallback(async () => {
     try {
@@ -224,24 +329,16 @@ export const BlobManagedAppExplorer: React.FC = () => {
     }
   }, [triggerAuditMutation, auditStorageAccount, auditContainer, includeUsers]);
 
+  /** Demo: simulate fetching results with hardcoded data */
   const handleFetchResults = useCallback(() => {
-    setShouldFetchBlobs(true);
-    void refetchBlobs();
-  }, [refetchBlobs]);
+    setDemoBlobs(DEMO_AUDIT_BLOBS);
+  }, []);
 
-  const handleViewResult = useCallback(
-    async (blob: AuditBlob) => {
-      try {
-        const result = await downloadAuditResultMutation.mutateAsync(blob.name);
-        result.lastModified = blob.lastModified;
-        setSelectedResult(result);
-        setShowRawContent(false);
-      } catch {
-        // error is available in downloadAuditResultMutation.error
-      }
-    },
-    [downloadAuditResultMutation],
-  );
+  /** Demo: simulate viewing a result with hardcoded audit data */
+  const handleViewResult = useCallback((_blob: AuditBlob) => {
+    setSelectedResult(DEMO_AUDIT_RESULT);
+    setShowRawContent(false);
+  }, []);
 
   const handleDownloadResult = useCallback(() => {
     if (!selectedResult) return;
@@ -330,6 +427,7 @@ export const BlobManagedAppExplorer: React.FC = () => {
           <div className={styles.configHeader}>
             <Shield24Regular />
             <Text weight="semibold">Blob Managed App Explorer</Text>
+            <Badge appearance="outline" color="informative" size="small">Demo</Badge>
           </div>
         }
       />
@@ -351,11 +449,6 @@ export const BlobManagedAppExplorer: React.FC = () => {
           </a>
           .
         </Caption1>
-
-        {/* ── Connect Storage Account Section (collapsed by default) ── */}
-        <ConnectStorageSection />
-
-        <Divider />
 
         {/* ── Configuration Section ── */}
         <Accordion collapsible defaultOpenItems={validation.valid ? [] : ['config']}>
@@ -504,7 +597,6 @@ export const BlobManagedAppExplorer: React.FC = () => {
               appearance="primary"
               icon={<CloudArrowUp24Regular />}
               disabled={
-                !validation.valid ||
                 !auditStorageAccount ||
                 !auditContainer ||
                 triggerAuditMutation.isPending
@@ -568,34 +660,24 @@ export const BlobManagedAppExplorer: React.FC = () => {
             </div>
             <Button
               appearance="primary"
-              icon={isLoadingBlobs ? <ArrowSync24Regular /> : <Search24Regular />}
-              disabled={!validation.valid || isLoadingBlobs}
+              icon={<Search24Regular />}
               onClick={handleFetchResults}
             >
-              {isLoadingBlobs ? 'Loading...' : 'Fetch Results'}
+              Fetch Results
             </Button>
           </div>
 
-          {blobsError && (
-            <MessageBar intent="error" style={{ marginTop: '8px' }}>
-              <MessageBarBody>
-                <MessageBarTitle>Error</MessageBarTitle>
-                {(blobsError as Error).message || 'Failed to list audit blobs.'}
-              </MessageBarBody>
-            </MessageBar>
-          )}
-
-          {/* Blob list */}
-          {auditBlobs && auditBlobs.length > 0 && (
+          {/* Demo blob list */}
+          {demoBlobs && demoBlobs.length > 0 && (
             <div style={{ marginTop: '12px' }}>
               <Text size={200} weight="semibold" block style={{ marginBottom: '8px' }}>
-                {auditBlobs.length} audit result{auditBlobs.length !== 1 ? 's' : ''} found
+                {demoBlobs.length} audit result{demoBlobs.length !== 1 ? 's' : ''} found
               </Text>
-              {auditBlobs.map((blob) => (
+              {demoBlobs.map((blob) => (
                 <div
                   key={blob.name}
                   className={styles.blobListItem}
-                  onClick={() => void handleViewResult(blob)}
+                  onClick={() => handleViewResult(blob)}
                 >
                   <div className={styles.blobInfo}>
                     <span className={styles.blobName}>{blob.name}</span>
@@ -614,7 +696,7 @@ export const BlobManagedAppExplorer: React.FC = () => {
                         icon={<Eye24Regular />}
                         onClick={(e) => {
                           e.stopPropagation();
-                          void handleViewResult(blob);
+                          handleViewResult(blob);
                         }}
                       />
                     </Tooltip>
@@ -622,31 +704,6 @@ export const BlobManagedAppExplorer: React.FC = () => {
                 </div>
               ))}
             </div>
-          )}
-
-          {shouldFetchBlobs && auditBlobs && auditBlobs.length === 0 && !isLoadingBlobs && (
-            <MessageBar intent="info" style={{ marginTop: '8px' }}>
-              <MessageBarBody>
-                No audit results found. Trigger an audit first, then wait for the managed
-                application to complete processing.
-              </MessageBarBody>
-            </MessageBar>
-          )}
-
-          {downloadAuditResultMutation.isPending && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-              <Spinner size="tiny" />
-              <Caption1>Loading audit result...</Caption1>
-            </div>
-          )}
-
-          {downloadAuditResultMutation.isError && (
-            <MessageBar intent="error" style={{ marginTop: '8px' }}>
-              <MessageBarBody>
-                <MessageBarTitle>Download Error</MessageBarTitle>
-                {downloadAuditResultMutation.error?.message || 'Failed to download audit result.'}
-              </MessageBarBody>
-            </MessageBar>
           )}
         </div>
 
@@ -696,9 +753,7 @@ export const BlobManagedAppExplorer: React.FC = () => {
                         All Digests Match
                       </Text>
                       <Text size={200}>
-                        {selectedResult.records.length > 0
-                          ? `All ${selectedResult.records.length} block(s) verified successfully. No tampering detected.`
-                          : 'Audit completed. See raw content for details.'}
+                        All {selectedResult.records.length} block(s) verified successfully. No tampering detected.
                       </Text>
                     </div>
                   </>
@@ -781,82 +836,8 @@ export const BlobManagedAppExplorer: React.FC = () => {
           </>
         )}
 
-        {/* Validation errors */}
-        {!validation.valid && (
-          <Caption1
-            style={{
-              color: tokens.colorPaletteRedForeground1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-            }}
-          >
-            <Warning24Regular />
-            Configure all connection settings above to enable audit operations.
-          </Caption1>
-        )}
-
       </div>
     </Card>
-  );
-};
-
-/**
- * Collapsible section within BlobManagedAppExplorer that generates
- * Azure CLI commands for connecting a storage account to the managed application.
- * Collapsed by default to keep the primary UI clean.
- */
-const ConnectStorageSection: React.FC = () => {
-  const {
-    params,
-    updateParam,
-    updateStorageAccountName,
-    regenerateSessionId,
-    isValid,
-    generated,
-    generate,
-    reset,
-    scripts,
-    fullScript,
-  } = useStorageConnection();
-
-  return (
-    <Accordion collapsible>
-      <AccordionItem value="connect-storage">
-        <AccordionHeader>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PlugConnectedRegular />
-            <Text weight="semibold">Connect Storage Account</Text>
-            <Badge appearance="outline" color="subtle" size="small">
-              CLI Generator
-            </Badge>
-          </div>
-        </AccordionHeader>
-        <AccordionPanel>
-          <Text size={200} block style={{ marginBottom: '12px' }}>
-            Generate Azure CLI commands to connect a new storage account to this managed
-            application. Fill in the details and copy the commands to run in your terminal
-            with <code>az login</code>.
-          </Text>
-          {!generated ? (
-            <StorageConnectionForm
-              params={params}
-              isValid={isValid}
-              onUpdateParam={updateParam}
-              onUpdateStorageAccountName={updateStorageAccountName}
-              onRegenerateSessionId={regenerateSessionId}
-              onGenerate={generate}
-            />
-          ) : (
-            <GeneratedScripts
-              scripts={scripts}
-              fullScript={fullScript}
-              onBack={reset}
-            />
-          )}
-        </AccordionPanel>
-      </AccordionItem>
-    </Accordion>
   );
 };
 
