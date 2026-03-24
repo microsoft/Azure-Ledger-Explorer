@@ -25,28 +25,6 @@ export interface BlobAppConfig {
   managedAppName: string;
 }
 
-/** Keys for persisting BlobAppConfig in localStorage */
-export const BLOB_APP_STORAGE_KEYS = {
-  SERVICE_BUS_NAMESPACE: 'blob_app_sb_namespace',
-  SERVICE_BUS_QUEUE_NAME: 'blob_app_sb_queue',
-  SERVICE_BUS_SAS_KEY_NAME: 'blob_app_sb_sas_key_name',
-  SERVICE_BUS_SAS_KEY: 'blob_app_sb_sas_key',
-  STORAGE_ACCOUNT_NAME: 'blob_app_storage_name',
-  STORAGE_SAS_TOKEN: 'blob_app_storage_sas',
-  MANAGED_APP_NAME: 'blob_app_managed_name',
-} as const;
-
-/**
- * Payload sent to the Service Bus queue to trigger an audit.
- */
-export interface AuditTriggerMessage {
-  eventType: 'PerformAudit';
-  storageAccount: string;
-  blobContainer: string;
-  /** Optional: include user tracking in audit */
-  getUsers?: boolean;
-}
-
 /**
  * A blob within a block from the audit result.
  */
@@ -114,12 +92,4 @@ export interface AuditBlob {
   name: string;
   lastModified: string;
   contentLength: string;
-}
-
-/**
- * Represents a container target for auditing.
- */
-export interface AuditTarget {
-  storageAccount: string;
-  containerName: string;
 }
