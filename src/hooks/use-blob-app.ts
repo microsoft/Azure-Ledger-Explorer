@@ -33,13 +33,13 @@ const blobAppQueryKeys = {
  */
 export function useBlobAppConfig() {
   const [config, setConfig] = useState<BlobAppConfig>(() => ({
-    serviceBusNamespace: localStorage.getItem(BLOB_APP_STORAGE_KEYS.SERVICE_BUS_NAMESPACE) || 'explorertestsbns20260319T234133179Z',
-    serviceBusQueueName: localStorage.getItem(BLOB_APP_STORAGE_KEYS.SERVICE_BUS_QUEUE_NAME) || 'explorertestsbns20260319t234133179zqueue',
-    serviceBusSasKeyName: localStorage.getItem(BLOB_APP_STORAGE_KEYS.SERVICE_BUS_SAS_KEY_NAME) || 'RootManageSharedAccessKey',
-    serviceBusSasKey: localStorage.getItem(BLOB_APP_STORAGE_KEYS.SERVICE_BUS_SAS_KEY) || 'dGhpcyBpcyBhIGRlbW8ga2V5IGZvciBwcmVzZW50YXRpb24gcHVycG9zZXM=',
-    storageAccountName: localStorage.getItem(BLOB_APP_STORAGE_KEYS.STORAGE_ACCOUNT_NAME) || 'explorerteststorage20260',
-    storageSasToken: localStorage.getItem(BLOB_APP_STORAGE_KEYS.STORAGE_SAS_TOKEN) || '?sv=2024-11-04&ss=b&srt=sco&sp=rl&se=2027-03-25T00:00:00Z&st=2026-03-24T00:00:00Z&spr=https&sig=DEMO_SAS_TOKEN_REDACTED',
-    managedAppName: localStorage.getItem(BLOB_APP_STORAGE_KEYS.MANAGED_APP_NAME) || 'explorertest',
+    serviceBusNamespace: 'explorertestsbns20260319T234133179Z',
+    serviceBusQueueName: 'explorertestsbns20260319t234133179zqueue',
+    serviceBusSasKeyName: 'RootManageSharedAccessKey',
+    serviceBusSasKey: 'dGhpcyBpcyBhIGRlbW8ga2V5IGZvciBwcmVzZW50YXRpb24gcHVycG9zZXM=',
+    storageAccountName: 'explorerteststorage20260',
+    storageSasToken: '?sv=2024-11-04&ss=b&srt=sco&sp=rl&se=2027-03-25T00:00:00Z&st=2026-03-24T00:00:00Z&spr=https&sig=DEMO_SAS_TOKEN_REDACTED',
+    managedAppName: 'explorertest',
   }));
 
   // Persist changes to localStorage
