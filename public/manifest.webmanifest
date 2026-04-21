@@ -1,5 +1,5 @@
 {
-  "name": "CCF Ledger Explorer",
+  "name": "Azure Ledger Explorer",
   "short_name": "CCF Explorer",
   "description": "A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with AI-powered querying capabilities",
   "start_url": "/",

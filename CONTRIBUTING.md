@@ -1,6 +1,6 @@
-# Contributing to CCF Ledger Explorer
+# Contributing to Azure Ledger Explorer
 
-Thank you for your interest in contributing to CCF Ledger Explorer! We welcome contributions from the community.
+Thank you for your interest in contributing to Azure Ledger Explorer! We welcome contributions from the community.
 
 ## How to Contribute
 

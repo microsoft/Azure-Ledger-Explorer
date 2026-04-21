@@ -1,4 +1,4 @@
-# CCF Ledger Explorer - Documentation Index
+# Azure Ledger Explorer - Documentation Index
 
 - [Architecture](./ARCHITECTURE_README.md)
 - [Parser System](./PARSER_README.md)

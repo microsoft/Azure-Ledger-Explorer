@@ -4,7 +4,7 @@
  */
 
 /**
- * CCF Ledger Explorer Design System
+ * Azure Ledger Explorer Design System
  * Built on Fluent UI.
  */
 
