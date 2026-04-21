@@ -41,3 +41,4 @@ Azure Ledger Explorer is a client-side React + TypeScript application for parsin
 - Respect QueryClient staleTime/gcTime defaults set in src/App.tsx; long-running uploads depend on them.
 - Use Fluent UI components for UX-critical surfaces; avoid raw HTML for buttons/cards unless wrapped.
 - Keep docs under docs/** updated alongside code changes—outdated guidance is treated as a bug.
+- When adding a new open source dependency to any package.json (root or workspace), also add it to the Acknowledgements section in README.md with its GitHub repo link, license, and a short description. Verify the license is compatible with Apache-2.0 (MIT, BSD, Apache-2.0 are OK; GPL/LGPL/AGPL are not).
