@@ -584,7 +584,7 @@ export const ConfigPage: React.FC = () => {
             />
             <div className={styles.configContent}>
               <Text size={200}>
-                Help improve CCF Ledger Explorer by sharing anonymous usage data.
+                Help improve Azure Ledger Explorer by sharing anonymous usage data.
                 We collect page views and feature usage to understand how the application is used.
                 No personal data or ledger content is ever collected.
               </Text>

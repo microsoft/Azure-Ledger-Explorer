@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the coding standards, patterns, and requirements for the CCF Ledger Explorer project. All contributors must follow these guidelines to ensure code consistency, maintainability, and reliability.
+This document outlines the coding standards, patterns, and requirements for the Azure Ledger Explorer project. All contributors must follow these guidelines to ensure code consistency, maintainability, and reliability.
 
 ## Core Technology Requirements
 

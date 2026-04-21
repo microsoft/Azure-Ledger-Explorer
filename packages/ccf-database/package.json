@@ -1,7 +1,7 @@
 {
   "name": "@microsoft/ccf-database",
   "version": "1.0.0",
-  "description": "SQLite database layer for CCF Ledger Explorer with OPFS persistence",
+  "description": "SQLite database layer for Azure Ledger Explorer with OPFS persistence",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",

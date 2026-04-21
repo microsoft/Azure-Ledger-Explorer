@@ -29,7 +29,7 @@ assignees: ''
 
 - **Browser**: [e.g., Chrome 120, Firefox 121, Edge 120]
 - **OS**: [e.g., Windows 11, macOS 14, Ubuntu 22.04]
-- **CCF Ledger Explorer Version**: [e.g., commit hash or release version]
+- **Azure Ledger Explorer Version**: [e.g., commit hash or release version]
 
 ## Ledger File Details (if applicable)
 

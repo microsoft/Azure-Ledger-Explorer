@@ -21,7 +21,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['**/*.md', 'src/assets/ccf.svg'],
       manifest: {
-        name: 'CCF Ledger Explorer',
+        name: 'Azure Ledger Explorer',
         short_name: 'CCF Explorer',
         description: 'A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with AI-powered querying capabilities',
         theme_color: '#0078d4',

@@ -94,7 +94,7 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 
 ## Telemetry Configuration (Optional)
 
-CCF Ledger Explorer supports optional telemetry via Azure Application Insights to collect anonymous usage data (page views, feature usage). No personal data or ledger content is collected.
+Azure Ledger Explorer supports optional telemetry via Azure Application Insights to collect anonymous usage data (page views, feature usage). No personal data or ledger content is collected.
 
 ### Setting Up Application Insights
 
