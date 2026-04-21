@@ -82,7 +82,7 @@ function App(): React.ReactElement {
   return (
     <QueryClientProvider client={queryClient}>
       <FluentProvider theme={currentTheme}>
-        <Router>
+        <Router basename={import.meta.env.BASE_URL}>
           <TelemetryProvider>
             <GridLayout>
               <GridLayout.Top>

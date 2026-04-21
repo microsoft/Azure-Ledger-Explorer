@@ -196,14 +196,14 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
                   <Text size={200}>Azure Ledger Backup</Text>
                 </Tooltip>
               </Tab>
-              <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
-                <Tooltip content="Microsoft's Signing Transparency" relationship="label">
-                  <Text size={200}>Signing Transparency</Text>
-                </Tooltip>
-              </Tab>
               <Tab value="local" icon={<Folder20Regular />}>
                 <Tooltip content="Upload Audit Ledger Files" relationship="label">
                   <Text size={200}>Audit Ledger Files</Text>
+                </Tooltip>
+              </Tab>
+              <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
+                <Tooltip content="Microsoft's Signing Transparency" relationship="label">
+                  <Text size={200}>Signing Transparency</Text>
                 </Tooltip>
               </Tab>
             </TabList>

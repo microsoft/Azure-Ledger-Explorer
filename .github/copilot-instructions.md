@@ -1,6 +1,6 @@
 # AI Contributor Guide
 ## Project Overview
-CCF Ledger Explorer is a client-side React + TypeScript application for parsing, storing, and querying CCF (Confidential Consortium Framework) ledger files entirely within the browser. All data processing is local—no backend server is required. Key technologies: React, TanStack Query, Fluent UI v9, @sqlite.org/sqlite-wasm (OPFS-backed), Vite.
+Azure Ledger Explorer is a client-side React + TypeScript application for parsing, storing, and querying CCF (Confidential Consortium Framework) ledger files entirely within the browser. All data processing is local—no backend server is required. Key technologies: React, TanStack Query, Fluent UI v9, @sqlite.org/sqlite-wasm (OPFS-backed), Vite.
 ## Key References
 - docs/CODE_STANDARDS.md is the contract (TanStack Query, Fluent UI, strict TS).
 - docs/ARCHITECTURE_README.md + docs/DATABASE_README.md explain end-to-end flow and OPFS usage; consult before touching parser or database.

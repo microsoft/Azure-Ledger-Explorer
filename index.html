@@ -20,7 +20,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="CCF Explorer" />
     
-    <title>CCF Ledger Explorer</title>
+    <title>Azure Ledger Explorer</title>
+
+    <!-- Cross-origin isolation for OPFS/sqlite-wasm on hosts without custom headers (e.g. GitHub Pages).
+         No-op when the server already provides COOP/COEP headers (e.g. Azure Static Web Apps). -->
+    <script src="/coi-serviceworker.js"></script>
   </head>
   <body>
     <style>

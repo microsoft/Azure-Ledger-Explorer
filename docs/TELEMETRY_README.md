@@ -1,6 +1,6 @@
 # Telemetry
 
-CCF Ledger Explorer collects optional, anonymous usage telemetry to help improve the application. This document explains what data is collected, how to opt out, and how to configure telemetry for deployment.
+Azure Ledger Explorer collects optional, anonymous usage telemetry to help improve the application. This document explains what data is collected, how to opt out, and how to configure telemetry for deployment.
 
 ## What Data is Collected
 
@@ -70,7 +70,7 @@ If `VITE_APPINSIGHTS_CONNECTION_STRING` is not set, telemetry is silently disabl
 
 ## Implementation Details
 
-CCF Ledger Explorer uses Microsoft's official Application Insights SDK:
+Azure Ledger Explorer uses Microsoft's official Application Insights SDK:
 
 - `@microsoft/applicationinsights-web`: Core web SDK
 - `@microsoft/applicationinsights-react-js`: React integration

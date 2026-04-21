@@ -6,16 +6,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
+
+const isGitHubPages = process.env.DEPLOY_TARGET === 'github-pages'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: isGitHubPages ? (process.env.GITHUB_PAGES_BASE || '/') : '/',
   plugins: [
     react(),
-    VitePWA({
+    // VitePWA is disabled for GitHub Pages builds to avoid service worker scope
+    // conflicts with coi-serviceworker (which provides COOP/COEP header injection).
+    !isGitHubPages && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['**/*.md', 'src/assets/ccf.svg'],
       manifest: {
-        name: 'CCF Ledger Explorer',
+        name: 'Azure Ledger Explorer',
         short_name: 'CCF Explorer',
         description: 'A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with AI-powered querying capabilities',
         theme_color: '#0078d4',
@@ -91,5 +97,13 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm']
   },
+  // When VitePWA is disabled, stub its virtual module so PWAPrompt.tsx compiles.
+  ...(isGitHubPages && {
+    resolve: {
+      alias: {
+        'virtual:pwa-register/react': path.resolve(__dirname, 'src/stubs/pwa-register-react.ts'),
+      }
+    }
+  }),
   assetsInclude: ['**/*.md'],
 })

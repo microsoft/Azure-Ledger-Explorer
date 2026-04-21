@@ -1,6 +1,6 @@
 # Static Site Infrastructure
 
-Infrastructure for hosting CCF Ledger Explorer as an Azure Static Web App.
+Infrastructure for hosting Azure Ledger Explorer as an Azure Static Web App.
 
 ## Create Infrastructure
 

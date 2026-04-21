@@ -1,6 +1,6 @@
 # Progressive Web App (PWA) Implementation
 
-This document describes the PWA implementation for CCF Ledger Explorer.
+This document describes the PWA implementation for Azure Ledger Explorer.
 
 ## Overview
 
@@ -78,7 +78,7 @@ VitePWA({
 ### 2. manifest.webmanifest
 
 Defines the PWA identity and behavior:
-- **Name**: "CCF Ledger Explorer"
+- **Name**: "Azure Ledger Explorer"
 - **Display**: Standalone (full-screen without browser chrome)
 - **Theme Color**: `#0078d4` (Microsoft blue)
 - **Icons**: Multiple sizes for various devices

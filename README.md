@@ -1,4 +1,4 @@
-# CCF Ledger Explorer
+# Azure Ledger Explorer
 
 A TypeScript/React application for exploring and analyzing CCF (Confidential Consortium Framework) ledger data with querying capabilities.
 

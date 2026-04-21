@@ -1,8 +1,8 @@
-# CCF Ledger Explorer Architecture Overview
+# Azure Ledger Explorer Architecture Overview
 
 ## System Architecture
 
-CCF Ledger Explorer is a modern, client-side React application built with TypeScript that enables users to parse, store, and analyze CCF (Confidential Consortium Framework) ledger data entirely within their browser. The application follows a layered architecture pattern with clear separation of concerns.
+Azure Ledger Explorer is a modern, client-side React application built with TypeScript that enables users to parse, store, and analyze CCF (Confidential Consortium Framework) ledger data entirely within their browser. The application follows a layered architecture pattern with clear separation of concerns.
 
 The project is organized as an **npm workspaces monorepo** with two internal packages:
 

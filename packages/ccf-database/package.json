@@ -1,7 +1,7 @@
 {
   "name": "@microsoft/ccf-database",
   "version": "1.0.0",
-  "description": "SQLite database layer for CCF Ledger Explorer with OPFS persistence",
+  "description": "SQLite database layer for Azure Ledger Explorer with OPFS persistence",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,7 +36,7 @@
   "devDependencies": {
     "rimraf": "^6.1.3",
     "typescript": "~5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.2"
   },
   "repository": {
     "type": "git",

@@ -2,7 +2,7 @@
 
 ## Overview
 
-CCF Ledger Explorer integrates with several external services to provide enhanced functionality. This document covers the integration patterns, authentication methods, error handling, and best practices for working with external APIs and services.
+Azure Ledger Explorer integrates with several external services to provide enhanced functionality. This document covers the integration patterns, authentication methods, error handling, and best practices for working with external APIs and services.
 
 ## Integrated Services
 

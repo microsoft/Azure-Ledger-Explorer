@@ -1,5 +1,45 @@
 # Deployment
 
+## GitHub Pages Deployment
+
+The project can be deployed to GitHub Pages as a fully static site. A GitHub Actions workflow (`.github/workflows/deploy-github-pages.yml`) automates the build and deployment on every push to `main`.
+
+### How It Works
+
+Since the app requires [cross-origin isolation](https://web.dev/cross-origin-isolation-guide/) (COOP/COEP headers) for OPFS-backed SQLite, and GitHub Pages does not support custom HTTP headers, the deployment uses [`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker) — a small MIT-licensed service worker that intercepts responses and injects the required headers client-side.
+
+| Aspect | Azure SWA | GitHub Pages |
+|--------|-----------|--------------|
+| COOP/COEP headers | Server-provided | `coi-serviceworker` (client-side) |
+| PWA service worker | VitePWA (Workbox) | Disabled (avoids SW scope conflict) |
+| SPA routing | `staticwebapp.config.json` | `404.html` fallback |
+| Base path | `/` | `/CCF-Ledger-Explorer/` |
+
+> **Note:** On first visit, `coi-serviceworker` triggers a single page reload to activate the service worker and enable cross-origin isolation. This is expected behavior.
+
+### Prerequisites
+
+1. **Enable GitHub Pages** in the repository settings:
+   - Go to **Settings** → **Pages**
+   - Under **Source**, select **GitHub Actions**
+2. The workflow runs automatically on push to `main`. No additional configuration is needed.
+
+### Building Locally for GitHub Pages
+
+To test the GitHub Pages build locally:
+
+```bash
+DEPLOY_TARGET=github-pages npm run build
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:DEPLOY_TARGET = "github-pages"; npm run build; Remove-Item Env:DEPLOY_TARGET
+```
+
+The build output in `dist/` will use `/CCF-Ledger-Explorer/` as the base path and exclude VitePWA.
+
 ## Azure Static Web Apps Deployment
 
 The project includes an automated PowerShell deployment script (`deploy-to-azure.ps1`) for deploying to Azure Static Web Apps.
@@ -54,7 +94,7 @@ The project includes an automated PowerShell deployment script (`deploy-to-azure
 
 ## Telemetry Configuration (Optional)
 
-CCF Ledger Explorer supports optional telemetry via Azure Application Insights to collect anonymous usage data (page views, feature usage). No personal data or ledger content is collected.
+Azure Ledger Explorer supports optional telemetry via Azure Application Insights to collect anonymous usage data (page views, feature usage). No personal data or ledger content is collected.
 
 ### Setting Up Application Insights
 
