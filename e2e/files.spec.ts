@@ -17,7 +17,7 @@ test('main page has title', async ({ page }) => {
 
 test('files page button opens add files dialog', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('tab', { name: 'Files' }).click();
+  await page.getByRole('button', { name: 'Files', exact: true }).click();
   await page.getByRole('button', { name: 'Add Files' }).click();
   await expect(page.getByRole('heading', { name: 'Add Ledger Files' })).toBeVisible();
 });

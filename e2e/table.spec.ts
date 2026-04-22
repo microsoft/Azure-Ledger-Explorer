@@ -33,7 +33,7 @@ test.beforeEach(async ({ page }) => {
 test('shows scitt entry columns', async ({ page }) => {
   await page.goto('/tables/public%3Ascitt.entry');
   // Wait for the sidebar title to load first (indicates page is ready)
-  await expect(page.getByRole('tab', { name: 'Tables' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('button', { name: 'Tables' })).toBeVisible({ timeout: 15000 });
   // Target the main content header (the first one, sidebar item is after the main heading loads)
   await expect(page.getByText('public:scitt.entry').first()).toBeVisible({ timeout: 15000 });
 

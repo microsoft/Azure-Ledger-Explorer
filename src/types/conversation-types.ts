@@ -11,15 +11,6 @@ export interface SavedConversation {
   messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface ConversationHistoryProps {
-  onConversationSelect: (conversation: SavedConversation) => void;
-  onNewConversation: () => void;
-  activeConversationId?: string;
-  /** Whether the sidebar is collapsed (controlled mode) */
-  isCollapsed?: boolean;
-  /** Callback when collapse is toggled (controlled mode) */
-  onToggleCollapse?: () => void;
-  refreshSignal?: number; // increment to trigger reload after save
+  /** User-pinned to the top of the Recents list. */
+  pinned?: boolean;
 }

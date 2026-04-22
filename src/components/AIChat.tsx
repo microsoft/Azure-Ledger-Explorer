@@ -82,6 +82,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   onChatStateChange,
   onRegisterClearChat,
   onSaveConversation,
+  onMessagesChange,
   loadedMessages,
   sidebarWidth = 0,
 }) => {
@@ -182,6 +183,11 @@ export const AIChat: React.FC<AIChatProps> = ({
       setMessages(loadedMessages);
     }
   }, [loadedMessages, setMessages]);
+
+  // Notify parent of every message mutation so it can persist to storage.
+  useEffect(() => {
+    onMessagesChange?.(messages);
+  }, [messages, onMessagesChange]);
 
   // Event handlers
   const handleSendMessage = async (optionalMessage?: string) => {

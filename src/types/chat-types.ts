@@ -76,6 +76,8 @@ export interface AIChatProps {
   onRegisterClearChat?: (clearFn: (() => void) | null) => void;
   clearChatFunction?: (() => void) | null;
   onSaveConversation?: (messages: ChatMessage[]) => void;
+  /** Called whenever the internal messages state changes; used to sync to storage. */
+  onMessagesChange?: (messages: ChatMessage[]) => void;
   loadedMessages?: ChatMessage[];
   sidebarWidth?: number;
 }

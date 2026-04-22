@@ -140,7 +140,7 @@ CCF-Ledger-Explorer/
 1. Shows a `SplashScreen` while the SQLite database initialises via OPFS.
 2. Wraps the entire tree in `QueryClientProvider` (TanStack Query) and `FluentProvider`.
 3. Sets up `BrowserRouter` with all application routes.
-4. Renders the persistent `MenuBar`, `PWAPrompt`, and `VerificationStatusIndicator`.
+4. Renders the persistent `AppSidebar`, `PWAPrompt`, and `VerificationStatusIndicator`.
 
 #### React Components (`src/components/`)
 
@@ -148,8 +148,8 @@ General components:
 
 | Component | Purpose |
 |---|---|
-| **AppLayout.tsx** | CSS Grid–based shell (top bar + main area) |
-| **MenuBar.tsx** | Navigation, theme toggle, and app-level controls |
+| **AppLayout.tsx** | CSS Grid–based shell (left sidebar + main area) |
+| **AppSidebar.tsx** | Left sidebar: navigation, chat actions, Recents list, theme toggle, collapse/expand |
 | **CCFVisualizerApp.tsx** | File list, drag-and-drop import, and per-file transaction view |
 | **TransactionViewer.tsx** | Paginated transaction browser and chunk selector |
 | **TransactionDataGrid.tsx** | Virtualized data grid for transaction records |
@@ -157,7 +157,7 @@ General components:
 | **FileUploadArea.tsx** | Drag-and-drop / file-picker upload surface |
 | **AddFilesWizard.tsx** | Multi-source import wizard (local / Azure / MST) |
 | **ChunkSelector.tsx** | File/chunk selection control |
-| **ConversationHistory.tsx** | Saved conversation history sidebar panel |
+| **ConversationSearchDialog.tsx** | Command-palette-style search over saved conversations |
 | **LedgerVisualization.tsx** | Timeline visualization of transaction types |
 | **LedgerBackupView.tsx** | Database export / backup management |
 | **MerkleTreeGraph.tsx** | Visual Merkle tree graph for a transaction |
@@ -209,7 +209,7 @@ The AI chat UI is split into single-responsibility components:
 #### Design System
 
 - **Fluent UI React v9** (`@fluentui/react-components`): Microsoft's design system — tokens, `makeStyles`, and component primitives throughout.
-- **Dark / Light Themes**: Stored in `localStorage` under `ccf-visualizer-theme`; toggled from `MenuBar`.
+- **Dark / Light Themes**: Stored in `localStorage` under `ccf-visualizer-theme`; toggled from `AppSidebar`.
 - **Responsive Design**: Media query breakpoints in `makeStyles` for mobile/tablet/desktop.
 - **Progressive Web App**: Installable via `vite-plugin-pwa` + Workbox service worker; manifested as a standalone app.
 

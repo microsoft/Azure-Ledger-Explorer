@@ -12,7 +12,7 @@ const TEST_DOMAIN = 'test-ledger.confidential-ledger.azure.com';
 
 // Helper function to navigate to the config page
 const goToConfigPage = async (page: Page) => {
-  await page.getByRole('tab', { name: 'Configuration' }).click();
+  await page.getByRole('button', { name: 'Configuration' }).click();
   await expect(page.getByText('Ledger data configuration')).toBeVisible();
 };
 
@@ -82,7 +82,7 @@ test.describe('Configuration Page - Domain Persistence', () => {
 
   test('should show fallback message after manual file upload', async ({ page }) => {
     // Go to Files tab
-    await page.getByRole('tab', { name: 'Files' }).click();
+    await page.getByRole('button', { name: 'Files', exact: true }).click();
     
     // Click Add Files button to open the wizard
     await page.getByRole('button', { name: 'Add Files' }).click();
