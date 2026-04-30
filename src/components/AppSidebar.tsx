@@ -510,7 +510,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isDarkMode, onToggleThem
     <div data-app-sidebar className={mergeClasses(styles.root, styles.expanded)}>
       <div className={styles.brandRow}>
         <a className={styles.brandLeft} href="/" title="Ledger Explorer">
-          <img height={26} src={ccfLogo} alt="CCF Logo" />
+          <img height={26} src={ccfLogo} alt="Ledger Explorer Logo" />
           <span className={styles.brandTitle}>Ledger Explorer</span>
         </a>
         <Button

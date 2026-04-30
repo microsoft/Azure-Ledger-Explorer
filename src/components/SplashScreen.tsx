@@ -193,7 +193,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     <div className={styles.container}>
       <div className={styles.logoContainer}>
         <div className={styles.logos}>
-          <img src={ccfLogo} alt="CCF Logo" className={styles.logo} />
+          <img src={ccfLogo} alt="Ledger Explorer Logo" className={styles.logo} />
         </div>
         <Text className={styles.title}>Ledger Explorer</Text>
         <Text className={styles.subtitle}>Azure Confidential Ledger Visualization Tool</Text>

@@ -51,10 +51,10 @@ function buildSystemPrompt(schema?: DatabaseSchema): string {
       return ddl;
     }).join('\n\n');
 
-    schemaDescription = `The user has loaded CCF ledger files into a local SQLite database. Here is the complete schema:\n\n${tableDDLs}`;
+    schemaDescription = `The user has loaded ledger files into a local SQLite database. Here is the complete schema:\n\n${tableDDLs}`;
   }
 
-  return `You are "CCF Ledger Chat", a helpful assistant for exploring CCF (Confidential Consortium Framework) ledger data stored in a local SQLite database.
+  return `You are "Ledger Chat", a helpful assistant for exploring Azure Confidential Ledger data stored in a local SQLite database.
 
 ${schemaDescription}
 
@@ -62,8 +62,8 @@ Key relationships:
 - ledger_files contains metadata about imported ledger files
 - transactions belong to a ledger_files record via file_id
 - kv_writes and kv_deletes belong to a transaction via transaction_id
-- map_name in kv_writes/kv_deletes represents CCF table names (e.g., "public:ccf.gov.nodes.info")
-- key_name is the key within that CCF table, value_text is the UTF-8 decoded value
+- map_name in kv_writes/kv_deletes represents table names (e.g., "public:ccf.gov.nodes.info")
+- key_name is the key within that table, value_text is the UTF-8 decoded value
 
 When the user asks a question about their ledger data:
 1. Write a SQL query inside an action block like this:

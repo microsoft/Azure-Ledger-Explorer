@@ -29,7 +29,7 @@ const testMsg: ChatMessage = {
 describe('AIChat component', () => {
   it('renders empty chat', () => {
     render(<QueryClientProvider client={new QueryClient()}><AIChat loadedMessages={[]}  /></QueryClientProvider>);
-    expect(screen.getByText(/Sage|CCF Ledger Chat/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sage|Ledger Chat/i)).toBeInTheDocument();
   });
 
   it('renders message with references', () => {

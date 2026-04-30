@@ -454,7 +454,7 @@ export const ConfigPage: React.FC = () => {
               header={
                 <div className={styles.configHeader}>
                   <Key24Regular />
-                  <Text weight="semibold">CCF Ledger Chat (Bring Your Own Key)</Text>
+                  <Text weight="semibold">Ledger Chat (Bring Your Own Key)</Text>
                 </div>
               }
             />

@@ -343,7 +343,7 @@ export const CCFVisualizerApp: React.FC = () => {
           icon={<DocumentAdd24Regular />}
           onClick={() => setShowUploadDialog(true)}
         >
-          Add Files
+          Get Started
         </Button>
       </div>
     </div>

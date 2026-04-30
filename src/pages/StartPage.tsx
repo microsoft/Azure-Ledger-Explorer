@@ -105,7 +105,7 @@ export const StartPage: React.FC = () => {
             <div className={styles.cardContent}>
               <Bot24Filled className={styles.cardIcon} />
               <Text className={styles.cardTitle}>
-                {import.meta.env.VITE_ENABLE_SAGE === 'true' ? 'Automated Analysis' : 'CCF Ledger Chat'}
+                {import.meta.env.VITE_ENABLE_SAGE === 'true' ? 'Automated Analysis' : 'Ledger Chat'}
               </Text>
               <Text className={styles.cardDescription}>
                 {import.meta.env.VITE_ENABLE_SAGE === 'true'

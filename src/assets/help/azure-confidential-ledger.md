@@ -1,6 +1,6 @@
 ### Azure Confidential Ledger
 
-A managed service providing tamper-proof ledger storage built on CCF.
+A managed service providing tamper-proof ledger storage.
 
 ### Setup Steps
 

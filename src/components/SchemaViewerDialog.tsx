@@ -241,7 +241,7 @@ export const SchemaViewerDialog: React.FC<SchemaViewerDialogProps> = ({
                                 {/* Intro Section */}
                                 <div className={classes.introSection}>
                                     <Text className={classes.introText} block>
-                                        Your CCF ledger data has been parsed and transformed into a relational schema 
+                                        Your ledger data has been parsed and transformed into a relational schema 
                                         for easy exploration. Use the <strong>Run SQL</strong> button to query this data directly.
                                     </Text>
                                     <div className={classes.exampleSection}>

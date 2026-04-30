@@ -285,7 +285,7 @@ const StatsPage: React.FC = () => {
                   <DatabaseRegular className={classes.statIcon} />
                   <div>
                     <div className={classes.statValue}>{formatNumber(stats.tableCount)}</div>
-                    <div className={classes.statLabel}>CCF Tables</div>
+                    <div className={classes.statLabel}>Tables</div>
                     <div className={classes.statDescription}>
                       {formatNumber(stats.uniqueKeyCount)} unique keys
                     </div>
