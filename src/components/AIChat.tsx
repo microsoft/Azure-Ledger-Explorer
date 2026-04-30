@@ -231,7 +231,7 @@ export const AIChat: React.FC<AIChatProps> = ({
       text: 'How many transactions are in the database?',
     },
     { show: allTransactionsCount > 0, group: 'Overview', text: 'Show me a summary of all loaded ledger files' },
-    { show: allTransactionsCount > 0, group: 'Explore', text: 'What CCF tables (map names) exist in the data?' },
+    { show: allTransactionsCount > 0, group: 'Explore', text: 'What tables (map names) exist in the data?' },
     { show: allTransactionsCount > 0, group: 'Explore', text: 'Show me the most recent transactions' },
     {
       show: allTransactionsCount > 0,
@@ -242,7 +242,7 @@ export const AIChat: React.FC<AIChatProps> = ({
   ];
 
   const starterTemplates = activeProvider === 'openai' ? openaiTemplates : sageTemplates;
-  const chatTitle = activeProvider === 'openai' ? 'CCF Ledger Chat' : 'Sage';
+  const chatTitle = activeProvider === 'openai' ? 'Ledger Chat' : 'Sage';
 
   return (
     <>

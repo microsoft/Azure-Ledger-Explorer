@@ -18,15 +18,15 @@ test('main page has title', async ({ page }) => {
 test('files page button opens add files dialog', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Files', exact: true }).click();
-  await page.getByRole('button', { name: 'Add Files' }).click();
+  await page.getByRole('button', { name: 'Get Started' }).click();
   await expect(page.getByRole('heading', { name: 'Add Ledger Files' })).toBeVisible();
 });
 
 test('cannot upload invalid file names', async ({ page }) => {
   await page.goto('/files');
-  await page.getByRole('button', { name: 'Add Files' }).click();
+  await page.getByRole('button', { name: 'Get Started' }).click();
   // Set files directly on the hidden input
-  await page.getByLabel('Upload CCF ledger files').setInputFiles([
+  await page.getByLabel('Upload ledger files').setInputFiles([
     path.join(testfilepath, 'test_files', 'invalidnameledger_1-14.committed'),
   ]);
   // Should show error message for invalid filename format
@@ -35,9 +35,9 @@ test('cannot upload invalid file names', async ({ page }) => {
 
 test('successfully imports ledger files', async ({ page }) => {
   await page.goto('/files');
-  await page.getByRole('button', { name: 'Add Files' }).click();
+  await page.getByRole('button', { name: 'Get Started' }).click();
   // Set files directly on the hidden input
-  await page.getByLabel('Upload CCF ledger files').setInputFiles([
+  await page.getByLabel('Upload ledger files').setInputFiles([
     path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
     path.join(testfilepath, 'test_files', 'ledger_15-3926.committed'),
   ]);

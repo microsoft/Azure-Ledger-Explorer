@@ -348,7 +348,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({ onImportComplete
             accept=".committed"
             onChange={handleFileChange}
             className={styles.hiddenInput}
-            aria-label="Upload CCF ledger files"
+            aria-label="Upload ledger files"
           />
 
           {!isImporting ? (
@@ -427,7 +427,7 @@ export const FileUploadArea: React.FC<FileUploadAreaProps> = ({ onImportComplete
       {allChunkFiles.length === 0 && !isImporting && (
         <div className={styles.emptyState}>
           <Caption1 className={styles.emptySubtext}>
-            Select CCF ledger .committed files to preview and import.
+            Select ledger .committed files to preview and import.
           </Caption1>
         </div>
       )}

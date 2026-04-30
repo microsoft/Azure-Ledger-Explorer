@@ -1,9 +1,9 @@
 ### Ledger Files Audit Experience
-Review the contents of any CCF based ledger files locally by uploading your files through this wizard.  The audit experience increases trust and transparency into the tamperproof and tamper-evident logs.
+Review the contents of any ledger files locally by uploading your files through this wizard.  The audit experience increases trust and transparency into the tamperproof and tamper-evident logs.
 
 ### Quick Start
 
-Upload CCF ledger files (`.committed`) from your local system.
+Upload ledger files (`.committed`) from your local system.
 
 ### Requirements
 
@@ -28,7 +28,7 @@ Upload CCF ledger files (`.committed`) from your local system.
 Files are validated, parsed, and stored locally in your browser for fast searching.
 
 ### Learn More
-[Ledger - CCF documentation](https://ccf.dev/main/architecture/ledger.html)
-[Merkle Tree - CCF documentation](https://ccf.dev/main/architecture/merkle_tree.html)
-[Receipts - CCF documentation](https://ccf.dev/main/audit/receipts.html)
-[Read-Write Permissions On KV Maps - CCF documentation](https://ccf.dev/main/audit/read_write_restrictions.html)
+[Ledger - Documentation](https://ccf.dev/main/architecture/ledger.html)
+[Merkle Tree - Documentation](https://ccf.dev/main/architecture/merkle_tree.html)
+[Receipts - Documentation](https://ccf.dev/main/audit/receipts.html)
+[Read-Write Permissions On KV Maps - Documentation](https://ccf.dev/main/audit/read_write_restrictions.html)
