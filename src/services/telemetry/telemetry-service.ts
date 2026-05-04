@@ -193,4 +193,8 @@ export const TelemetryEvents = {
   // Settings
   TELEMETRY_TOGGLED: 'TelemetryToggled',
   THEME_CHANGED: 'ThemeChanged',
+
+  // Onboarding
+  ONBOARDING_PATH_CLICKED: 'OnboardingPathClicked',
+  ONBOARDING_SAMPLE_LOADED: 'OnboardingSampleLoaded',
 } as const;

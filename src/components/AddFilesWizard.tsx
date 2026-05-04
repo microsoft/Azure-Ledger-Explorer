@@ -28,6 +28,7 @@ import remarkGfm from 'remark-gfm';
 import { FileUploadArea } from './FileUploadArea';
 import { LedgerBackupView } from './LedgerBackupView';
 import { MstLedgerImportView } from './MstLedgerImportView';
+import { isMstEnabled } from '../utils/feature-flags';
 import azureLedgerHelp from '../assets/help/azure-confidential-ledger.md?raw';
 import mstHelp from '../assets/help/microsoft-signing-transparency.md?raw';
 import localFilesHelp from '../assets/help/local-files.md?raw';
@@ -127,13 +128,42 @@ const useStyles = makeStyles({
 export interface AddFilesWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Optional initial tab to select when the wizard is opened.
+   * If omitted, defaults to 'local'. Note: this only seeds the initial state;
+   * users can still switch tabs after the wizard opens.
+   */
+  initialTab?: AllowedOptions;
 }
 
 type AllowedOptions = 'azure' | 'mst' | 'local';
 
-export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChange }) => {
+export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChange, initialTab }) => {
   const styles = useStyles();
-  const [selectedTab, setSelectedTab] = useState<AllowedOptions>('local');
+  const mstEnabled = isMstEnabled();
+
+  // Resolve a requested initial tab against the feature gate. If the caller
+  // asks for the MST tab while the flag is off (defensive — the entry point
+  // that supplies 'mst' should also be hidden), fall back to 'local'.
+  const resolveInitialTab = React.useCallback(
+    (requested: AllowedOptions | undefined): AllowedOptions => {
+      if (requested === 'mst' && !mstEnabled) return 'local';
+      return requested ?? 'local';
+    },
+    [mstEnabled]
+  );
+
+  const [selectedTab, setSelectedTab] = useState<AllowedOptions>(resolveInitialTab(initialTab));
+
+  // When the wizard is (re)opened, sync the selected tab from `initialTab`,
+  // falling back to the default 'local'. This avoids "stickiness" where
+  // re-opening the wizard from a generic entry point (sidebar `+` button)
+  // after picking a deep-link card keeps the previously selected tab.
+  React.useEffect(() => {
+    if (open) {
+      setSelectedTab(resolveInitialTab(initialTab));
+    }
+  }, [open, initialTab, resolveInitialTab]);
 
   // Callback to close the dialog when import completes
   const handleImportComplete = () => {
@@ -145,7 +175,7 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
       case 'azure':
         return azureLedgerHelp;
       case 'mst':
-        return mstHelp;
+        return mstEnabled ? mstHelp : localFilesHelp;
       case 'local':
       default:
         return localFilesHelp;
@@ -157,7 +187,11 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
       case 'azure':
         return <LedgerBackupView onImportComplete={handleImportComplete} />;
       case 'mst':
-        return <MstLedgerImportView onImportComplete={handleImportComplete} />;
+        // Defensive: if the gate is off the tab itself isn't rendered, but
+        // fall back to the local view rather than instantiating the MST one.
+        return mstEnabled
+          ? <MstLedgerImportView onImportComplete={handleImportComplete} />
+          : <FileUploadArea onImportComplete={handleImportComplete} />;
       case 'local':
       default:
         return <FileUploadArea onImportComplete={handleImportComplete} />;
@@ -201,11 +235,13 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
                   <Text size={200}>Audit Ledger Files</Text>
                 </Tooltip>
               </Tab>
-              <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
-                <Tooltip content="Microsoft's Signing Transparency" relationship="label">
-                  <Text size={200}>Signing Transparency</Text>
-                </Tooltip>
-              </Tab>
+              {mstEnabled && (
+                <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
+                  <Tooltip content="Microsoft's Signing Transparency" relationship="label">
+                    <Text size={200}>Signing Transparency</Text>
+                  </Tooltip>
+                </Tab>
+              )}
             </TabList>
 
             <div className={styles.tabContent}>

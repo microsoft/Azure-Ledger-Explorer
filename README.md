@@ -26,7 +26,8 @@ A TypeScript/React application for exploring and analyzing CCF (Confidential Con
 1. Upload ledger files: 
     - Option 1: drag and drop CCF ledger files that you already obtained, find sample files in the `e2e` tests folder
     - Option 2: backup CCF ledger to Azure File Share and provide a SAS token in the import dialog
-    - Option 3: download files from a known Microsoft's Signing Transparency ledger, i.e. provide a known domain name in the import dialog    
+    - Option 3: download files from a known Microsoft's Signing Transparency ledger, i.e. provide a known domain name in the import dialog
+    - Option 4: click **Load sample ledger** on the welcome screen to import a small bundled sample (`public/samples/ledger_1-14.committed`) and explore the app immediately
 2. Verify ledger integrity after importing the files 
 3. Explore transactions, key-value operations, and statistics. Find specific transactions and analyze patterns.
 

@@ -11,7 +11,7 @@ const testfilepath = path.dirname(fileURLToPath(import.meta.url));
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/files');
-  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.getByRole('button', { name: 'Upload files' }).click();
   // Set files directly on the hidden input
   await page.getByLabel('Upload ledger files').setInputFiles([
     path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
