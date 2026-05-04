@@ -35,6 +35,7 @@ import {
   DatabaseRegular,
   NumberSymbolRegular,
   SettingsRegular,
+  BuildingGovernmentRegular,
   WrenchRegular,
   ChevronRightRegular,
   ShieldCheckmarkRegular,
@@ -406,6 +407,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isDarkMode, onToggleThem
   }> = [
     { path: '/files', label: 'Files', icon: <FolderRegular />, visible: true },
     { path: '/tables', label: 'Tables', icon: <DatabaseRegular />, visible: hasData },
+    { path: '/governance', label: 'Governance', icon: <BuildingGovernmentRegular />, visible: hasData },
     { path: '/stats', label: 'Stats', icon: <NumberSymbolRegular />, visible: hasData },
     { path: '/config', label: 'Configuration', icon: <SettingsRegular />, visible: true },
   ];

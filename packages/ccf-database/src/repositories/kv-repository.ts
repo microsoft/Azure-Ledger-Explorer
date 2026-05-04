@@ -188,4 +188,33 @@ export class KVRepository extends BaseRepository {
       fileName: row.filename as string,
     }));
   }
+
+  /**
+   * Fetch the value text + bytes written at a specific (sequence_no, map, key)
+   * tuple. Returns null if no matching write exists.
+   *
+   * Used by the governance timeline drill-down to lazily load payloads only
+   * for events the user actually inspects.
+   */
+  async getKvWriteValueAt(
+    sequenceNo: number,
+    mapName: string,
+    keyName: string
+  ): Promise<{ valueText: string | null; valueBytes: Uint8Array | null } | null> {
+    const result = await this.exec(
+      `SELECT value_text, value_bytes
+         FROM kv_writes
+        WHERE sequence_no = ?
+          AND map_name = ?
+          AND key_name = ?
+        LIMIT 1`,
+      [sequenceNo, mapName, keyName]
+    );
+    if (result.length === 0) return null;
+    const row = result[0];
+    return {
+      valueText: (row.value_text as string | null) ?? null,
+      valueBytes: (row.value_bytes as Uint8Array | null) ?? null,
+    };
+  }
 }

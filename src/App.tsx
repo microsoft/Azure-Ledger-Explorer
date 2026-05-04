@@ -11,6 +11,7 @@ import { CCFVisualizerApp } from './components/CCFVisualizerApp';
 import { TransactionDetailsPage } from './pages/TransactionDetailsPage';
 import TablesPage from './pages/TablesPage';
 import StatsPage from './pages/StatsPage';
+import GovernancePage from './pages/GovernancePage';
 import { AIPage } from './pages/AIPage';
 import { StartPage } from './pages/StartPage';
 import { VerificationPage } from './pages/VerificationPage';
@@ -115,6 +116,7 @@ function App(): React.ReactElement {
                       <Route path="/tables" element={<TablesPage />} />
                       <Route path="/tables/:tableName" element={<TablesPage />} />
                       <Route path="/stats" element={<StatsPage />} />
+                      <Route path="/governance" element={<GovernancePage />} />
                       <Route path="/verification" element={<VerificationPage />} />
                       <Route path="/write-receipt" element={<WriteReceiptVerificationPage />} />
                       <Route path="/mst-receipt" element={<MstReceiptVerificationPage />} />

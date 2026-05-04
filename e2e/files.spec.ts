@@ -49,3 +49,24 @@ test('successfully imports ledger files', async ({ page }) => {
   // Wait for the visualization to show
   await expect(page.getByText('Total: 14 transactions')).toBeVisible({ timeout: 30000 });
 });
+
+test('governance timeline renders after import', async ({ page }) => {
+  await page.goto('/files');
+  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.getByLabel('Upload ledger files').setInputFiles([
+    path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
+    path.join(testfilepath, 'test_files', 'ledger_15-3926.committed'),
+  ]);
+  await page.getByRole('button', { name: /Import Selected/ }).dispatchEvent('click');
+  await page.waitForTimeout(1000);
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Total: 14 transactions')).toBeVisible({ timeout: 30000 });
+
+  await page.goto('/governance');
+  // Page heading is always visible
+  await expect(page.getByRole('heading', { name: 'Governance' })).toBeVisible({ timeout: 15000 });
+  // Either we have governance events (timeline rendered) or a friendly empty state.
+  const hasEvents = page.getByTestId('governance-timeline-svg');
+  const emptyState = page.getByRole('button', { name: /Go to Files/ });
+  await expect(hasEvents.or(emptyState)).toBeVisible({ timeout: 15000 });
+});

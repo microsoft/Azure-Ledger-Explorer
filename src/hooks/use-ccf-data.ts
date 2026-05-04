@@ -9,6 +9,12 @@ import { CCFDatabase, DATABASE_FILENAME } from '@microsoft/ccf-database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
 import { verificationService } from '../services/verification-service';
 import { trackEvent, TelemetryEvents } from '../services/telemetry';
+import {
+  buildGovernanceEventMeta,
+  decodeGovValue,
+  type GovernanceEventDetail,
+  type GovernanceEventMeta,
+} from '../utils/governance-events';
 
 // Global database instance (singleton pattern)
 let dbInstance: CCFDatabase | null = null;
@@ -120,6 +126,9 @@ export const queryKeys = {
   tableLatestStateCount: (mapName: string, searchQuery?: string) => ['tableLatestStateCount', mapName, searchQuery] as const,
   keyTransactions: (mapName: string, keyName: string, limit: number, offset: number) => ['keyTransactions', mapName, keyName, limit, offset] as const,
   searchByKeyOrValue: (query: string, limit: number) => ['searchByKeyOrValue', query, limit] as const,
+  governanceEvents: ['governanceEvents'] as const,
+  governanceEventDetail: (seqno: number, mapName: string, keyName: string, op: 'write' | 'delete') =>
+    ['governanceEventDetail', seqno, mapName, keyName, op] as const,
 };
 
 /**
@@ -676,6 +685,114 @@ export const useDatabase = () => {
     queryKey: ['database'],
     queryFn: getDatabase,
     staleTime: Infinity, // Database instance doesn't change once created
+  });
+};
+
+/**
+ * Hook to load the lightweight (metadata-only) governance event timeline.
+ *
+ * Phase 1 of the two-phase load: returns one row per kv_writes / kv_deletes
+ * row in any governance-prefixed table (current `public:ccf.gov.*`, legacy
+ * `public:ccf.governance.*`, and `public:ccf.nodes.*`). Returns ordered by
+ * sequence number ascending.
+ *
+ * The value payload is intentionally NOT loaded here — see
+ * {@link useGovernanceEventDetail} for the drill-down query.
+ */
+export const useGovernanceEvents = () => {
+  return useQuery({
+    queryKey: queryKeys.governanceEvents,
+    queryFn: async (): Promise<GovernanceEventMeta[]> => {
+      const db = await getDatabase();
+      const sql = `
+        SELECT t.sequence_no AS seqno,
+               t.transaction_id AS transaction_id,
+               kv.map_name AS map_name,
+               kv.key_name AS key_name,
+               'write' AS op
+          FROM kv_writes kv
+          JOIN transactions t ON t.sequence_no = kv.sequence_no
+         WHERE kv.map_name LIKE 'public:ccf.gov.%'
+            OR kv.map_name LIKE 'public:ccf.governance.%'
+            OR kv.map_name LIKE 'public:ccf.nodes.%'
+        UNION ALL
+        SELECT t.sequence_no AS seqno,
+               t.transaction_id AS transaction_id,
+               kv.map_name AS map_name,
+               kv.key_name AS key_name,
+               'delete' AS op
+          FROM kv_deletes kv
+          JOIN transactions t ON t.sequence_no = kv.sequence_no
+         WHERE kv.map_name LIKE 'public:ccf.gov.%'
+            OR kv.map_name LIKE 'public:ccf.governance.%'
+            OR kv.map_name LIKE 'public:ccf.nodes.%'
+        ORDER BY seqno ASC
+      `;
+      const rows = (await db.executeQuery(sql)) as Array<{
+        seqno: number;
+        transaction_id: string;
+        map_name: string;
+        key_name: string;
+        op: 'write' | 'delete';
+      }>;
+      return rows.map((r) =>
+        buildGovernanceEventMeta({
+          seqno: r.seqno,
+          transactionId: r.transaction_id,
+          mapName: r.map_name,
+          keyName: r.key_name,
+          op: r.op,
+        })
+      );
+    },
+  });
+};
+
+/**
+ * Hook to load the value payload for a single governance event (drill-down).
+ *
+ * Phase 2 of the two-phase load: only runs when `enabled` is true so that the
+ * timeline never pays the cost of decoding payloads it does not show.
+ */
+export const useGovernanceEventDetail = (
+  meta: GovernanceEventMeta | null,
+  enabled: boolean
+) => {
+  return useQuery({
+    queryKey: meta
+      ? queryKeys.governanceEventDetail(meta.seqno, meta.mapName, meta.keyName, meta.op)
+      : ['governanceEventDetail', 'noop'],
+    queryFn: async (): Promise<GovernanceEventDetail> => {
+      if (!meta) {
+        return decodeGovValue({
+          mapName: '',
+          keyName: '',
+          valueText: null,
+          valueBytes: null,
+          isDelete: true,
+        });
+      }
+      const db = await getDatabase();
+      if (meta.op === 'delete') {
+        return decodeGovValue({
+          mapName: meta.mapName,
+          keyName: meta.keyName,
+          valueText: null,
+          valueBytes: null,
+          isDelete: true,
+        });
+      }
+      const value = await db.kv.getKvWriteValueAt(meta.seqno, meta.mapName, meta.keyName);
+      return decodeGovValue({
+        mapName: meta.mapName,
+        keyName: meta.keyName,
+        valueText: value?.valueText ?? null,
+        valueBytes: value?.valueBytes ?? null,
+        isDelete: false,
+      });
+    },
+    enabled: enabled && !!meta,
+    staleTime: 60_000,
   });
 };
 

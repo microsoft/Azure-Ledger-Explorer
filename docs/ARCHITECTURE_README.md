@@ -513,6 +513,29 @@ User clicks "Verify Ledger"
   → useVerification invalidates ledgerFiles query → UI updates
 ```
 
+### Governance Flow
+
+```
+GovernancePage (/governance)
+  → useGovernanceEvents()  (in src/hooks/use-ccf-data.ts)
+      → executeQuery: lightweight UNION ALL of public:ccf.gov.*,
+        public:ccf.governance.*, and public:ccf.nodes.* writes/deletes
+        joined to transactions, ordered by sequence_no ASC
+      → returns GovernanceEventMeta[] (no value payloads)
+  → src/utils/governance-events.ts.classifyGovEvent()
+      → assigns category + label to each event
+  → GovernanceTimeline renders SVG markers + density strip
+  → click marker
+      → useGovernanceEventDetail(meta, enabled)
+          → kv.getKvWriteValueAt(seqno, mapName, keyName)
+          → decodeGovValue() returns { rawKind, parsed?, summary }
+      → DetailPanel renders summary + JSON / hex preview
+      → "View transaction" button → /transaction/:transactionId
+```
+
+See `docs/GOVERNANCE_README.md` for category mapping, noisy-table policy,
+and the seqno-only timeline limitation.
+
 ## Key Architectural Decisions
 
 ### 1. Client-Side Processing
