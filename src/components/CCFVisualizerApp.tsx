@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   makeStyles,
@@ -42,10 +42,13 @@ import {
   useFileTransactions,
   useFileTransactionsCount,
   useStorageQuota,
+  useDatabase,
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from './AddFilesWizard';
 import { LedgerVisualization } from './LedgerVisualization';
 import { TransactionDataGrid } from './TransactionDataGrid';
+import { ExportMenu } from './export';
+import type { ExportRow } from '../utils/export';
 import type { TransactionType } from '../utils/transaction-classification';
 import { filterTransactionsByTypes } from '../utils/transaction-classification';
 import { Sidebar } from './Sidebar';
@@ -90,6 +93,13 @@ const useStyles = makeStyles({
   searchContainer: {
     maxWidth: '400px',
     flex: 1,
+  },
+  toolbarRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   visualizationContainer: {
     padding: '16px 24px',
@@ -252,6 +262,55 @@ export const CCFVisualizerApp: React.FC = () => {
   const transactions = fileTransactions ? filterTransactionsByTypes(fileTransactions, selectedTypeFilters) : fileTransactions;
   const transactionsLoading = fileTransactionsLoading;
   const totalTransactions = fileTransactionsCount;
+
+  const { data: database } = useDatabase();
+  const TX_EXPORT_LIMIT = 1_000_000;
+  const fetchTransactionRows = useCallback(async () => {
+    if (!database) return { rows: [] };
+    const all = selectedFileId
+      ? await database.transactions.getByFileIdWithDetails(
+          selectedFileId,
+          TX_EXPORT_LIMIT,
+          0,
+          searchQuery || undefined
+        )
+      : await database.transactions.getAll(TX_EXPORT_LIMIT, 0, searchQuery || undefined);
+    const filtered =
+      selectedTypeFilters.size === 0 ? all : filterTransactionsByTypes(all, selectedTypeFilters);
+    const rows: ExportRow[] = filtered.map((tx) => ({
+      sequence_no: tx.version,
+      transaction_id: tx.txId ?? null,
+      tx_view: tx.txView ?? null,
+      file_id: tx.fileId,
+      file_name: tx.fileName,
+      flags: tx.flags,
+      size: tx.size,
+      entry_type: tx.entryType,
+      tx_version: tx.txVersion,
+      max_conflict_version: tx.maxConflictVersion,
+      write_count: tx.writeCount ?? 0,
+      delete_count: tx.deleteCount ?? 0,
+      map_names: tx.mapNames ?? null,
+    }));
+    return {
+      rows,
+      columns: [
+        { key: 'sequence_no' },
+        { key: 'transaction_id' },
+        { key: 'tx_view' },
+        { key: 'file_id' },
+        { key: 'file_name' },
+        { key: 'flags' },
+        { key: 'size' },
+        { key: 'entry_type' },
+        { key: 'tx_version' },
+        { key: 'max_conflict_version' },
+        { key: 'write_count' },
+        { key: 'delete_count' },
+        { key: 'map_names' },
+      ],
+    };
+  }, [database, selectedFileId, searchQuery, selectedTypeFilters]);
 
   const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
 
@@ -583,11 +642,21 @@ export const CCFVisualizerApp: React.FC = () => {
                 ? `Transactions in ${selectedFileName}`
                 : `All Transactions${searchQuery ? ` (filtered: "${searchQuery}")` : ''}`}
             </Body1>
-            <div className={styles.searchContainer}>
-              <SearchBox
-                placeholder="Search transactions, files, or keys..."
-                value={searchQuery}
-                onChange={(_, data) => handleSearch(data.value)}
+            <div className={styles.toolbarRow}>
+              <div className={styles.searchContainer}>
+                <SearchBox
+                  placeholder="Search transactions, files, or keys..."
+                  value={searchQuery}
+                  onChange={(_, data) => handleSearch(data.value)}
+                />
+              </div>
+              <ExportMenu
+                surface="transactions"
+                slug={selectedFileName ?? 'all-files'}
+                scope="all-filtered"
+                rowCountHint={totalTransactions}
+                disabled={!database}
+                fetchRows={fetchTransactionRows}
               />
             </div>
           </div>

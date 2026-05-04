@@ -193,4 +193,8 @@ export const TelemetryEvents = {
   // Settings
   TELEMETRY_TOGGLED: 'TelemetryToggled',
   THEME_CHANGED: 'ThemeChanged',
+
+  // Export
+  EXPORT_PERFORMED: 'ExportPerformed',
+  EXPORT_REPORT_GENERATED: 'ExportReportGenerated',
 } as const;

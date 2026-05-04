@@ -513,6 +513,33 @@ User clicks "Verify Ledger"
   → useVerification invalidates ledgerFiles query → UI updates
 ```
 
+### 6. Export Flow
+
+```
+User clicks "Export" on a surface (Tables, Transactions, …)
+  → <ExportMenu> calls surface-supplied getRows()
+      └── re-fetches the same query with high limit (no pagination)
+  → If row count > 250 000 → confirmation dialog
+  → utils/export.ts: normalizeExportValue() → toCsv()/toJson()/toNdjson()
+      └── chunked main-thread assembly with setTimeout(0) yields
+      └── CSV defaults: CRLF + UTF-8 BOM + spreadsheet-formula sanitization
+  → utils/download.ts: Blob + <a> click + revokeObjectURL on next tick
+  → trackEvent('ExportPerformed', { format, surface, scope, rowCount,
+                                    byteCount, durationMs, success })
+```
+
+The Verification page additionally exposes **Generate report**, which:
+
+1. Aggregates `kv_writes` per `public:ccf.gov.*` table via SQL.
+2. Reads enhanced stats and the imported file inventory.
+3. Builds a self-contained Markdown report via `utils/verification-report.ts`.
+4. Downloads it as `verification-report-<timestamp>.md`.
+
+The report enumerates the local explorer's view of the ledger; it is **not** an
+independent cryptographic attestation. The report explicitly states this caveat
+and refers users to the in-app verification flow for receipt validation. The MST
+section is gated behind the `?mst=true` URL flag.
+
 ## Key Architectural Decisions
 
 ### 1. Client-Side Processing

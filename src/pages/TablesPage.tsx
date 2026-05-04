@@ -42,7 +42,9 @@ import { ChevronRightRegular, DatabaseRegular, KeyRegular, HistoryRegular, Chevr
 import { useCCFTables, useTableLatestState, useTableLatestStateCount, useKeyTransactions, useDatabase, type TableLatestStateSortColumn, type TableLatestStateSortDirection } from '../hooks/use-ccf-data';
 import { Sidebar } from '../components/Sidebar';
 import { SchemaViewerDialog } from '../components/SchemaViewerDialog';
-import { getDatabaseSchema, TABLE_DESCRIPTIONS, CCF_TABLE_PREFIXES, SCITT_TABLES, type DatabaseSchema, type TableKeyValue } from '@microsoft/ccf-database';
+import { ExportMenu } from '../components/export';
+import type { ExportRow } from '../utils/export';
+import { getDatabaseSchema, TABLE_DESCRIPTIONS, CCF_TABLE_PREFIXES, SCITT_TABLES, type DatabaseSchema, type TableKeyValue, type KeyTransaction } from '@microsoft/ccf-database';
 
 const SORTABLE_COLUMNS: TableLatestStateSortColumn[] = ['sequence', 'transactionId', 'keyName', 'value'];
 const DEFAULT_SORT_COLUMN: TableLatestStateSortColumn = 'sequence';
@@ -113,6 +115,24 @@ const useStyles = makeStyles({
     searchContainer: {
         padding: '16px 24px',
         borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+    },
+    searchContainerSearch: {
+        flex: 1,
+        minWidth: 0,
+    },
+    searchContainerActions: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        flexShrink: 0,
+    },
+    keyTransactionsHeaderActions: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
     },
     tableContainer: {
         flex: 1,
@@ -433,6 +453,83 @@ const TablesPage: React.FC = () => {
         0
     );
     const { data: database, isLoading: databaseLoading, error: databaseError } = useDatabase();
+
+    const decodeValueText = useCallback((value: Uint8Array | null): string | null => {
+        if (!value) return null;
+        try {
+            return utf8Decoder.decode(value);
+        } catch {
+            return null;
+        }
+    }, [utf8Decoder]);
+
+    const tableKeyValueToExportRow = useCallback(
+        (row: TableKeyValue): ExportRow => ({
+            sequence_no: row.transactionId,
+            transaction_id: row.transactionIdentifier ?? null,
+            version: row.version,
+            key_name: row.keyName,
+            value: decodeValueText(row.value),
+            is_deleted: row.isDeleted,
+        }),
+        [decodeValueText]
+    );
+
+    const keyTransactionToExportRow = useCallback(
+        (row: KeyTransaction): ExportRow => ({
+            sequence_no: row.transactionId,
+            version: row.version,
+            operation_type: row.operationType,
+            value: decodeValueText(row.value),
+            file_name: row.fileName,
+        }),
+        [decodeValueText]
+    );
+
+    const TABLE_EXPORT_LIMIT = 1_000_000;
+
+    const fetchKeyListRows = useCallback(async () => {
+        if (!database || !tableName) return { rows: [] };
+        const all = await database.kv.getTableLatestState(
+            tableName,
+            TABLE_EXPORT_LIMIT,
+            0,
+            searchQuery,
+            sortColumn,
+            sortDirection
+        );
+        return {
+            rows: all.map(tableKeyValueToExportRow),
+            columns: [
+                { key: 'sequence_no' },
+                { key: 'transaction_id' },
+                { key: 'version' },
+                { key: 'key_name' },
+                { key: 'value' },
+                { key: 'is_deleted' },
+            ],
+        };
+    }, [database, tableName, searchQuery, sortColumn, sortDirection, tableKeyValueToExportRow]);
+
+    const fetchKeyHistoryRows = useCallback(async () => {
+        if (!database || !selectedKey) return { rows: [] };
+        const all = await database.kv.getKeyTransactions(
+            selectedKey.mapName,
+            selectedKey.keyName,
+            TABLE_EXPORT_LIMIT,
+            0
+        );
+        return {
+            rows: all.map(keyTransactionToExportRow),
+            columns: [
+                { key: 'sequence_no' },
+                { key: 'version' },
+                { key: 'operation_type' },
+                { key: 'value' },
+                { key: 'file_name' },
+            ],
+        };
+    }, [database, selectedKey, keyTransactionToExportRow]);
     const tableItems = useMemo<TableLatestStateRow[]>(() => keyValues ?? [], [keyValues]);
     const getRowId = useCallback((item: TableLatestStateRow) => `${item.transactionId}-${item.keyName}`, []);
     const columnSizingPlugin = useTableColumnSizing_unstable<TableLatestStateRow>({ columnSizingOptions });
@@ -861,9 +958,19 @@ const TablesPage: React.FC = () => {
                                 Table: {selectedKey.mapName}
                             </Text>
                         </div>
-                        <Button appearance="subtle" onClick={() => setSelectedKey(null)}>
-                            Close
-                        </Button>
+                        <div className={classes.keyTransactionsHeaderActions}>
+                            <ExportMenu
+                                surface="tables-key-history"
+                                slug={`${selectedKey.mapName}-${selectedKey.keyName}`}
+                                scope="all-filtered"
+                                disabled={!database}
+                                fetchRows={fetchKeyHistoryRows}
+                                size="small"
+                            />
+                            <Button appearance="subtle" onClick={() => setSelectedKey(null)}>
+                                Close
+                            </Button>
+                        </div>
                     </div>
                     <div className={classes.keyTransactionsBody}>
                         {keyTransactionsLoading ? (
@@ -1179,11 +1286,23 @@ const TablesPage: React.FC = () => {
                             </div>
 
                             <div className={classes.searchContainer}>
-                                <SearchBox
-                                    placeholder="Search keys and values..."
-                                    value={searchQuery}
-                                    onChange={(_, data) => handleSearchChange(data?.value || '')}
-                                />
+                                <div className={classes.searchContainerSearch}>
+                                    <SearchBox
+                                        placeholder="Search keys and values..."
+                                        value={searchQuery}
+                                        onChange={(_, data) => handleSearchChange(data?.value || '')}
+                                    />
+                                </div>
+                                <div className={classes.searchContainerActions}>
+                                    <ExportMenu
+                                        surface="tables-key-list"
+                                        slug={tableName}
+                                        scope="all-filtered"
+                                        rowCountHint={totalKeyCount}
+                                        disabled={!database || !tableName}
+                                        fetchRows={fetchKeyListRows}
+                                    />
+                                </div>
                             </div>
 
                             <div className={classes.tableContainer}>
