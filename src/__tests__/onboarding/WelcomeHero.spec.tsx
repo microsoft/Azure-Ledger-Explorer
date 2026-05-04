@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WelcomeHero } from '../../components/onboarding/WelcomeHero';
@@ -18,6 +18,16 @@ vi.mock('../../hooks/use-ccf-data', () => ({
   }),
 }));
 
+// MST is preview-gated. Most existing tests below were written assuming the
+// MST card is visible, so default the mock to enabled. The "MST card hidden
+// when feature gate is off" test overrides this per-test using `vi.mocked`.
+vi.mock('../../utils/feature-flags', () => ({
+  isMstEnabled: vi.fn(() => true),
+}));
+
+import { isMstEnabled } from '../../utils/feature-flags';
+const isMstEnabledMock = vi.mocked(isMstEnabled);
+
 const renderHero = (onPathClick = vi.fn()) => {
   const client = new QueryClient();
   render(
@@ -29,6 +39,10 @@ const renderHero = (onPathClick = vi.fn()) => {
 };
 
 describe('WelcomeHero', () => {
+  beforeEach(() => {
+    isMstEnabledMock.mockReturnValue(true);
+  });
+
   it('renders the welcome title and the value-prop subtitle', () => {
     renderHero();
     expect(screen.getByRole('heading', { name: /welcome to ledger explorer/i })).toBeInTheDocument();
@@ -105,5 +119,16 @@ describe('WelcomeHero', () => {
   it('renders the "Load sample ledger" CTA', () => {
     renderHero();
     expect(screen.getByRole('button', { name: /load sample ledger/i })).toBeInTheDocument();
+  });
+
+  it('hides the Signing Transparency card when the MST feature gate is off', () => {
+    isMstEnabledMock.mockReturnValue(false);
+    renderHero();
+    // Local + Azure remain.
+    expect(screen.getByRole('listitem', { name: /local files/i })).toBeInTheDocument();
+    expect(screen.getByRole('listitem', { name: /azure confidential ledger/i })).toBeInTheDocument();
+    // MST card is gone.
+    expect(screen.queryByRole('listitem', { name: /signing transparency/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /fetch from mst/i })).not.toBeInTheDocument();
   });
 });

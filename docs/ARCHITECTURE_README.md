@@ -654,6 +654,10 @@ User clicks "Verify Ledger"
 - **SAS Tokens**: Azure SAS tokens are supplied by the user at runtime and held only in component state for the duration of the import.
 - **COOP / COEP Headers**: Required for `SharedArrayBuffer` (used by sqlite-wasm); configured in `vite.config.ts` dev server and `staticwebapp.config.json` for production.
 
+### Feature Gates
+
+- **MST (Microsoft Signing Transparency)**: Still a preview service, so all MST-facing UX is hidden by default. Users opt in by appending `?mst=true` to the URL once per browser tab; the flag is cached in `sessionStorage` so it survives reloads and internal navigation. `?mst=false` clears the override. The single source of truth is `src/utils/feature-flags.ts` (`isMstEnabled()`); gated surfaces are the Welcome hero card, the AddFilesWizard tab, the AppSidebar tools menu item, the `/mst-receipt` route, and the `importmst` chat action.
+
 ## Browser Compatibility
 
 ### Target Browsers

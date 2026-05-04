@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   makeStyles,
   Card,
@@ -23,6 +23,7 @@ import { trackEvent, TelemetryEvents } from '../../services/telemetry';
 import { HowItWorks } from './HowItWorks';
 import { WhatIsLedgerPopover } from './WhatIsLedgerPopover';
 import { LoadSampleButton } from './LoadSampleButton';
+import { isMstEnabled } from '../../utils/feature-flags';
 import ccfLogo from '../../assets/ccf.svg';
 
 export type OnboardingPath = 'local' | 'azure' | 'mst';
@@ -210,6 +211,14 @@ const useStyles = makeStyles({
 export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onPathClick, onSampleError, disabled }) => {
   const styles = useStyles();
 
+  // MST is still a preview service, so the Signing Transparency card only
+  // shows when the user has explicitly opted in via `?mst=true`. We compute
+  // this once per mount; the flag itself is cached at module-init.
+  const visibleCards = useMemo(
+    () => PATH_CARDS.filter(c => c.path !== 'mst' || isMstEnabled()),
+    []
+  );
+
   const handleCardClick = (path: OnboardingPath) => {
     if (disabled) return;
     trackEvent(TelemetryEvents.ONBOARDING_PATH_CLICKED, { path });
@@ -237,7 +246,7 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onPathClick, onSampleE
           make the card div itself focusable (which would risk keyboard event
           double-firing when activating the inner button). */}
       <div className={styles.cardsRow} role="list" aria-label="Choose how to import a ledger">
-        {PATH_CARDS.map(card => (
+        {visibleCards.map(card => (
           <Card
             key={card.path}
             className={styles.card}
