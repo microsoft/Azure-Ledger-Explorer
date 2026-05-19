@@ -34,6 +34,7 @@ jobs:
         env:
           DEPLOY_TARGET: github-pages
           GITHUB_PAGES_BASE: /${{ github.event.repository.name }}/
+          VITE_APPINSIGHTS_CONNECTION_STRING: ${{ secrets.VITE_APPINSIGHTS_CONNECTION_STRING }}
 
       - name: Create SPA routing fallback
         run: cp dist/index.html dist/404.html
