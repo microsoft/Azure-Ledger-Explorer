@@ -84,8 +84,8 @@ test.describe('Configuration Page - Domain Persistence', () => {
     // Go to Files tab
     await page.getByRole('button', { name: 'Files', exact: true }).click();
     
-    // Click Get Started button to open the wizard
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    // Click the Local files card CTA to open the wizard
+    await page.getByRole('button', { name: 'Upload files' }).click();
     
     // Set files directly on the hidden input
     await page.getByLabel('Upload ledger files').setInputFiles([

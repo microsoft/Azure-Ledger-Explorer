@@ -25,7 +25,6 @@ import {
   Document24Regular,
   ChevronLeft24Regular,
   ChevronRight24Regular,
-  DocumentAdd24Regular,
   DocumentAdd16Regular,
   DocumentRegular,
   CheckmarkCircle12Regular,
@@ -50,6 +49,7 @@ import type { TransactionType } from '../utils/transaction-classification';
 import { filterTransactionsByTypes } from '../utils/transaction-classification';
 import { Sidebar } from './Sidebar';
 import { useVerification } from '../hooks/use-verification';
+import { WelcomeHero, type OnboardingPath } from './onboarding';
 
 
 const useStyles = makeStyles({
@@ -140,11 +140,14 @@ const useStyles = makeStyles({
     textAlign: 'center',
     color: tokens.colorNeutralForeground2,
   },
-  centerContent: {
-    flex: 1,
+  emptySidebar: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: '8px',
+    padding: '16px',
+    textAlign: 'center',
+    color: tokens.colorNeutralForeground2,
   },
   loadingContainer: {
     display: 'flex',
@@ -217,7 +220,16 @@ export const CCFVisualizerApp: React.FC = () => {
   const { data: ledgerFiles } = useLedgerFiles();
   const { isUploading, uploadError, uploadProgress } = useFileDrop();
   const [showUploadDialog, setShowUploadDialog] = React.useState(false);
+  const [wizardInitialTab, setWizardInitialTab] = React.useState<OnboardingPath | undefined>(undefined);
+  const [sampleError, setSampleError] = React.useState<string | null>(null);
   const { data: storageInfo } = useStorageQuota();
+
+  // App-wide indicator that some import is in flight. `useFileDrop().isUploading`
+  // is per-hook-instance, but `uploadProgress` is backed by a shared store that
+  // `handleFiles` itself sets/clears, so it reliably reflects every active import
+  // path (sample button, drag-and-drop, wizard, etc.) and prevents concurrent
+  // imports that would race on Merkle reset / OPFS writes.
+  const isImportBusy = isUploading || uploadProgress !== null;
   
   // Verification hook
   const {
@@ -253,7 +265,12 @@ export const CCFVisualizerApp: React.FC = () => {
   const transactionsLoading = fileTransactionsLoading;
   const totalTransactions = fileTransactionsCount;
 
-  const hasData = stats && (stats.fileCount > 0 || stats.transactionCount > 0);
+  // We have data once either ledger files exist or stats report any rows.
+  // Checking `ledgerFiles` first avoids a brief flash of the empty-state hero
+  // after an import completes, since `useLedgerFiles` may invalidate before
+  // `useStats` does.
+  const hasData = (ledgerFiles && ledgerFiles.length > 0)
+    || (stats && (stats.fileCount > 0 || stats.transactionCount > 0));
 
   const handleFileSelect = (fileId: number) => {
     setSelectedFileId(fileId);
@@ -316,38 +333,48 @@ export const CCFVisualizerApp: React.FC = () => {
   };
 
   // Render empty state content (no early return - dialog rendered at end)
-  const renderEmptyState = () => (
-    <div className={styles.container}>
-      {/* Upload Error Message */}
-      {uploadError && (
-        <MessageBar intent="error">
-          Failed to upload file: {uploadError.message}
-        </MessageBar>
-      )}
+  const renderEmptyState = () => {
+    const handlePathClick = (path: OnboardingPath) => {
+      if (isImportBusy) return;
+      setWizardInitialTab(path);
+      setSampleError(null);
+      setShowUploadDialog(true);
+    };
 
-      {/* Upload Progress */}
-      {isUploading && (
-        <MessageBar intent="info">
-          <div className={styles.uploadProgress}>
-            <Spinner size="tiny" />
-            <span>Processing ledger file...</span>
-          </div>
-        </MessageBar>
-      )}
+    return (
+      <div className={styles.container}>
+        {/* Upload Error Message */}
+        {uploadError && (
+          <MessageBar intent="error">
+            Failed to upload file: {uploadError.message}
+          </MessageBar>
+        )}
 
-      <div className={styles.centerContent}>
-        {/* Upload Files Button */}
-        <Button
-          size='large'
-          appearance="primary"
-          icon={<DocumentAdd24Regular />}
-          onClick={() => setShowUploadDialog(true)}
-        >
-          Get Started
-        </Button>
+        {/* Sample Load Error */}
+        {sampleError && (
+          <MessageBar intent="error">
+            Failed to load sample ledger: {sampleError}
+          </MessageBar>
+        )}
+
+        {/* Upload Progress */}
+        {isUploading && (
+          <MessageBar intent="info">
+            <div className={styles.uploadProgress}>
+              <Spinner size="tiny" />
+              <span>Processing ledger file...</span>
+            </div>
+          </MessageBar>
+        )}
+
+        <WelcomeHero
+          onPathClick={handlePathClick}
+          onSampleError={setSampleError}
+          disabled={isImportBusy}
+        />
       </div>
-    </div>
-  );
+    );
+  };
 
   // Empty state is rendered inline, not as early return
   // This ensures single AddFilesWizard instance persists across hasData changes
@@ -406,7 +433,10 @@ export const CCFVisualizerApp: React.FC = () => {
           size="small"
           appearance="subtle"
           icon={<DocumentAdd16Regular />}
-          onClick={() => setShowUploadDialog(true)}
+          onClick={() => {
+            setWizardInitialTab(undefined);
+            setShowUploadDialog(true);
+          }}
         />
       </Tooltip>
     );
@@ -512,8 +542,19 @@ export const CCFVisualizerApp: React.FC = () => {
             })}
           </Tree>
         ) : (
-          <div className={styles.emptyState}>
+          <div className={styles.emptySidebar}>
             <Body1>No files uploaded</Body1>
+            <Button
+              size="small"
+              appearance="primary"
+              icon={<DocumentAdd16Regular />}
+              onClick={() => {
+                setWizardInitialTab(undefined);
+                setShowUploadDialog(true);
+              }}
+            >
+              Add files
+            </Button>
           </div>
         )}
       </Sidebar>
@@ -653,6 +694,7 @@ export const CCFVisualizerApp: React.FC = () => {
       <AddFilesWizard
         open={showUploadDialog}
         onOpenChange={setShowUploadDialog}
+        initialTab={wizardInitialTab}
       />
     </>
   );

@@ -198,4 +198,8 @@ export const TelemetryEvents = {
   GOVERNANCE_PAGE_OPENED: 'GovernancePageOpened',
   GOVERNANCE_EVENT_CLICKED: 'GovernanceEventClicked',
   GOVERNANCE_FILTER_APPLIED: 'GovernanceFilterApplied',
+
+  // Onboarding
+  ONBOARDING_PATH_CLICKED: 'OnboardingPathClicked',
+  ONBOARDING_SAMPLE_LOADED: 'OnboardingSampleLoaded',
 } as const;
