@@ -324,6 +324,9 @@ self.onmessage = async (event: MessageEvent) => {
           writeStmt.finalize();
           deleteStmt.finalize();
 
+          // Refresh query-planner statistics so SQLite picks optimal indexes
+          db.exec('ANALYZE');
+
           log(`Completed: ${transactionCount} transactions inserted`);
 
           // Update verification status in the database

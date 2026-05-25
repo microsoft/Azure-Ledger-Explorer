@@ -73,5 +73,13 @@ export const migration: Migration = {
     `CREATE INDEX IF NOT EXISTS idx_kv_writes_map_key ON kv_writes(map_name, key_name)`,
     `CREATE INDEX IF NOT EXISTS idx_kv_deletes_sequence_no ON kv_deletes(sequence_no)`,
     `CREATE INDEX IF NOT EXISTS idx_kv_deletes_map_key ON kv_deletes(map_name, key_name)`,
+
+    // Covering indexes for the table view's "latest state" query.
+    // Include version (DESC for MAX), sequence_no, and value_text so SQLite can
+    // resolve the ROW_NUMBER() window function via index-only scans.
+    `CREATE INDEX IF NOT EXISTS idx_kv_writes_map_key_ver
+       ON kv_writes(map_name, key_name, version DESC, sequence_no, value_text)`,
+    `CREATE INDEX IF NOT EXISTS idx_kv_deletes_map_key_ver
+       ON kv_deletes(map_name, key_name, version DESC, sequence_no)`,
   ],
 };

@@ -14,7 +14,7 @@ test.describe('SCITT COSE entry decoding', () => {
   test.setTimeout(120_000);
   test.beforeEach(async ({ page }) => {
     await page.goto('/files');
-    await page.getByRole('button', { name: 'Get Started' }).click();
+    await page.getByRole('button', { name: 'Upload files' }).click();
     await page.getByLabel('Upload ledger files').setInputFiles([
       path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
       path.join(testfilepath, 'test_files', 'ledger_15-3926.committed'),

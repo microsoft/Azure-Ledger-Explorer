@@ -9,34 +9,53 @@ function likePattern(query: string): string {
   return `%${query.trim()}%`;
 }
 
+/**
+ * Single-pass CTE using MAX() window function to find the latest version of each key.
+ * Returns ALL rows where version equals the maximum version for that key.
+ *
+ * This preserves the original behavior where tables with multiple entries
+ * sharing the same key_name but same max version are all returned (e.g., SCITT entries
+ * that all have key_name='' and version=1).
+ *
+ * With covering indexes (map_name, key_name, version DESC, sequence_no, value_text)
+ * SQLite can resolve the query via index-only scans.
+ *
+ * Params: [mapName, mapName] (one per side of UNION ALL).
+ */
 const BASE_CTE = `
-  WITH latest_versions AS (
+  WITH all_operations AS (
     SELECT
       key_name,
-      MAX(version) as max_version
-    FROM (
-      SELECT key_name, version FROM kv_writes WHERE map_name = ?
-      UNION ALL
-      SELECT key_name, version FROM kv_deletes WHERE map_name = ?
-    ) AS all_keys
-    GROUP BY key_name
+      value_text,
+      version,
+      sequence_no,
+      0 as is_deleted
+    FROM kv_writes
+    WHERE map_name = ?
+    UNION ALL
+    SELECT
+      key_name,
+      NULL as value_text,
+      version,
+      sequence_no,
+      1 as is_deleted
+    FROM kv_deletes
+    WHERE map_name = ?
   ),
   latest_operations AS (
     SELECT
-      lv.key_name,
-      COALESCE(w.value_text, NULL) as value_text,
-      lv.max_version as version,
-      COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
-      CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted,
-      t.transaction_id as transaction_id
-    FROM latest_versions lv
-    LEFT JOIN kv_writes w ON lv.key_name = w.key_name
-      AND lv.max_version = w.version
-      AND w.map_name = ?
-    LEFT JOIN kv_deletes d ON lv.key_name = d.key_name
-      AND lv.max_version = d.version
-      AND d.map_name = ?
-    LEFT JOIN transactions t ON t.sequence_no = COALESCE(w.sequence_no, d.sequence_no)
+      ao.key_name,
+      ao.value_text,
+      ao.version,
+      ao.sequence_no,
+      ao.is_deleted
+    FROM (
+      SELECT
+        *,
+        MAX(version) OVER (PARTITION BY key_name) as max_version
+      FROM all_operations
+    ) ao
+    WHERE ao.version = ao.max_version
   )
 `;
 
@@ -55,11 +74,12 @@ export function buildTableLatestStateQuery(args: {
       lo.version,
       lo.sequence_no,
       lo.is_deleted,
-      lo.transaction_id
+      t.transaction_id
     FROM latest_operations lo
+    LEFT JOIN transactions t ON t.sequence_no = lo.sequence_no
   `;
 
-  const params: unknown[] = [args.mapName, args.mapName, args.mapName, args.mapName];
+  const params: unknown[] = [args.mapName, args.mapName];
 
   if (args.searchQuery && args.searchQuery.trim()) {
     sql += `
@@ -80,8 +100,8 @@ export function buildTableLatestStateQuery(args: {
       orderExpressions.push(`lo.sequence_no ${directionKeyword}`);
       break;
     case 'transactionId':
-      orderExpressions.push('CASE WHEN lo.transaction_id IS NULL THEN 1 ELSE 0 END ASC');
-      orderExpressions.push(`lo.transaction_id COLLATE NOCASE ${directionKeyword}`);
+      orderExpressions.push('CASE WHEN t.transaction_id IS NULL THEN 1 ELSE 0 END ASC');
+      orderExpressions.push(`t.transaction_id COLLATE NOCASE ${directionKeyword}`);
       break;
     case 'value':
       orderExpressions.push('CASE WHEN lo.value_text IS NULL THEN 1 ELSE 0 END ASC');
@@ -115,39 +135,13 @@ export function buildTableLatestStateCountQuery(args: {
   mapName: string;
   searchQuery?: string;
 }): { sql: string; params: unknown[] } {
-  // Same CTE, but without joining to transactions (saves a join for count queries).
-  let sql = `
-    WITH latest_versions AS (
-      SELECT
-        key_name,
-        MAX(version) as max_version
-      FROM (
-        SELECT key_name, version FROM kv_writes WHERE map_name = ?
-        UNION ALL
-        SELECT key_name, version FROM kv_deletes WHERE map_name = ?
-      ) AS all_keys
-      GROUP BY key_name
-    ),
-    latest_operations AS (
-      SELECT
-        lv.key_name,
-        COALESCE(w.value_text, NULL) as value_text,
-        lv.max_version as version,
-        COALESCE(w.sequence_no, d.sequence_no) as sequence_no,
-        CASE WHEN d.sequence_no IS NOT NULL THEN 1 ELSE 0 END as is_deleted
-      FROM latest_versions lv
-      LEFT JOIN kv_writes w ON lv.key_name = w.key_name
-        AND lv.max_version = w.version
-        AND w.map_name = ?
-      LEFT JOIN kv_deletes d ON lv.key_name = d.key_name
-        AND lv.max_version = d.version
-        AND d.map_name = ?
-    )
+  // Same CTE but skip the transactions JOIN — not needed for counting.
+  let sql = `${BASE_CTE}
     SELECT COUNT(*) as count
     FROM latest_operations lo
   `;
 
-  const params: unknown[] = [args.mapName, args.mapName, args.mapName, args.mapName];
+  const params: unknown[] = [args.mapName, args.mapName];
 
   if (args.searchQuery && args.searchQuery.trim()) {
     sql += `
