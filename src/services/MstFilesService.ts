@@ -109,7 +109,10 @@ class MstClient implements IMstClient {
       }
     } catch (error) {
       console.error(`Error listing files in ${path}:`, error);
-      throw new Error(`Failed to access directory ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to access directory ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { cause: error }
+      );
     }
   }
 
@@ -127,7 +130,10 @@ class MstClient implements IMstClient {
       };
     } catch (error) {
       console.error(`Error downloading file ${filename}:`, error);
-      throw new Error(`Failed to download file ${filename}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to download file ${filename}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { cause: error }
+      );
     }
   }
 }
@@ -141,7 +147,8 @@ export class MstFilesService {
     } catch (error) {
       console.error('Initialization error:', error);
       throw new Error(
-        'Failed to initialize MST client. Please ensure your domain is correct.'
+        'Failed to initialize MST client. Please ensure your domain is correct.',
+        { cause: error }
       );
     }
   }
@@ -208,7 +215,7 @@ export class MstFilesService {
       return { files, filesDownloaded };
     } catch (error) {
       console.error('Failed to download files', error);
-      throw new Error('Failed to download files');
+      throw new Error('Failed to download files', { cause: error });
     }
   }
 
@@ -257,7 +264,7 @@ export class MstFilesService {
 
     catch (error) {
       console.error('No Files to download in the File share', error);
-      throw new Error('No Files to download in the File share');
+      throw new Error('No Files to download in the File share', { cause: error });
     }
   }
 
@@ -300,7 +307,7 @@ export class MstFilesService {
 
     catch (error) {
       console.error('No Files to download in the File share', error);
-      throw new Error('No Files to download in the File share');
+      throw new Error('No Files to download in the File share', { cause: error });
     }
   }
 
