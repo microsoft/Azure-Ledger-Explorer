@@ -3,11 +3,8 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
-import header from 'eslint-plugin-header'
 import { globalIgnores } from 'eslint/config'
-
-// Required for eslint-plugin-header to work with flat config
-header.rules.header.meta.schema = false
+import licenseHeader from "./eslint-rules/license-header.js";
 
 export default tseslint.config([
   globalIgnores(['dist', 'node_modules', 'coverage', '*.config.js', 'packages/*/dist']),
@@ -22,7 +19,11 @@ export default tseslint.config([
       reactRefresh.configs.vite,
     ],
     plugins: {
-      header,
+      local: {
+        rules: {
+          "license-header": licenseHeader,
+        },
+      },
     },
     languageOptions: {
       ecmaVersion: 2020,
@@ -33,16 +34,7 @@ export default tseslint.config([
     },
     rules: {
       // Copyright header enforcement
-      'header/header': [
-        'error',
-        'block',
-        [
-          '',
-          ' * Copyright (c) Microsoft Corporation.',
-          ' * Licensed under the Apache License, Version 2.0.',
-          ' ',
-        ],
-      ],
+      'local/license-header': 'error',
 
       // TypeScript rules
       '@typescript-eslint/no-unused-vars': [
