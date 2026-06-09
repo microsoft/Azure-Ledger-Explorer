@@ -27,7 +27,7 @@ export function cborArrayToText(cbor: Uint8Array): string {
     const decoded = decode(cbor) as { tag?: number; contents?: unknown[] } | unknown[];
     
     const output: Record<string, unknown> = {};
-    let parts: unknown[] = [];
+    let parts: unknown[];
     if (typeof decoded === 'object' && decoded !== null && 'tag' in decoded && decoded.tag === 18) {
         parts = decoded.contents ?? [];
     } else if (Array.isArray(decoded) && decoded.length === 4) {
