@@ -419,5 +419,48 @@ describe('cborArrayToText', () => {
       const parsed = JSON.parse(result!);
       expect(parsed).toEqual(UVM_DETAILS_EXPECTED);
     });
+
+    it('should parse mst-hashv-older.cose without throwing and produce valid output', async () => {
+      const cose = await loadCoseFile('mst-hashv-older.cose');
+
+      let result: string;
+      expect(() => {
+        result = cborArrayToText(cose);
+      }).not.toThrow();
+
+      // Output must be valid JSON
+      let parsed: Record<string, unknown>;
+      expect(() => {
+        parsed = JSON.parse(result!);
+      }).not.toThrow();
+
+      const protectedHeader = parsed!.protected as Record<string, unknown>;
+      expect(protectedHeader.alg).toBe('PS256');
+      expect(protectedHeader['content type']).toBe('application/json+cose-hash-v');
+      expect(protectedHeader['CWT Claims']).toEqual({
+        iss: 'did:x509:0:sha256:HnwZ4lezuxq_GVcl_Sk7YWW170qAD0DZBLXilXet0jg::eku:1.3.6.1.4.1.311.10.3.13',
+        sub: 'Test',
+        iat: '2024-08-20T20:38:00.000Z',
+        svn: 0,
+      });
+      expect(protectedHeader.x5t).toBe('SHA-256:26d40d8e012c3358c01b494dc188e9bf1b77ee9a29987ed9f6a06fb0bf9188f4');
+      expect(protectedHeader.x5chain).toHaveLength(3);
+
+      // The cose-hash-v payload decodes to [hash-alg, hash, location]
+      expect(parsed!.payload).toEqual([
+        -16,
+        '015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862',
+        'https://url-to-content',
+      ]);
+
+      // The attached receipt is a CCF Merkle proof (not a COSE Sign1),
+      // so it is rendered as a diagnostic string rather than throwing.
+      const receipts = (parsed!.unprotected as Record<string, unknown>).receipts as unknown[];
+      expect(Array.isArray(receipts)).toBe(true);
+      expect(receipts).toHaveLength(1);
+      expect(typeof receipts[0]).toBe('string');
+
+      expect(typeof parsed!.signature).toBe('string');
+    });
   });
 });

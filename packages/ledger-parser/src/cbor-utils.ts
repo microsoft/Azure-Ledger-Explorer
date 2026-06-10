@@ -43,7 +43,7 @@ function decodeCoseSign1(cbor: Uint8Array): Record<string, unknown> | string {
     } else if (Array.isArray(decoded) && decoded.length === 4) {
         parts = decoded;
     } else {
-        const diagnosed = prettyPrintDecodedCbor(decoded as Uint8Array);
+        const diagnosed = prettyPrintDecodedCbor(cbor);
         return typeof diagnosed === 'string' ? diagnosed : JSON.stringify(diagnosed, null, 2);
     }
 
