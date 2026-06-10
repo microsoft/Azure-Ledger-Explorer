@@ -98,8 +98,10 @@ describe('invalidateAfterImport', () => {
 
     // Pin the keyed invalidations to the exact query keys they target so a
     // future change that adds/removes/renames a key has to update this test.
-    const keyedCalls = spy.mock.calls.filter(([arg]) => 'queryKey' in arg);
-    const queryKeysInvalidated = keyedCalls.map(([arg]) => arg.queryKey);
+    const keyedCalls = spy.mock.calls.filter(
+      ([arg]) => arg != null && 'queryKey' in arg,
+    );
+    const queryKeysInvalidated = keyedCalls.map(([arg]) => arg!.queryKey);
     expect(queryKeysInvalidated).toEqual(
       expect.arrayContaining([
         queryKeys.ledgerFiles,
@@ -110,7 +112,9 @@ describe('invalidateAfterImport', () => {
     );
 
     // The two predicate invalidations must each be predicate-based.
-    const predicateCalls = spy.mock.calls.filter(([arg]) => 'predicate' in arg);
+    const predicateCalls = spy.mock.calls.filter(
+      ([arg]) => arg != null && 'predicate' in arg,
+    );
     expect(predicateCalls).toHaveLength(2);
   });
 });
