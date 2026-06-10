@@ -307,7 +307,8 @@ export class LedgerChunkV2 {
       return new Uint8Array(finalDigestBuffer);
     } catch (error) {
       throw new Error(
-        `Failed to calculate transaction digest: ${error instanceof Error ? error.message : String(error)}`
+        `Failed to calculate transaction digest: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error }
       );
     }
   }

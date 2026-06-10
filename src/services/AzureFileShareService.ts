@@ -21,7 +21,8 @@ export class AzureFileShareService {
     } catch (error) {
       console.error('Failed to initialize Azure file share client:', error);
       throw new Error(
-        'Failed to initialize file share client. Please ensure your SAS token is valid and has Read/List permissions.'
+        'Failed to initialize file share client. Please ensure your SAS token is valid and has Read/List permissions.',
+        { cause: error }
       );
     }
   }
@@ -54,7 +55,7 @@ export class AzureFileShareService {
 
     } catch (error) {
       console.error('No Directory named ledger present in the File share', error);
-      throw new Error('No Directory named ledger present in the File share');
+      throw new Error('No Directory named ledger present in the File share', { cause: error });
     }
   }
 
@@ -101,7 +102,7 @@ export class AzureFileShareService {
       return { files, filesDownloaded };
     } catch (error) {
       console.error('Failed to download files from File share', error);
-      throw new Error('Failed to download files from File share');
+      throw new Error('Failed to download files from File share', { cause: error });
     }
   }
 
@@ -130,7 +131,7 @@ export class AzureFileShareService {
 
     catch (error) {
       console.error('No Files to download in the File share', error);
-      throw new Error('No Files to download in the File share');
+      throw new Error('No Files to download in the File share', { cause: error });
     }
   }
 

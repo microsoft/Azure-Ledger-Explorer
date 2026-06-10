@@ -114,35 +114,38 @@ export function useChat(config: UseChatConfig): UseChatReturn {
   const lastKeyRef = useRef<string>('');
   const lastBaseUrlRef = useRef<string>('');
 
-  // Re-create the service when provider, key, baseUrl, or schema changes
-  if (provider === 'openai' && openaiApiKey) {
-    if (
-      lastProviderRef.current !== 'openai' ||
-      lastKeyRef.current !== openaiApiKey
-    ) {
-      chatServiceRef.current = createOpenAIChatService({
-        apiKey: openaiApiKey,
-        model: openaiModel,
-        databaseSchema,
-      });
-      lastProviderRef.current = 'openai';
-      lastKeyRef.current = openaiApiKey;
-      lastBaseUrlRef.current = '';
-    } else if (chatServiceRef.current && 'updateSchema' in chatServiceRef.current && databaseSchema) {
-      // Update schema on the existing OpenAI service
-      (chatServiceRef.current as OpenAIChatService).updateSchema(databaseSchema);
+  // Re-create the service when provider, key, baseUrl, or schema changes.
+  // This runs in an effect (not during render) so refs can be safely read/updated.
+  useEffect(() => {
+    if (provider === 'openai' && openaiApiKey) {
+      if (
+        lastProviderRef.current !== 'openai' ||
+        lastKeyRef.current !== openaiApiKey
+      ) {
+        chatServiceRef.current = createOpenAIChatService({
+          apiKey: openaiApiKey,
+          model: openaiModel,
+          databaseSchema,
+        });
+        lastProviderRef.current = 'openai';
+        lastKeyRef.current = openaiApiKey;
+        lastBaseUrlRef.current = '';
+      } else if (chatServiceRef.current && 'updateSchema' in chatServiceRef.current && databaseSchema) {
+        // Update schema on the existing OpenAI service
+        (chatServiceRef.current as OpenAIChatService).updateSchema(databaseSchema);
+      }
+    } else if (provider === 'sage' && baseUrl) {
+      if (
+        lastProviderRef.current !== 'sage' ||
+        lastBaseUrlRef.current !== baseUrl
+      ) {
+        chatServiceRef.current = createChatService(baseUrl);
+        lastProviderRef.current = 'sage';
+        lastBaseUrlRef.current = baseUrl;
+        lastKeyRef.current = '';
+      }
     }
-  } else if (provider === 'sage' && baseUrl) {
-    if (
-      lastProviderRef.current !== 'sage' ||
-      lastBaseUrlRef.current !== baseUrl
-    ) {
-      chatServiceRef.current = createChatService(baseUrl);
-      lastProviderRef.current = 'sage';
-      lastBaseUrlRef.current = baseUrl;
-      lastKeyRef.current = '';
-    }
-  }
+  }, [provider, openaiApiKey, openaiModel, baseUrl, databaseSchema]);
 
   // Persist messages to localStorage (provider-aware key)
   useEffect(() => {
