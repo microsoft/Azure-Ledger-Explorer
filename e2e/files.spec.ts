@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -49,6 +49,38 @@ test('successfully imports ledger files', async ({ page }) => {
   await page.keyboard.press('Escape');
   // Wait for the visualization to show
   await expect(page.getByText('Total: 14 transactions')).toBeVisible({ timeout: 30000 });
+});
+
+async function importSampleLedger(page: Page) {
+  await page.goto('/files');
+  await page.getByRole('button', { name: 'Get Started' }).click();
+  await page.getByLabel('Upload ledger files').setInputFiles([
+    path.join(testfilepath, 'test_files', 'ledger_1-14.committed'),
+    path.join(testfilepath, 'test_files', 'ledger_15-3926.committed'),
+  ]);
+  await page.getByRole('button', { name: /Import Selected/ }).dispatchEvent('click');
+  await page.waitForTimeout(1000);
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Total: 14 transactions')).toBeVisible({ timeout: 30000 });
+}
+
+test('exports transaction list as CSV', async ({ page }) => {
+  await importSampleLedger(page);
+  // Open the Export menu in the transactions toolbar.
+  await page.getByRole('button', { name: 'Export', exact: true }).first().click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: /CSV/ }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^transactions-.*\.csv$/);
+});
+
+test('generates verification audit report as Markdown', async ({ page }) => {
+  await importSampleLedger(page);
+  await page.goto('/verification');
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByTestId('verification-generate-report').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^verification-report-.*\.md$/);
 });
 
 test('Welcome hero shows the default (non-MST) import paths and How-it-works', async ({ page }) => {

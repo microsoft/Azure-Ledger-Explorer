@@ -6,6 +6,7 @@ A TypeScript/React application for exploring and analyzing CCF (Confidential Con
 
 - **Ledger File Parsing**: Import and parse CCF ledger files with full transaction details
 - **Transaction Visualization**: Browse transactions with detailed information and search capabilities
+- **Data Export**: Export transactions, key-value tables, and key history to CSV, JSON, or NDJSON; generate a Markdown audit report from the Verification page
 - **Azure Integration**: Direct import from Azure File Shares using SAS tokens
 - **Persistent Storage**: Client-side SQLite database with OPFS VFS
 - **Progressive Web App**: Install to your device, work offline, and get automatic updates
