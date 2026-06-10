@@ -24,8 +24,18 @@ type CborKey = string | number;
  * ```
  */
 export function cborArrayToText(cbor: Uint8Array): string {
+    const result = decodeCoseSign1(cbor);
+    return typeof result === 'string' ? result : JSON.stringify(result, null, 2);
+}
+
+/**
+ * Decodes a COSE Sign1 structure into a plain object (or a diagnostic string for
+ * non-COSE input). Used by {@link cborArrayToText} and for recursively decoding
+ * attached receipts.
+ */
+function decodeCoseSign1(cbor: Uint8Array): Record<string, unknown> | string {
     const decoded = decode(cbor) as { tag?: number; contents?: unknown[] } | unknown[];
-    
+
     const output: Record<string, unknown> = {};
     let parts: unknown[];
     if (typeof decoded === 'object' && decoded !== null && 'tag' in decoded && decoded.tag === 18) {
@@ -33,18 +43,22 @@ export function cborArrayToText(cbor: Uint8Array): string {
     } else if (Array.isArray(decoded) && decoded.length === 4) {
         parts = decoded;
     } else {
-        const diagnosed = prettyPrintDecodedCbor(decoded as Uint8Array);
+        const diagnosed = prettyPrintDecodedCbor(cbor);
         return typeof diagnosed === 'string' ? diagnosed : JSON.stringify(diagnosed, null, 2);
     }
 
     if (parts.length === 4) {
-        output['protected'] = ArrayBuffer.isView(parts[0]) && parts[0] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[0], {preferMap:true}) as Map<CborKey, CborValue>) : parts[0];
-        output['unprotected'] = ArrayBuffer.isView(parts[1]) && parts[1] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[1], {preferMap:true}) as Map<CborKey, CborValue>) : parts[1];
-        output['payload'] = prettyPrintCosePayload(parts[2] as Uint8Array);
+        output['protected'] = parts[0] instanceof Uint8Array ? prettyPrintCborMap(null, decode(parts[0], {preferMap:true}) as Map<CborKey, CborValue>) : parts[0];
+        output['unprotected'] = parts[1] instanceof Uint8Array
+            ? prettyPrintCborMap(null, decode(parts[1], {preferMap:true}) as Map<CborKey, CborValue>)
+            : parts[1] instanceof Map
+                ? prettyPrintCborMap(null, parts[1] as Map<CborKey, CborValue>)
+                : parts[1];
+        output['payload'] = prettyPrintCosePayload(parts[2] as Uint8Array | null);
         output['signature'] = uint8ArrayToHexString(parts[3] as Uint8Array);
     }
 
-    return JSON.stringify(output, null, 2);
+    return output;
 }
 
 // https://www.iana.org/assignments/cose/cose.xhtml
@@ -263,6 +277,10 @@ const coseKeyKeys: Record<string, string> = {
     "1": "kty",
 };
 
+const verifiableProofsKeys: Record<string, string> = {
+    "-1": "inclusion-proof"
+};
+
 function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): CborValue {
     if (value instanceof Uint8Array) {
         return uint8ArrayToHexString(value);
@@ -303,7 +321,13 @@ function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: Cbor
         }
 
         if (keyStr === '394') { // Attached receipts
-            return [prettyKey, (value as Uint8Array[]).map(prettyPrintDecodedCbor)];
+            return [prettyKey, (value as unknown[]).map((v) =>
+                v instanceof Uint8Array
+                    ? decodeCoseSign1(v)
+                    : v instanceof Map
+                        ? prettyPrintCborMap(null, v as Map<CborKey, CborValue>)
+                        : prettyPrintArbitraryCborVal(v)
+            )];
         }
 
         return [prettyKey, prettyPrintArbitraryCborVal(value)];
@@ -320,6 +344,28 @@ function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: Cbor
             const keyStr = key.toString();
             const prettyKey = coseKeyKeys[keyStr] || key;
             return [prettyKey, prettyPrintArbitraryCborVal(value)];
+        }
+        if (parentKey.toString() === '396') { // vdp — verifiable data proofs (CCF inclusion proofs)
+            const keyStr = key.toString();
+            const prettyKey = verifiableProofsKeys[keyStr] || key;
+            if (keyStr === '-1') {
+                // only -1 (inclusion proof) is currently defined
+                // see https://github.com/microsoft/CCF/blob/abd59c461a9139370e040f7ea06a251d3f334ccc/cddl/ccf-receipt.cddl#L11
+                return [prettyKey, (value as Uint8Array[]).map((proof) => {
+                    const decodedProof = decode(proof, { preferMap: true }) as Map<CborKey, CborValue>;
+                    const proofOutput: Record<string, CborValue> = {};
+                    decodedProof.forEach((proofVal, proofKey) => {
+                        if (proofKey === 1) { // leaf
+                            proofOutput['leaf'] = (proofVal as unknown[]).map((entry) => prettyPrintArbitraryCborVal(entry));
+                        } else if (proofKey === 2) { // path
+                            proofOutput['path'] = (proofVal as unknown[]).map((entry) => prettyPrintArbitraryCborVal(entry));
+                        } else {
+                            proofOutput[String(proofKey)] = prettyPrintArbitraryCborVal(proofVal);
+                        }
+                    });
+                    return proofOutput;
+                })];
+            }
         }
         return [key, prettyPrintArbitraryCborVal(value, key)];
     }
@@ -361,7 +407,12 @@ export function uint8ArrayToB64String(uint8Array: Uint8Array): string {
     return btoa(binary);
 }
 
-function prettyPrintCosePayload(input: Uint8Array): CborValue {
+function prettyPrintCosePayload(input: Uint8Array | null): CborValue {
+    // detached or empty payload
+    if (input === null || input === undefined) {
+        return '';
+    }
+
     // test if Uint8Array is json
     const text = new TextDecoder().decode(input);
     try {
