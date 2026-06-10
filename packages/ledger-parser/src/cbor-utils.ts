@@ -277,6 +277,10 @@ const coseKeyKeys: Record<string, string> = {
     "1": "kty",
 };
 
+const verifiableProofsKeys: Record<string, string> = {
+    "-1": "inclusion-proof"
+};
+
 function prettyPrintArbitraryCborVal(value: CborValue, idxOrKey?: CborKey): CborValue {
     if (value instanceof Uint8Array) {
         return uint8ArrayToHexString(value);
@@ -340,6 +344,28 @@ function prettyCborKeyValue(parentKey: CborKey | null, key: CborKey, value: Cbor
             const keyStr = key.toString();
             const prettyKey = coseKeyKeys[keyStr] || key;
             return [prettyKey, prettyPrintArbitraryCborVal(value)];
+        }
+        if (parentKey.toString() === '396') { // vdp — verifiable data proofs (CCF inclusion proofs)
+            const keyStr = key.toString();
+            const prettyKey = verifiableProofsKeys[keyStr] || key;
+            if (keyStr === '-1') {
+                // only -1 (inclusion proof) is currently defined
+                // see https://github.com/microsoft/CCF/blob/abd59c461a9139370e040f7ea06a251d3f334ccc/cddl/ccf-receipt.cddl#L11
+                return [prettyKey, (value as Uint8Array[]).map((proof) => {
+                    const decodedProof = decode(proof, { preferMap: true }) as Map<CborKey, CborValue>;
+                    const proofOutput: Record<string, CborValue> = {};
+                    decodedProof.forEach((proofVal, proofKey) => {
+                        if (proofKey === 1) { // leaf
+                            proofOutput['leaf'] = (proofVal as unknown[]).map((entry) => prettyPrintArbitraryCborVal(entry));
+                        } else if (proofKey === 2) { // path
+                            proofOutput['path'] = (proofVal as unknown[]).map((entry) => prettyPrintArbitraryCborVal(entry));
+                        } else {
+                            proofOutput[String(proofKey)] = prettyPrintArbitraryCborVal(proofVal);
+                        }
+                    });
+                    return proofOutput;
+                })];
+            }
         }
         return [key, prettyPrintArbitraryCborVal(value, key)];
     }
