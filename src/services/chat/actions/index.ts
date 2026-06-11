@@ -8,7 +8,6 @@ import { registerAction } from './action-registry';
 import { sqlActionHandler } from './sql-action';
 import { verifyActionHandler } from './verify-action';
 import { mstActionHandler } from './mst-action';
-import { isMstEnabled } from '../../../utils/feature-flags';
 
 /**
  * Initialize all built-in action handlers
@@ -17,13 +16,7 @@ import { isMstEnabled } from '../../../utils/feature-flags';
 export function initializeActions(): void {
   registerAction(UIActionName.RunSQL, sqlActionHandler);
   registerAction(UIActionName.VerifyLedger, verifyActionHandler);
-  // MST is preview-gated. Don't register the import handler unless the user
-  // has explicitly opted in; this prevents `action:importmst` blocks (from
-  // pasted content or a future system-prompt change) from triggering an MST
-  // download in a non-MST environment.
-  if (isMstEnabled()) {
-    registerAction(UIActionName.ImportMST, mstActionHandler);
-  }
+  registerAction(UIActionName.ImportMST, mstActionHandler);
 }
 
 // Export everything from the registry

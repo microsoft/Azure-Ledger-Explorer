@@ -28,7 +28,6 @@ import remarkGfm from 'remark-gfm';
 import { FileUploadArea } from './FileUploadArea';
 import { LedgerBackupView } from './LedgerBackupView';
 import { MstLedgerImportView } from './MstLedgerImportView';
-import { isMstEnabled } from '../utils/feature-flags';
 import azureLedgerHelp from '../assets/help/azure-confidential-ledger.md?raw';
 import mstHelp from '../assets/help/microsoft-signing-transparency.md?raw';
 import localFilesHelp from '../assets/help/local-files.md?raw';
@@ -137,8 +136,10 @@ export interface AddFilesWizardProps {
    * selection. Users can still switch tabs freely while the wizard is
    * open; their choice is only reset on the next (re-)open.
    *
-   * If omitted, defaults to `'local'`. If `'mst'` is requested while the
-   * MST feature gate is off, falls back to `'local'` defensively.
+  /**
+   * Optional tab to select when the wizard opens. The Welcome hero and the
+   * sidebar's `+` button pass different defaults so deep-linked entry points
+   * land users on the relevant import flow. If omitted, defaults to `'local'`.
    */
   initialTab?: AllowedOptions;
 }
@@ -147,17 +148,10 @@ type AllowedOptions = 'azure' | 'mst' | 'local';
 
 export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChange, initialTab }) => {
   const styles = useStyles();
-  const mstEnabled = isMstEnabled();
 
-  // Resolve a requested initial tab against the feature gate. If the caller
-  // asks for the MST tab while the flag is off (defensive — the entry point
-  // that supplies 'mst' should also be hidden), fall back to 'local'.
   const resolveInitialTab = React.useCallback(
-    (requested: AllowedOptions | undefined): AllowedOptions => {
-      if (requested === 'mst' && !mstEnabled) return 'local';
-      return requested ?? 'local';
-    },
-    [mstEnabled]
+    (requested: AllowedOptions | undefined): AllowedOptions => requested ?? 'local',
+    []
   );
 
   const [selectedTab, setSelectedTab] = useState<AllowedOptions>(resolveInitialTab(initialTab));
@@ -182,7 +176,7 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
       case 'azure':
         return azureLedgerHelp;
       case 'mst':
-        return mstEnabled ? mstHelp : localFilesHelp;
+        return mstHelp;
       case 'local':
       default:
         return localFilesHelp;
@@ -194,11 +188,7 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
       case 'azure':
         return <LedgerBackupView onImportComplete={handleImportComplete} />;
       case 'mst':
-        // Defensive: if the gate is off the tab itself isn't rendered, but
-        // fall back to the local view rather than instantiating the MST one.
-        return mstEnabled
-          ? <MstLedgerImportView onImportComplete={handleImportComplete} />
-          : <FileUploadArea onImportComplete={handleImportComplete} />;
+        return <MstLedgerImportView onImportComplete={handleImportComplete} />;
       case 'local':
       default:
         return <FileUploadArea onImportComplete={handleImportComplete} />;
@@ -242,13 +232,11 @@ export const AddFilesWizard: React.FC<AddFilesWizardProps> = ({ open, onOpenChan
                   <Text size={200}>Audit Ledger Files</Text>
                 </Tooltip>
               </Tab>
-              {mstEnabled && (
-                <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
-                  <Tooltip content="Microsoft's Signing Transparency" relationship="label">
-                    <Text size={200}>Signing Transparency</Text>
-                  </Tooltip>
-                </Tab>
-              )}
+              <Tab value="mst" icon={<ShieldCheckmark20Regular />}>
+                <Tooltip content="Microsoft's Signing Transparency" relationship="label">
+                  <Text size={200}>Signing Transparency</Text>
+                </Tooltip>
+              </Tab>
             </TabList>
 
             <div className={styles.tabContent}>

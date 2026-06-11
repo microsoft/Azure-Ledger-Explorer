@@ -25,6 +25,7 @@ import {
 } from '@microsoft/ccf-ledger-parser';
 
 import { MerkleTreeGraph } from './MerkleTreeGraph';
+import { unwrapJsonEncodedString } from '../utils/ccf-value-decoding';
 
 const useStyles = makeStyles({
   container: {
@@ -270,16 +271,8 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
     switch (type) {
       case 'javascript': {
         try {
-          let text = new TextDecoder('utf-8').decode(data);
-          
-          // Remove surrounding double quotes if the entire content is wrapped in quotes
-          if (text.startsWith('"') && text.endsWith('"') && text.length > 1) {
-            text = text.slice(1, -1);
-          }
-          
-          // Replace escaped newlines with actual newlines for better formatting
-          text = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
-          return { content: text, language: 'javascript' };
+          const text = new TextDecoder('utf-8').decode(data);
+          return { content: unwrapJsonEncodedString(text), language: 'javascript' };
         } catch {
           return { content: formatHex(data), language: 'plaintext' };
         }
@@ -287,16 +280,12 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
       
       case 'json': {
         try {
-          let text = new TextDecoder('utf-8').decode(data);
-          
-          // Remove surrounding double quotes if the entire content is wrapped in quotes
-          if (text.startsWith('"') && text.endsWith('"') && text.length > 1) {
-            text = text.slice(1, -1);
-            // Unescape any escaped quotes within the JSON string
-            text = text.replace(/\\"/g, '"');
-          }
-          
-          const parsed = JSON.parse(text);
+          const text = new TextDecoder('utf-8').decode(data);
+          // CCF often stores JSON values double-encoded as JSON strings (e.g.
+          // `"{\"a\":1}"`). Unwrap a JSON-string envelope first so we get the
+          // real inner JSON text, then re-parse and pretty-print.
+          const inner = unwrapJsonEncodedString(text);
+          const parsed = JSON.parse(inner);
           return { content: JSON.stringify(parsed, null, 2), language: 'json' };
         } catch {
           return { content: formatHex(data), language: 'plaintext' };
@@ -474,10 +463,10 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div data-testid="value-viewer" className={styles.container}>
+      <div data-testid="value-viewer-header" className={styles.header}>
         <div className={styles.keyInfo}>
-          <Text className={styles.keyLabel}>Key: {keyName}</Text>
+          {keyName !== "" && <Text className={styles.keyLabel}>Key: {keyName}</Text>}
           <Text style={{ fontSize: '11px', color: tokens.colorNeutralForeground3 }}>
             Size: {value.length} bytes
             {tableName && ` • Table: ${tableName}`}
@@ -509,7 +498,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
         </div>
       </div>
       
-      <div className={styles.editorContainer}>
+      <div data-testid="value-viewer-editor" className={styles.editorContainer}>
         {effectiveContentType === 'merkletree' && tableName === CCF_INTERNAL_TREE_TABLE ? (
           <MerkleTreeGraph value={value} />
         ) : (

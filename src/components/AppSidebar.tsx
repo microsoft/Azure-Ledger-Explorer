@@ -60,7 +60,6 @@ import { useStats } from '../hooks/use-ccf-data';
 import { useConfig } from '../pages/ConfigPage';
 import { useOpenAIKeyValidation } from '../hooks/use-openai-key-validation';
 import { ConversationSearchDialog } from './ConversationSearchDialog';
-import { isMstEnabled } from '../utils/feature-flags';
 import ccfLogo from '../assets/ccf.svg';
 
 export const APP_SIDEBAR_WIDTH = {
@@ -415,12 +414,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ isDarkMode, onToggleThem
     const map: Record<string, string> = {
       'ledger-verification': '/verification',
       'acl-receipt-verification': '/write-receipt',
+      'mst-receipt-verification': '/mst-receipt',
       'cose-viewer': '/cose-viewer',
     };
-    // MST Receipt Verification is preview-gated; only wire it up when on.
-    if (isMstEnabled()) {
-      map['mst-receipt-verification'] = '/mst-receipt';
-    }
     const target = map[toolValue];
     if (target) navigate(target);
   };
@@ -724,7 +720,6 @@ interface ToolsMenuPopoverProps {
 
 /** The Tools dropdown contents, extracted so it can be reused for collapsed + expanded. */
 const ToolsMenuPopover: React.FC<ToolsMenuPopoverProps> = ({ hasData, onSelect }) => {
-  const mstEnabled = isMstEnabled();
   return (
     <MenuPopover>
       <MenuList>
@@ -742,14 +737,12 @@ const ToolsMenuPopover: React.FC<ToolsMenuPopoverProps> = ({ hasData, onSelect }
         >
           ACL Receipt Verification
         </MenuItem>
-        {mstEnabled && (
-          <MenuItem
-            icon={<DocumentSearchRegular />}
-            onClick={() => onSelect('mst-receipt-verification')}
-          >
-            MST Receipt Verification
-          </MenuItem>
-        )}
+        <MenuItem
+          icon={<DocumentSearchRegular />}
+          onClick={() => onSelect('mst-receipt-verification')}
+        >
+          MST Receipt Verification
+        </MenuItem>
         <MenuItem
           icon={<DocumentSearchRegular />}
           onClick={() => onSelect('cose-viewer')}
