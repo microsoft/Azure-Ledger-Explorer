@@ -8,6 +8,7 @@ import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../m
 import { DATABASE_PATH } from '../constants';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
+import { LedgerChunkV2, MerkleTree, cborArrayToText } from '@microsoft/ccf-ledger-parser';
 
 const log = (...args: unknown[]) => console.warn('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
@@ -101,9 +102,8 @@ const execSQL = (db: SQLiteDB, sql: string, bind?: unknown[]): unknown[] => {
 let db: SQLiteDB;
 
 // Module-level Merkle tree state - persists across insertLedgerFile calls
-// This avoids expensive serialization/deserialization via postMessage
-// Using 'unknown' since the actual MerkleTree type is dynamically imported
-let currentMerkleTree: unknown = null;
+// This avoids expensive serialization/deserialization via postMessage.
+let currentMerkleTree: InstanceType<typeof MerkleTree> | null = null;
 
 initializeSQLite().then((database) => {
   db = database;
@@ -132,9 +132,6 @@ self.onmessage = async (event: MessageEvent) => {
       }
 
       case 'insertLedgerFile': {
-        // Import LedgerChunkV2 dynamically in the worker
-        const { LedgerChunkV2, MerkleTree } = await import('@microsoft/ccf-ledger-parser');
-
         const { filename, fileSize, arrayBuffer, shouldVerify } = payload;
 
         log(`Processing ledger file: ${filename} (${fileSize} bytes), verify: ${shouldVerify !== false}`);
@@ -167,9 +164,8 @@ self.onmessage = async (event: MessageEvent) => {
         const ledgerChunk = new LedgerChunkV2(filename, arrayBuffer);
         
         // Use module-level Merkle tree state (persists across calls, avoids postMessage overhead)
-        // Cast via unknown since the type is dynamically imported
-        const merkleTree = shouldVerify !== false 
-          ? (currentMerkleTree as InstanceType<typeof MerkleTree> | undefined) 
+        const merkleTree = shouldVerify !== false
+          ? (currentMerkleTree ?? undefined)
           : undefined;
 
         // Define type for parsed transactions
@@ -196,9 +192,6 @@ self.onmessage = async (event: MessageEvent) => {
           verificationResult = { verified: false, transactionCount: transactionsToInsert.length };
           updatedTree = merkleTree || new MerkleTree();
         }
-
-        // Import CBOR decoder
-        const { cborArrayToText } = await import('@microsoft/ccf-ledger-parser');
 
         // Collect all data in memory first for bulk insert
         const txBinds: unknown[][] = [];
@@ -252,7 +245,7 @@ self.onmessage = async (event: MessageEvent) => {
 
           transactionCount++;
 
-          if (transactionCount % 1000 === 0) {
+          if (transactionCount % 10000 === 0) {
             log(`Parsed ${transactionCount} transactions...`);
           }
         }
@@ -289,8 +282,9 @@ self.onmessage = async (event: MessageEvent) => {
             txStmt.bind(txBinds[i] as any).step();
             txStmt.reset();
 
-            // Progress logging every 1000 inserts
-            if ((i + 1) % 1000 === 0) {
+            // Progress logging every 25000 inserts (keeps the console useful
+            // for long imports without serialising thousands of postMessage logs)
+            if ((i + 1) % 25000 === 0) {
               log(`Inserted ${i + 1}/${txBinds.length} transactions...`);
             }
           }
@@ -302,7 +296,7 @@ self.onmessage = async (event: MessageEvent) => {
             writeStmt.bind(writeBinds[i] as any).step();
             writeStmt.reset();
 
-            if ((i + 1) % 5000 === 0) {
+            if ((i + 1) % 50000 === 0) {
               log(`Inserted ${i + 1}/${writeBinds.length} writes...`);
             }
           }
@@ -324,8 +318,11 @@ self.onmessage = async (event: MessageEvent) => {
           writeStmt.finalize();
           deleteStmt.finalize();
 
-          // Refresh query-planner statistics so SQLite picks optimal indexes
-          db.exec('ANALYZE');
+          // NOTE: ANALYZE used to run here, once per file. For multi-file
+          // imports that meant N ANALYZE passes over a growing database —
+          // the dominant cost of importing a large MST ledger. The hook
+          // layer now triggers ANALYZE once at the end of a batch via the
+          // 'analyzeDatabase' worker message.
 
           log(`Completed: ${transactionCount} transactions inserted`);
 
@@ -461,6 +458,18 @@ self.onmessage = async (event: MessageEvent) => {
       case 'resetMerkleState': {
         // Reset the module-level Merkle tree state (used when starting a fresh import)
         currentMerkleTree = null;
+        result = { success: true };
+        break;
+      }
+
+      case 'analyzeDatabase': {
+        // Refresh SQLite query-planner statistics. Run once after a batch
+        // of insertLedgerFile calls so the planner picks optimal indexes
+        // for subsequent reads, without paying the N-times cost of doing
+        // it per file during the batch.
+        log('Running ANALYZE to refresh query-planner statistics...');
+        db.exec('ANALYZE');
+        log('ANALYZE complete');
         result = { success: true };
         break;
       }

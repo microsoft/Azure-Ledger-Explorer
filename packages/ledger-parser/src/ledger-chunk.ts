@@ -24,6 +24,11 @@ import {
 } from './merkle-tree';
 import { CCF_INTERNAL_TABLES } from './table-names';
 
+// Reuse a single TextDecoder across all parses. Allocating a new TextDecoder
+// per call (once per map/key/signature) is measurable overhead when parsing
+// large ledgers with hundreds of thousands of writes.
+const TEXT_DECODER = new TextDecoder('utf-8');
+
 /**
  * Parser for CCF LedgerChunkV2 format files.
  * 
@@ -63,22 +68,27 @@ export class LedgerChunkV2 {
     }
 
     try {
-      // Read transaction header
-      const headerBuffer = this.buffer.slice(this.offset, this.offset + LEDGER_CONSTANTS.LEDGER_HEADER_SIZE);
-      const header = this.parseTransactionHeader(new DataView(headerBuffer));
-      this.offset += LEDGER_CONSTANTS.LEDGER_HEADER_SIZE;
+      // Avoid per-transaction ArrayBuffer.slice() copies. The downstream
+      // parsers (parseTransactionHeader/parseGcmHeader/parsePublicDomain)
+      // and calculateTxDigest only read from their inputs, so we can pass
+      // typed-array views directly over the underlying file buffer.
+      const headerStart = this.offset;
+      const headerSize = LEDGER_CONSTANTS.LEDGER_HEADER_SIZE;
+      const headerView = new DataView(this.buffer, headerStart, headerSize);
+      const header = this.parseTransactionHeader(headerView);
+      this.offset += headerSize;
 
-      // Read the entire transaction into memory
-      const txBuffer = this.buffer.slice(this.offset, this.offset + Number(header.size));
-      const txView = new DataView(txBuffer);
-      this.offset += Number(header.size);      
+      const txStart = this.offset;
+      const txSize = Number(header.size);
+      const txView = new DataView(this.buffer, txStart, txSize);
+      this.offset += txSize;
 
       let txOffset = 0;
 
       // Read GCM header
       const gcmHeaderSize = LEDGER_CONSTANTS.GCM_SIZE_IV + LEDGER_CONSTANTS.GCM_SIZE_TAG;
-      const gcmHeaderBuffer = txBuffer.slice(txOffset, txOffset + gcmHeaderSize);
-      const gcmHeader = this.parseGcmHeader(new DataView(gcmHeaderBuffer));
+      const gcmHeaderView = new DataView(this.buffer, txStart + txOffset, gcmHeaderSize);
+      const gcmHeader = this.parseGcmHeader(gcmHeaderView);
       txOffset += gcmHeaderSize;
 
       // Read public domain size
@@ -86,14 +96,15 @@ export class LedgerChunkV2 {
       txOffset += LEDGER_CONSTANTS.LEDGER_DOMAIN_SIZE;
 
       // Read public domain
-      const publicDomainBuffer = txBuffer.slice(txOffset, txOffset + publicDomainSize);
-      const publicDomain = this.parsePublicDomain(new DataView(publicDomainBuffer), publicDomainSize);
+      const publicDomainView = new DataView(this.buffer, txStart + txOffset, publicDomainSize);
+      const publicDomain = this.parsePublicDomain(publicDomainView, publicDomainSize);
       txOffset += publicDomainSize;
 
-      // Calculate transaction digest
+      // Calculate transaction digest using Uint8Array views over the same
+      // backing buffer (no copy).
       const txDigest = await this.calculateTxDigest(
-        new Uint8Array(headerBuffer),
-        new Uint8Array(txBuffer),
+        new Uint8Array(this.buffer, headerStart, headerSize),
+        new Uint8Array(this.buffer, txStart, txSize),
         publicDomain.commitEvidenceDigest,
         publicDomain.claimsDigest
       );
@@ -177,7 +188,7 @@ export class LedgerChunkV2 {
       const mapNameSize = Number(view.getBigUint64(offset, true));
       offset += 8;
 
-      const mapName = new TextDecoder().decode(
+      const mapName = TEXT_DECODER.decode(
         new Uint8Array(view.buffer, view.byteOffset + offset, mapNameSize)
       );
       offset += mapNameSize;
@@ -200,7 +211,7 @@ export class LedgerChunkV2 {
         const keySize = Number(view.getBigUint64(offset, true));
         offset += 8;
 
-        const key = new TextDecoder().decode(
+        const key = TEXT_DECODER.decode(
           new Uint8Array(view.buffer, view.byteOffset + offset, keySize)
         );
         offset += keySize;
@@ -227,7 +238,7 @@ export class LedgerChunkV2 {
         const keySize = Number(view.getBigUint64(offset, true));
         offset += 8;
 
-        const key = new TextDecoder().decode(
+        const key = TEXT_DECODER.decode(
           new Uint8Array(view.buffer, view.byteOffset + offset, keySize)
         );
         offset += keySize;
@@ -378,7 +389,7 @@ export class LedgerChunkV2 {
 
         if (signatureWrite && signatureWrite.value.length > 0) {
           try {
-            const signatureJson = new TextDecoder().decode(signatureWrite.value);
+            const signatureJson = TEXT_DECODER.decode(signatureWrite.value);
             const signatureData = JSON.parse(signatureJson) as { root?: string };
             
             if (signatureData.root) {

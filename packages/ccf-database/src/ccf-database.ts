@@ -145,6 +145,15 @@ export class CCFDatabase {
   }
 
   /**
+   * Refresh SQLite query-planner statistics (runs ANALYZE).
+   * Call once after a batch of ledger-file imports completes.
+   */
+  async analyzeDatabase(): Promise<void> {
+    if (!this.client) throw new Error('Database not initialized');
+    await this.client.analyzeDatabase();
+  }
+
+  /**
    * Close the database connection.
    */
   async close(): Promise<void> {
