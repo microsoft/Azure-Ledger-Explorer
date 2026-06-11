@@ -94,6 +94,15 @@ export default defineConfig({
   worker: {
     format: 'es'
   },
+  build: {
+    // Emit separate .map files for every chunk (main bundle, workers, css).
+    // Browsers only fetch them when DevTools is open with sourcemaps enabled,
+    // so there is no runtime cost for ordinary users. Lets engineers step
+    // through original TypeScript (parser, DB worker, hooks) and gives App
+    // Insights symbolicated stack traces. Safe because the project is fully
+    // open source and the workspace packages already emit TS sourcemaps.
+    sourcemap: true,
+  },
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm']
   },

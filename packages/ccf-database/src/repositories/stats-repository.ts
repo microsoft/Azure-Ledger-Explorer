@@ -36,7 +36,21 @@ export class StatsRepository extends BaseRepository {
   }
 
   /**
-   * Get enhanced database statistics with additional metrics
+   * Get enhanced database statistics with additional metrics.
+   *
+   * Performance notes — the `table_count` and `unique_key_count` subqueries
+   * historically dominated this query on large databases. Two changes were
+   * made to make them index-friendly:
+   *
+   * 1. Push `DISTINCT` down to each side of the `UNION` so SQLite can
+   *    satisfy each branch with an index-only scan against
+   *    `idx_kv_writes_map_key` / `idx_kv_deletes_map_key` (returning O(distinct
+   *    maps) rows instead of O(total rows)). The outer `UNION` then merges
+   *    two already-small sets.
+   * 2. Replace `COUNT(DISTINCT key_name || map_name)` with a `DISTINCT
+   *    map_name, key_name` projection. The string concat blocked the planner
+   *    from using the `(map_name, key_name)` covering index; the tuple form
+   *    matches the index order directly.
    */
   async getEnhancedStats(): Promise<EnhancedStats> {
     const result = await this.exec(`
@@ -46,15 +60,15 @@ export class StatsRepository extends BaseRepository {
         (SELECT COUNT(*) FROM kv_writes) as write_count,
         (SELECT COUNT(*) FROM kv_deletes) as delete_count,
         (SELECT COUNT(*) FROM kv_writes WHERE map_name LIKE '%confidentialledger.logs%') as user_write_count,
-        (SELECT COUNT(DISTINCT map_name) FROM (
-          SELECT map_name FROM kv_writes
+        (SELECT COUNT(*) FROM (
+          SELECT DISTINCT map_name FROM kv_writes
           UNION
-          SELECT map_name FROM kv_deletes
+          SELECT DISTINCT map_name FROM kv_deletes
         )) as table_count,
-        (SELECT COUNT(DISTINCT key_name || map_name) FROM (
-          SELECT key_name, map_name FROM kv_writes
+        (SELECT COUNT(*) FROM (
+          SELECT DISTINCT map_name, key_name FROM kv_writes
           UNION
-          SELECT key_name, map_name FROM kv_deletes
+          SELECT DISTINCT map_name, key_name FROM kv_deletes
         )) as unique_key_count,
         (SELECT AVG(size) FROM transactions) as avg_transaction_size,
         (SELECT MAX(size) FROM transactions) as largest_transaction_size,

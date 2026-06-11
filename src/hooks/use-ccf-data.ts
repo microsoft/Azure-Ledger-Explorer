@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query';
 import { useCallback, useSyncExternalStore } from 'react';
 import { CCFDatabase, DATABASE_FILENAME } from '@microsoft/ccf-database';
 import { getStorageQuota, checkStorageCapacity, estimateDatabaseSize } from '../utils/storage-quota';
@@ -277,8 +277,47 @@ export const useEnhancedStats = () => {
 /**
  * Hook to upload and parse a ledger file
  */
-export const useUploadLedgerFile = () => {
+/**
+ * Invalidate every query whose data may have changed after a ledger import.
+ *
+ * Hoisted into a helper so the batch-upload path in `useFileDrop.handleFiles`
+ * can call this once at the end of a multi-file import instead of paying the
+ * full invalidation cost (most importantly the `enhancedStats` full-table
+ * scan) after every single file.
+ *
+ * Exported for unit tests; not part of the public hook API.
+ */
+export const invalidateAfterImport = (queryClient: QueryClient): void => {
+  queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
+  queryClient.invalidateQueries({ queryKey: queryKeys.stats });
+  queryClient.invalidateQueries({ queryKey: queryKeys.enhancedStats });
+  queryClient.invalidateQueries({ queryKey: queryKeys.ccfTables });
+  // Invalidate all transaction-related queries
+  queryClient.invalidateQueries({ predicate: (query) => 
+    Array.isArray(query.queryKey) && 
+    (query.queryKey[0] === 'transactions' || 
+     query.queryKey[0] === 'fileTransactions' || 
+     query.queryKey[0] === 'fileTransactionsCount' ||
+     query.queryKey[0] === 'transactionById')
+  });
+  // Invalidate all search queries
+  queryClient.invalidateQueries({ predicate: (query) => 
+    Array.isArray(query.queryKey) && (query.queryKey[0] === 'search' || query.queryKey[0] === 'searchByKeyOrValue')
+  });
+};
+
+/**
+ * Mutation hook to upload + parse a single ledger file.
+ *
+ * By default, after a successful upload this hook invalidates every query
+ * affected by an import. Callers that drive batch imports (such as
+ * `useFileDrop.handleFiles`) should pass `{ invalidateOnSuccess: false }` and
+ * call `invalidateAfterImport` once at the end of the batch to avoid the
+ * O(files * queries) refetch storm.
+ */
+export const useUploadLedgerFile = (options?: { invalidateOnSuccess?: boolean }) => {
   const queryClient = useQueryClient();
+  const invalidateOnSuccess = options?.invalidateOnSuccess !== false;
 
   return useMutation({
     mutationFn: async (params: { 
@@ -303,24 +342,10 @@ export const useUploadLedgerFile = () => {
     onSuccess: () => {
       // Track file upload
       trackEvent(TelemetryEvents.FILE_UPLOADED);
-      
-      // Final comprehensive invalidation after upload completes
-      queryClient.invalidateQueries({ queryKey: queryKeys.ledgerFiles });
-      queryClient.invalidateQueries({ queryKey: queryKeys.stats });
-      queryClient.invalidateQueries({ queryKey: queryKeys.enhancedStats });
-      queryClient.invalidateQueries({ queryKey: queryKeys.ccfTables });
-      // Invalidate all transaction-related queries
-      queryClient.invalidateQueries({ predicate: (query) => 
-        Array.isArray(query.queryKey) && 
-        (query.queryKey[0] === 'transactions' || 
-         query.queryKey[0] === 'fileTransactions' || 
-         query.queryKey[0] === 'fileTransactionsCount' ||
-         query.queryKey[0] === 'transactionById')
-      });
-      // Invalidate all search queries
-      queryClient.invalidateQueries({ predicate: (query) => 
-        Array.isArray(query.queryKey) && (query.queryKey[0] === 'search' || query.queryKey[0] === 'searchByKeyOrValue')
-      });
+
+      if (invalidateOnSuccess) {
+        invalidateAfterImport(queryClient);
+      }
     },
     onError: (error) => {
       console.error('Failed to upload and parse ledger file:', error);
@@ -449,7 +474,10 @@ function getUploadProgressSnapshot() {
  * Uses shared state so upload progress is visible across all components
  */
 export const useFileDrop = () => {
-  const uploadMutation = useUploadLedgerFile();
+  const queryClient = useQueryClient();
+  // Suppress per-file invalidation; the batch fires one invalidation at the
+  // end of `handleFiles` instead.
+  const uploadMutation = useUploadLedgerFile({ invalidateOnSuccess: false });
   
   // Subscribe to shared upload progress state
   const uploadProgress = useSyncExternalStore(
@@ -467,66 +495,73 @@ export const useFileDrop = () => {
     const allFiles = fileArray.map(f => f.name);
     const completedFiles = new Set<string>();
     const shouldVerify = options?.shouldVerify !== false;
-    
+
+    if (totalFiles === 0) {
+      // Nothing to import — no state changed, no invalidation needed.
+      return;
+    }
+
     // Reset Merkle tree state before starting a new import sequence
     // This ensures verification starts from a clean state
-    if (shouldVerify && totalFiles > 0) {
+    if (shouldVerify) {
       const db = await getDatabase();
       await db.resetMerkleState();
     }
-    
+
     // Show all files immediately in the pending state
-    if (totalFiles > 0) {
-      setSharedUploadProgress({
-        currentFileIndex: 0,
-        totalFiles,
-        currentFileName: '',
-        allFiles,
-        completedFiles: new Set(),
-        processingFile: null,
-      });
-    }
-    
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i];
-      try {
-        // Update progress before processing
-        setSharedUploadProgress({
-          currentFileIndex: i + 1,
-          totalFiles,
-          currentFileName: file.name,
-          allFiles,
-          completedFiles: new Set(completedFiles),
-          processingFile: file.name,
-        });
-        
-        // Worker maintains Merkle tree state internally across calls
-        await uploadMutation.mutateAsync({
-          file,
-          shouldVerify,
-        });
-        
-        // Mark as completed
-        completedFiles.add(file.name);
-        setSharedUploadProgress({
-          currentFileIndex: i + 1,
-          totalFiles,
-          currentFileName: file.name,
-          allFiles,
-          completedFiles: new Set(completedFiles),
-          processingFile: null,
-        });
-      } catch (error) {
-        console.error(`Failed to process file ${file.name}:`, error);
-        // Clear progress on error
-        setSharedUploadProgress(null);
-        // Re-throw to stop processing more files if there's an error
-        throw error;
+    setSharedUploadProgress({
+      currentFileIndex: 0,
+      totalFiles,
+      currentFileName: '',
+      allFiles,
+      completedFiles: new Set(),
+      processingFile: null,
+    });
+
+    try {
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        try {
+          // Update progress before processing
+          setSharedUploadProgress({
+            currentFileIndex: i + 1,
+            totalFiles,
+            currentFileName: file.name,
+            allFiles,
+            completedFiles: new Set(completedFiles),
+            processingFile: file.name,
+          });
+
+          // Worker maintains Merkle tree state internally across calls
+          await uploadMutation.mutateAsync({
+            file,
+            shouldVerify,
+          });
+
+          // Mark as completed
+          completedFiles.add(file.name);
+          setSharedUploadProgress({
+            currentFileIndex: i + 1,
+            totalFiles,
+            currentFileName: file.name,
+            allFiles,
+            completedFiles: new Set(completedFiles),
+            processingFile: null,
+          });
+        } catch (error) {
+          console.error(`Failed to process file ${file.name}:`, error);
+          // Re-throw to stop processing more files if there's an error.
+          // The finally block below will still clear progress and invalidate
+          // queries so the UI reflects any partially-imported files.
+          throw error;
+        }
       }
+    } finally {
+      setSharedUploadProgress(null);
+      // Batch invalidation: even if the import failed partway through,
+      // some files may have committed and the UI must reflect that state.
+      invalidateAfterImport(queryClient);
     }
-    
-    // Clear progress when all done
-    setSharedUploadProgress(null);
 
     // Refresh SQLite query-planner statistics once after the whole batch.
     // Previously the worker ran ANALYZE per file; for a 50-file MST drop
@@ -543,7 +578,7 @@ export const useFileDrop = () => {
         console.warn('Failed to refresh SQLite query-planner statistics:', analyzeErr);
       }
     }
-  }, [uploadMutation]);
+  }, [uploadMutation, queryClient]);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
