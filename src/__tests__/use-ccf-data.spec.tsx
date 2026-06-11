@@ -17,6 +17,7 @@ const dbSpies = vi.hoisted(() => ({
   initialize: vi.fn().mockResolvedValue(undefined),
   resetMerkleState: vi.fn().mockResolvedValue(undefined),
   insertLedgerFileWithData: vi.fn().mockResolvedValue({ fileId: 1, transactionsInserted: 1 }),
+  analyzeDatabase: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@microsoft/ccf-database', () => {
@@ -26,6 +27,7 @@ vi.mock('@microsoft/ccf-database', () => {
       initialize = dbSpies.initialize;
       resetMerkleState = dbSpies.resetMerkleState;
       insertLedgerFileWithData = dbSpies.insertLedgerFileWithData;
+      analyzeDatabase = dbSpies.analyzeDatabase;
     },
   };
 });
@@ -75,6 +77,7 @@ beforeEach(() => {
   dbSpies.initialize.mockClear();
   dbSpies.resetMerkleState.mockClear();
   dbSpies.insertLedgerFileWithData.mockClear();
+  dbSpies.analyzeDatabase.mockClear();
   dbSpies.insertLedgerFileWithData.mockResolvedValue({ fileId: 1, transactionsInserted: 1 });
 });
 

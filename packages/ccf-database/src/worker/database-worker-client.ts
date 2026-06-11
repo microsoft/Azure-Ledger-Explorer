@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -198,6 +198,16 @@ export class DatabaseWorkerClient {
    */
   async resetMerkleState(): Promise<void> {
     await this.sendMessage('resetMerkleState', {});
+  }
+
+  /**
+   * Refresh SQLite query-planner statistics (runs ANALYZE).
+   * Call this once after a batch of insertLedgerFile() calls completes,
+   * so subsequent queries pick optimal indexes without paying ANALYZE
+   * per file during the import loop.
+   */
+  async analyzeDatabase(): Promise<void> {
+    await this.sendMessage('analyzeDatabase', {});
   }
 
   /**

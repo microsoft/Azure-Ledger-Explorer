@@ -562,6 +562,22 @@ export const useFileDrop = () => {
       // some files may have committed and the UI must reflect that state.
       invalidateAfterImport(queryClient);
     }
+
+    // Refresh SQLite query-planner statistics once after the whole batch.
+    // Previously the worker ran ANALYZE per file; for a 50-file MST drop
+    // that's 50 ANALYZE passes over a growing DB. One pass at the end is
+    // both correct and dramatically faster.
+    if (totalFiles > 0) {
+      try {
+        const db = await getDatabase();
+        await db.analyzeDatabase();
+      } catch (analyzeErr) {
+        // ANALYZE is a query-planner optimization, not correctness-critical.
+        // Log and continue — queries will still work, just possibly with
+        // less optimal plans until ANALYZE next runs.
+        console.warn('Failed to refresh SQLite query-planner statistics:', analyzeErr);
+      }
+    }
   }, [uploadMutation, queryClient]);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLElement>) => {
