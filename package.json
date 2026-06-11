@@ -28,7 +28,7 @@
     "@fluentui/react-components": "^9.72.2",
     "@fluentui/react-icons": "^2.0.326",
     "@microsoft/applicationinsights-react-js": "^19.3.8",
-    "@microsoft/applicationinsights-web": "^3.3.11",
+    "@microsoft/applicationinsights-web": "^3.4.1",
     "@microsoft/ccf-database": "*",
     "@microsoft/ccf-ledger-parser": "*",
     "@monaco-editor/react": "^4.7.0",
