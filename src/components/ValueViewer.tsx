@@ -463,10 +463,10 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
+    <div data-testid="value-viewer" className={styles.container}>
+      <div data-testid="value-viewer-header" className={styles.header}>
         <div className={styles.keyInfo}>
-          <Text className={styles.keyLabel}>Key: {keyName}</Text>
+          {keyName !== "" && <Text className={styles.keyLabel}>Key: {keyName}</Text>}
           <Text style={{ fontSize: '11px', color: tokens.colorNeutralForeground3 }}>
             Size: {value.length} bytes
             {tableName && ` • Table: ${tableName}`}
@@ -498,7 +498,7 @@ export const ValueViewer: React.FC<ValueViewerProps> = ({ keyName, value, tableN
         </div>
       </div>
       
-      <div className={styles.editorContainer}>
+      <div data-testid="value-viewer-editor" className={styles.editorContainer}>
         {effectiveContentType === 'merkletree' && tableName === CCF_INTERNAL_TREE_TABLE ? (
           <MerkleTreeGraph value={value} />
         ) : (

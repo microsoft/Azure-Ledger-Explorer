@@ -1182,6 +1182,7 @@ const TablesPage: React.FC = () => {
                                 <SearchBox
                                     placeholder="Search keys and values..."
                                     value={searchQuery}
+                                    data-testid="table-search-box"
                                     onChange={(_, data) => handleSearchChange(data?.value || '')}
                                 />
                             </div>
@@ -1371,6 +1372,7 @@ const TablesPage: React.FC = () => {
                                                                         <Button
                                                                             appearance="outline"
                                                                             size="small"
+                                                                            data-testid={`details-button-${kv.transactionId}`}
                                                                             onClick={() => handleTransactionSelect(kv.transactionId)}
                                                                         >
                                                                             <span>Details</span> <ChevronRightRegular />
