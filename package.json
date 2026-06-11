@@ -23,7 +23,7 @@
     "test:parser": "npm run test -w @microsoft/ccf-ledger-parser"
   },
   "dependencies": {
-    "@azure-rest/confidential-ledger": "1.1.2-beta.3",
+    "@azure-rest/confidential-ledger": "1.1.2-beta.4",
     "@azure/storage-file-share": "^12.30.0",
     "@fluentui/react-components": "^9.72.2",
     "@fluentui/react-icons": "^2.0.326",
