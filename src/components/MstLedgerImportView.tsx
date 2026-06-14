@@ -130,7 +130,7 @@ interface DownloadMstFilesResult {
 }
 
 export const useDownloadMstFiles = (): DownloadMstFilesResult => {
-    const { handleFiles } = useFileDrop();
+    const { handleFilesStream } = useFileDrop();
 
     const downloadFiles = async (targetDomain?: string, options?: { shouldVerify?: boolean }): Promise<void> => {
         const domainToUse = targetDomain;
@@ -139,8 +139,17 @@ export const useDownloadMstFiles = (): DownloadMstFilesResult => {
         }
         const fileShareService = new MstFilesService();
         await fileShareService.initialize(domainToUse);
-        const { files: downloadedFiles } = await fileShareService.downloadAllLedgerFiles();
-        await handleFiles(downloadedFiles, { shouldVerify: options?.shouldVerify ?? false });
+        // List first so we know totalFiles up front for the progress UI.
+        const ledgerFiles = await fileShareService.listLedgerFiles();
+        const filenames = ledgerFiles.map(f => f.filename);
+
+        async function* fileSource(): AsyncGenerator<File> {
+            for await (const { file } of fileShareService.streamSelectedFiles(filenames)) {
+                yield file;
+            }
+        }
+
+        await handleFilesStream(fileSource(), filenames.length, filenames, { shouldVerify: options?.shouldVerify ?? false });
     };
 
     return { 
@@ -164,7 +173,7 @@ export const MstLedgerImportView: React.FC<MstLedgerImportViewProps> = ({ onImpo
     const [downloadedLedgerFiles, setDownloadedFiles] = useState<LedgerFileInfo[]>([]);
     const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
     const fileShareService = React.useMemo(() => new MstFilesService(), []);
-    const { handleFiles } = useFileDrop();
+    const { handleFilesStream } = useFileDrop();
 
     const hasExistingData = existingLedgerFiles && existingLedgerFiles.length > 0;
 
@@ -238,25 +247,39 @@ export const MstLedgerImportView: React.FC<MstLedgerImportViewProps> = ({ onImpo
             }
 
             const filenames = selectedFiles.map(f => f.filename);
-            const { files: downloadedFiles, filesDownloaded } = await fileShareService.downloadSelectedFiles(
-                filenames,
-                (progress) => setDownloadProgress(progress)
-            );
+            // Track which files actually completed download for the summary
+            // panel. We collect this as a side-effect inside the generator so
+            // the streaming path doesn't have to round-trip through an array.
+            const filesDownloaded: LedgerFileInfo[] = [];
 
-            if (downloadedFiles.length > 0) {
-                // Import files - shouldVerify controls inline merkle verification during parsing
-                await handleFiles(downloadedFiles, { shouldVerify: autoVerify });
+            // Stream the downloads: each `await for` step kicks off the next
+            // fetch only after the previous file has been handed to the
+            // indexing worker. Peak memory therefore scales with one chunk
+            // (~60 MB max for esrp-cts-cp) instead of the whole batch
+            // (~1.47 GB) as before.
+            async function* fileSource(): AsyncGenerator<File> {
+                for await (const { file, info } of fileShareService.streamSelectedFiles(
+                    filenames,
+                    (progress) => setDownloadProgress(progress),
+                )) {
+                    filesDownloaded.push(info);
+                    yield file;
+                }
+            }
 
+            await handleFilesStream(fileSource(), filenames.length, filenames, { shouldVerify: autoVerify });
+
+            if (filesDownloaded.length > 0) {
                 if (ledgerDomain) {
                     storeLedgerDomain(ledgerDomain, 'MST');
                 }
 
                 setFiles([]);
                 setDownloadedFiles(filesDownloaded);
-                
+
                 // Clear saved verification progress
                 verificationService.clearSavedProgress();
-                
+
                 // If autoVerify is enabled, start the verification service to verify all chunks
                 if (autoVerify) {
                     // Start verification without awaiting - let it run in background
