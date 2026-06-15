@@ -19,6 +19,22 @@ import {
  */
 export class KVRepository extends BaseRepository {
   /**
+   * Per-instance cache of append-only detection results, keyed by map_name.
+   *
+   * Safe because the only transition that can break correctness — going from
+   * "true" (no deletes / no duplicates) to "false" — requires a write into
+   * kv_writes or kv_deletes. CCFDatabase explicitly calls
+   * `invalidateAppendOnlyCache()` on every write path
+   * (insertLedgerFileWithData, clearAllData, deleteAndRecreateDatabase).
+   *
+   * Deletes from kv_writes/kv_deletes (e.g., FileRepository.delete) can only
+   * shift the answer the other way (false → true), which would cost us a
+   * little perf via the heavy CTE but never returns wrong rows. Acceptable
+   * staleness; user refresh / next import clears it.
+   */
+  private appendOnlyCache = new Map<string, boolean>();
+
+  /**
    * Get all distinct CCF table names (map names)
    */
   async getTables(): Promise<string[]> {
@@ -107,16 +123,39 @@ export class KVRepository extends BaseRepository {
    * fast path: the map has no kv_deletes and no duplicate key_names (so every
    * row IS its own latest version).
    *
-   * Always run before each query rather than cached so it stays correct across
-   * additional ledger imports during the session.
+   * Result is cached per-instance in `appendOnlyCache`. The cache is cleared
+   * by `invalidateAppendOnlyCache()`, which CCFDatabase calls on every write
+   * path. See the field comment for the correctness argument.
    */
   async isAppendOnlyMap(mapName: string): Promise<boolean> {
+    const cached = this.appendOnlyCache.get(mapName);
+    if (cached !== undefined) {
+      return cached;
+    }
+
     const { sql, params } = buildAppendOnlyDetectionQuery(mapName);
     const result = await this.exec(sql, params);
     const row = result[0] ?? {};
     const hasDeletes = (row.has_deletes as number | undefined) ?? 0;
     const hasDuplicates = (row.has_duplicate_keys as number | undefined) ?? 0;
-    return hasDeletes === 0 && hasDuplicates === 0;
+    const isAppendOnly = hasDeletes === 0 && hasDuplicates === 0;
+
+    this.appendOnlyCache.set(mapName, isAppendOnly);
+    return isAppendOnly;
+  }
+
+  /**
+   * Clear the cached append-only detection result for a specific map, or for
+   * all maps when called with no argument. Must be invoked by any code path
+   * that inserts into or clears `kv_writes` / `kv_deletes`, otherwise the
+   * fast path may skip dedup on a map that has just become non-append-only.
+   */
+  invalidateAppendOnlyCache(mapName?: string): void {
+    if (mapName === undefined) {
+      this.appendOnlyCache.clear();
+    } else {
+      this.appendOnlyCache.delete(mapName);
+    }
   }
 
   /**

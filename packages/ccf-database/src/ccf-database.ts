@@ -91,7 +91,12 @@ export class CCFDatabase {
     options?: InsertLedgerFileOptions
   ): Promise<InsertLedgerFileResult> {
     if (!this.client) throw new Error('Database not initialized');
-    return await this.client.insertLedgerFile(filename, fileSize, arrayBuffer, options);
+    const result = await this.client.insertLedgerFile(filename, fileSize, arrayBuffer, options);
+    // Newly-inserted rows may have introduced duplicate keys or deletes
+    // into a previously append-only map; drop the detection cache so the
+    // next read path re-detects against current state.
+    this._kv?.invalidateAppendOnlyCache();
+    return result;
   }
 
   /**
@@ -121,6 +126,7 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
     console.warn('[CCFDatabase] Deleting and recreating entire database - all data will be lost!');
     await this.client.deleteDatabase();
+    this._kv?.invalidateAppendOnlyCache();
   }
 
   /**
@@ -132,6 +138,7 @@ export class CCFDatabase {
     if (!this.client) throw new Error('Database not initialized');
     console.warn('[CCFDatabase] Clearing all data from tables');
     await this.client.clearAllData();
+    this._kv?.invalidateAppendOnlyCache();
   }
 
   /**

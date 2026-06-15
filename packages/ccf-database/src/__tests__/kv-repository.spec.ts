@@ -350,3 +350,142 @@ describe('KVRepository.isAppendOnlyMap', () => {
     // documented in the helper. Querying an empty table is a no-op anyway.
   });
 });
+
+// ---------------------------------------------------------------------------
+// Detection caching — avoid re-running the EXISTS pair on every page click
+// ---------------------------------------------------------------------------
+
+describe('KVRepository.isAppendOnlyMap — caching', () => {
+  it('runs the detection query only once per map across repeated calls', async () => {
+    let detectionCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      return [];
+    });
+
+    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
+    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
+    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
+
+    expect(detectionCalls).toBe(1);
+  });
+
+  it('caches independently per map name', async () => {
+    let detectionCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      return [];
+    });
+
+    await repo.isAppendOnlyMap('a');
+    await repo.isAppendOnlyMap('b');
+    await repo.isAppendOnlyMap('a');
+    await repo.isAppendOnlyMap('b');
+
+    expect(detectionCalls).toBe(2);
+  });
+
+  it('caches the false result too', async () => {
+    let detectionCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 1, has_duplicate_keys: 0 }];
+      }
+      return [];
+    });
+
+    expect(await repo.isAppendOnlyMap('m')).toBe(false);
+    expect(await repo.isAppendOnlyMap('m')).toBe(false);
+
+    expect(detectionCalls).toBe(1);
+  });
+
+  it('invalidateAppendOnlyCache() with no arg clears every entry', async () => {
+    let detectionCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      return [];
+    });
+
+    await repo.isAppendOnlyMap('a');
+    await repo.isAppendOnlyMap('b');
+    expect(detectionCalls).toBe(2);
+
+    repo.invalidateAppendOnlyCache();
+
+    await repo.isAppendOnlyMap('a');
+    await repo.isAppendOnlyMap('b');
+    expect(detectionCalls).toBe(4);
+  });
+
+  it('invalidateAppendOnlyCache(mapName) clears only that map', async () => {
+    let detectionCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      return [];
+    });
+
+    await repo.isAppendOnlyMap('a');
+    await repo.isAppendOnlyMap('b');
+    expect(detectionCalls).toBe(2);
+
+    repo.invalidateAppendOnlyCache('a');
+
+    await repo.isAppendOnlyMap('a'); // re-runs
+    await repo.isAppendOnlyMap('b'); // still cached
+    expect(detectionCalls).toBe(3);
+  });
+
+  it('repeated getTableLatestState calls on the same map avoid detection queries after the first', async () => {
+    let detectionCalls = 0;
+    let pageCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      pageCalls += 1;
+      return [];
+    });
+
+    await repo.getTableLatestState('public:scitt.entry', 100, 0);
+    await repo.getTableLatestState('public:scitt.entry', 100, 100);
+    await repo.getTableLatestState('public:scitt.entry', 100, 200);
+
+    expect(detectionCalls).toBe(1);
+    expect(pageCalls).toBe(3);
+  });
+
+  it('repeated getTableLatestStateCount calls on the same map avoid detection queries after the first', async () => {
+    let detectionCalls = 0;
+    let countCalls = 0;
+    const { repo } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        detectionCalls += 1;
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      countCalls += 1;
+      return [{ count: 42 }];
+    });
+
+    await repo.getTableLatestStateCount('public:scitt.entry');
+    await repo.getTableLatestStateCount('public:scitt.entry');
+    await repo.getTableLatestStateCount('public:scitt.entry');
+
+    expect(detectionCalls).toBe(1);
+    expect(countCalls).toBe(3);
+  });
+});
