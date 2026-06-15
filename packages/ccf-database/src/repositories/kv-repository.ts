@@ -9,6 +9,9 @@ import type { TableLatestStateSortColumn, TableLatestStateSortDirection } from '
 import {
   buildTableLatestStateCountQuery,
   buildTableLatestStateQuery,
+  buildAppendOnlyLatestStateQuery,
+  buildAppendOnlyLatestStateCountQuery,
+  buildAppendOnlyDetectionQuery,
 } from '../queries/table-latest-state-queries';
 
 /**
@@ -100,6 +103,23 @@ export class KVRepository extends BaseRepository {
   }
 
   /**
+   * Returns true when getTableLatestState can route through the append-only
+   * fast path: the map has no kv_deletes and no duplicate key_names (so every
+   * row IS its own latest version).
+   *
+   * Always run before each query rather than cached so it stays correct across
+   * additional ledger imports during the session.
+   */
+  async isAppendOnlyMap(mapName: string): Promise<boolean> {
+    const { sql, params } = buildAppendOnlyDetectionQuery(mapName);
+    const result = await this.exec(sql, params);
+    const row = result[0] ?? {};
+    const hasDeletes = (row.has_deletes as number | undefined) ?? 0;
+    const hasDuplicates = (row.has_duplicate_keys as number | undefined) ?? 0;
+    return hasDeletes === 0 && hasDuplicates === 0;
+  }
+
+  /**
    * Get the latest state of all keys in a table (most recent version only)
    */
   async getTableLatestState(
@@ -110,14 +130,30 @@ export class KVRepository extends BaseRepository {
     sortColumn: TableLatestStateSortColumn = 'sequence',
     sortDirection: TableLatestStateSortDirection = 'asc'
   ): Promise<TableKeyValue[]> {
-    const { sql, params } = buildTableLatestStateQuery({
-      mapName,
-      limit,
-      offset,
-      searchQuery,
-      sortColumn,
-      sortDirection,
-    });
+    const hasSearch = !!(searchQuery && searchQuery.trim());
+    const fastPathEligible = !hasSearch && sortColumn !== 'value';
+
+    let sql: string;
+    let params: unknown[];
+
+    if (fastPathEligible && (await this.isAppendOnlyMap(mapName))) {
+      ({ sql, params } = buildAppendOnlyLatestStateQuery({
+        mapName,
+        limit,
+        offset,
+        sortColumn,
+        sortDirection,
+      }));
+    } else {
+      ({ sql, params } = buildTableLatestStateQuery({
+        mapName,
+        limit,
+        offset,
+        searchQuery,
+        sortColumn,
+        sortDirection,
+      }));
+    }
 
     const result = await this.exec(sql, params);
 
@@ -135,7 +171,17 @@ export class KVRepository extends BaseRepository {
    * Get count of keys in a table's latest state
    */
   async getTableLatestStateCount(mapName: string, searchQuery?: string): Promise<number> {
-    const { sql, params } = buildTableLatestStateCountQuery({ mapName, searchQuery });
+    const hasSearch = !!(searchQuery && searchQuery.trim());
+
+    let sql: string;
+    let params: unknown[];
+
+    if (!hasSearch && (await this.isAppendOnlyMap(mapName))) {
+      ({ sql, params } = buildAppendOnlyLatestStateCountQuery({ mapName }));
+    } else {
+      ({ sql, params } = buildTableLatestStateCountQuery({ mapName, searchQuery }));
+    }
+
     const result = await this.exec(sql, params);
     return (result[0]?.count as number) || 0;
   }
