@@ -46,7 +46,7 @@ import { getDatabaseSchema, TABLE_DESCRIPTIONS, CCF_TABLE_PREFIXES, SCITT_TABLES
 
 const SORTABLE_COLUMNS: TableLatestStateSortColumn[] = ['sequence', 'transactionId', 'keyName', 'value'];
 const DEFAULT_SORT_COLUMN: TableLatestStateSortColumn = 'sequence';
-const DEFAULT_SORT_DIRECTION: TableLatestStateSortDirection = 'asc';
+const DEFAULT_SORT_DIRECTION: TableLatestStateSortDirection = 'desc';
 
 
 
