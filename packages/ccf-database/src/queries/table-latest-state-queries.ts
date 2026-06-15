@@ -266,6 +266,18 @@ export function buildAppendOnlyLatestStateQuery(args: {
   sortColumn: TableLatestStateSortColumn;
   sortDirection: TableLatestStateSortDirection;
 }): { sql: string; params: unknown[] } {
+  // Defensive: the page CTE only joins kv_writes, so it cannot evaluate
+  // sort-by-value (needs value_text in the page tuple to be useful, defeating
+  // the deferred-join optimisation) or sort-by-transactionId (would reference
+  // an unavailable `t.transaction_id`). The caller (KVRepository) is
+  // responsible for not routing those sorts here; we assert it so a future
+  // caller bug fails loudly instead of producing a broken query.
+  if (args.sortColumn === 'value' || args.sortColumn === 'transactionId') {
+    throw new Error(
+      `buildAppendOnlyLatestStateQuery does not support sortColumn=${args.sortColumn}; route through the heavy path instead`
+    );
+  }
+
   // We still want value_text in the result, but only for the page (LIMIT 100).
   // Two-stage: (1) pick the page using just (sequence_no, key_name, version),
   // (2) join back for value_text. For the sequence sort this is index-only.
@@ -286,9 +298,8 @@ export function buildAppendOnlyLatestStateQuery(args: {
       sortDirection: args.sortDirection,
       keyAlias: 'kv_writes',
       sequenceAlias: 'kv_writes',
-      // No transaction_id available at this stage; sort-by-transactionId here
-      // would fall back; the append-only path does not advertise itself for
-      // value sort either (caller decides eligibility).
+      // sortColumn is 'sequence' or 'keyName' at this point (guarded above),
+      // so no transaction/value alias is needed.
     })}
     LIMIT ? OFFSET ?
   `;

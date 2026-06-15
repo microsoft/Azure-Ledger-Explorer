@@ -146,6 +146,30 @@ describe('buildAppendOnlyLatestStateQuery', () => {
     });
     expect(sql).toMatch(/JOIN\s+kv_writes\s+w\s+ON\s+w\.id\s*=\s*p\.id/i);
   });
+
+  it('throws if asked to sort by value (defends against caller misuse)', () => {
+    expect(() =>
+      buildAppendOnlyLatestStateQuery({
+        mapName: 'm',
+        limit: 10,
+        offset: 0,
+        sortColumn: 'value',
+        sortDirection: 'asc',
+      })
+    ).toThrow(/sortColumn=value/);
+  });
+
+  it('throws if asked to sort by transactionId (page CTE has no transactions join)', () => {
+    expect(() =>
+      buildAppendOnlyLatestStateQuery({
+        mapName: 'm',
+        limit: 10,
+        offset: 0,
+        sortColumn: 'transactionId',
+        sortDirection: 'asc',
+      })
+    ).toThrow(/sortColumn=transactionId/);
+  });
 });
 
 describe('buildAppendOnlyLatestStateCountQuery', () => {
@@ -237,6 +261,49 @@ describe('KVRepository.getTableLatestState — routing', () => {
     expect(captured).toHaveLength(1);
     expect(captured[0].sql).not.toMatch(/has_deletes/i);
     expect(inferredCteShape(captured[0].sql)).toBe('heavy');
+  });
+
+  it('does not route to the append-only fast path when sorting by transactionId (the page CTE has no transactions join)', async () => {
+    // Even when detection would say "append-only", a sort-by-transactionId
+    // must use the heavy path because the append-only page CTE only joins
+    // kv_writes and cannot reference t.transaction_id in its ORDER BY.
+    // Without this guard, the previous code emitted SQL that referenced an
+    // out-of-scope alias and failed at runtime.
+    const { repo, captured } = makeRepo(async sql => {
+      if (sql.includes('has_deletes')) {
+        return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+      }
+      return [];
+    });
+
+    await repo.getTableLatestState('m', 100, 0, undefined, 'transactionId', 'asc');
+
+    // Skips detection (sort-by-transactionId is ineligible up front) and
+    // goes directly to the heavy CTE path.
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).not.toMatch(/has_deletes/i);
+    expect(captured[0].sql).not.toMatch(/WITH\s+page\s+AS/i);
+    expect(inferredCteShape(captured[0].sql)).toBe('deferred');
+  });
+
+  it('still routes the protocol-known append-only map to the heavy path when sorting by transactionId', async () => {
+    const { repo, captured } = makeRepo(async () => []);
+
+    await repo.getTableLatestState(
+      'public:scitt.entry',
+      100,
+      0,
+      undefined,
+      'transactionId',
+      'asc'
+    );
+
+    // Even though scitt.entry is in KNOWN_APPEND_ONLY_MAPS, sort-by-transactionId
+    // is ineligible for the fast path. Heavy CTE only — no detection, no page CTE.
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).not.toMatch(/has_deletes/i);
+    expect(captured[0].sql).not.toMatch(/WITH\s+page\s+AS/i);
+    expect(inferredCteShape(captured[0].sql)).toBe('deferred');
   });
 });
 
@@ -365,7 +432,7 @@ describe('KVRepository.isAppendOnlyMap', () => {
     }
   });
 
-  it('returns false on an empty detection result', async () => {
+  it('treats an empty detection result as append-only (both flags default to 0)', async () => {
     const { repo } = makeRepo(async () => []);
     expect(await repo.isAppendOnlyMap('m')).toBe(true); // both default to 0 -> append-only
     // Note: this matches the "empty table also counts as append-only" case;

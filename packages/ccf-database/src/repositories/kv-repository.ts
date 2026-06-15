@@ -175,7 +175,12 @@ export class KVRepository extends BaseRepository {
     sortDirection: TableLatestStateSortDirection = 'asc'
   ): Promise<TableKeyValue[]> {
     const hasSearch = !!(searchQuery && searchQuery.trim());
-    const fastPathEligible = !hasSearch && sortColumn !== 'value';
+    // Fast path requires (a) no search filter (no value_text scan), (b) sort
+    // that the page CTE alone can evaluate. Sort by 'value' needs value_text
+    // which the page CTE doesn't project; sort by 'transactionId' needs the
+    // transactions table which the page CTE doesn't join. Both fall through
+    // to the heavy path.
+    const fastPathEligible = !hasSearch && sortColumn !== 'value' && sortColumn !== 'transactionId';
 
     let sql: string;
     let params: unknown[];
