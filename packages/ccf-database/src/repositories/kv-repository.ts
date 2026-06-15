@@ -15,6 +15,24 @@ import {
 } from '../queries/table-latest-state-queries';
 
 /**
+ * Map names that are guaranteed append-only by CCF protocol design.
+ *
+ * These maps never receive deletes and never overwrite an existing key, so the
+ * `(no kv_deletes) AND (no duplicate key_names)` detection query would always
+ * return true. Hardcoding them lets us skip that ~1-2s EXISTS check on every
+ * `getTableLatestState` / `getTableLatestStateCount` call.
+ *
+ * Only add a map here if you can guarantee it by protocol — runtime detection
+ * remains the safety net for anything not on this list.
+ *
+ * - `public:scitt.entry`: SCITT append-only transparency log; each receipt is
+ *   a new sequence_no with a fresh key, never replaced or deleted.
+ */
+const KNOWN_APPEND_ONLY_MAPS = new Set<string>([
+  'public:scitt.entry',
+]);
+
+/**
  * Repository for key-value (CCF table) operations
  */
 export class KVRepository extends BaseRepository {
@@ -107,10 +125,17 @@ export class KVRepository extends BaseRepository {
    * fast path: the map has no kv_deletes and no duplicate key_names (so every
    * row IS its own latest version).
    *
-   * Always run before each query rather than cached so it stays correct across
-   * additional ledger imports during the session.
+   * For maps listed in `KNOWN_APPEND_ONLY_MAPS`, returns true without hitting
+   * the database — these are append-only by CCF protocol design and the
+   * detection query (~1-2s on large ledgers) would always return true anyway.
+   *
+   * For all other maps, runs the EXISTS-pair detection on every call so we
+   * stay correct across additional ledger imports during the session.
    */
   async isAppendOnlyMap(mapName: string): Promise<boolean> {
+    if (KNOWN_APPEND_ONLY_MAPS.has(mapName)) {
+      return true;
+    }
     const { sql, params } = buildAppendOnlyDetectionQuery(mapName);
     const result = await this.exec(sql, params);
     const row = result[0] ?? {};
