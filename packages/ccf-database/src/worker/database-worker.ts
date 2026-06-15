@@ -13,6 +13,13 @@ import { LedgerChunkV2, MerkleTree, cborArrayToText } from '@microsoft/ccf-ledge
 const log = (...args: unknown[]) => console.warn('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
 
+type Sqlite3Module = Awaited<ReturnType<typeof sqlite3InitModule>>;
+
+// Module-level reference to the sqlite3 module. Set by initializeSQLite() so
+// later message handlers (exportDatabase, deleteDatabase) can reuse the
+// already-initialised module without paying the wasm load cost again.
+let sqlite3Module: Sqlite3Module | undefined;
+
 // Initialize the SQLite worker
 const initializeSQLite = async () => {
   let db: SQLiteDB | undefined;
@@ -23,6 +30,7 @@ const initializeSQLite = async () => {
       print: log,
       printErr: error
     });
+    sqlite3Module = sqlite3;
 
     log('Running SQLite3 version', sqlite3.version.libVersion);
 
@@ -472,6 +480,32 @@ self.onmessage = async (event: MessageEvent) => {
         log('ANALYZE complete');
         result = { success: true };
         break;
+      }
+
+      case 'exportDatabase': {
+        // Snapshot the live database to a Uint8Array using sqlite-wasm's
+        // built-in serialise helper. Works on the open OPFS DB without
+        // requiring close/reopen; sqlite3_serialize() copies the page cache
+        // and any uncommitted pages internally.
+        log('Exporting database snapshot...');
+        if (!sqlite3Module) {
+          throw new Error('sqlite3 module not initialised');
+        }
+        const bytes = sqlite3Module.capi.sqlite3_js_db_export(db);
+        log(`Exported database: ${bytes.byteLength} bytes`);
+
+        // Transfer the ArrayBuffer zero-copy back to the main thread. Returns
+        // early so we can pass the transfer list — the default postMessage at
+        // the bottom of this handler does not support it.
+        postMessage(
+          {
+            type: 'response',
+            id,
+            result: { bytes: bytes.buffer, byteLength: bytes.byteLength },
+          },
+          [bytes.buffer]
+        );
+        return;
       }
 
       case 'deleteDatabase': {

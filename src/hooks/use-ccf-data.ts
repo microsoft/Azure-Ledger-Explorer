@@ -436,6 +436,76 @@ export const useDropDatabase = () => {
 };
 
 /**
+ * Format a Date as `YYYYMMDD-HHmmss` in local time, suitable for filenames.
+ */
+const formatTimestampForFilename = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    '-',
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join('');
+};
+
+/**
+ * Trigger a browser file download for the given Blob using a synthesized
+ * anchor element. The created object URL is revoked after the click so the
+ * browser can release the backing buffer once the download is flushed.
+ *
+ * Exposed via a helper rather than inlined so tests can stub it.
+ */
+export const triggerBlobDownload = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  } finally {
+    // Revoke on the next tick so the browser has a chance to start the
+    // download before we drop the URL reference.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+};
+
+/**
+ * Hook to export the live SQLite database as a downloadable file.
+ *
+ * Produces a `ccf-ledger-YYYYMMDD-HHmmss.sqlite3` file suitable for opening in
+ * offline tools (sqlite3 CLI, DB Browser for SQLite, DataGrip, etc.).
+ *
+ * Peak memory cost is ~one DB-sized buffer; for very large MST ledgers the
+ * exported file may be 2-3 GB and the browser tab may briefly hold both the
+ * worker-transferred buffer and the Blob backing it. If this becomes a
+ * problem, a future streaming-via-OPFS path can be added.
+ */
+export const useExportDatabase = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const db = await getDatabase();
+      const buffer = await db.exportDatabase();
+      const blob = new Blob([buffer], { type: 'application/x-sqlite3' });
+      const filename = `ccf-ledger-${formatTimestampForFilename(new Date())}.sqlite3`;
+      triggerBlobDownload(blob, filename);
+      return { filename, byteLength: buffer.byteLength };
+    },
+    onSuccess: ({ byteLength }) => {
+      trackEvent(TelemetryEvents.DATABASE_EXPORTED, { byteLength });
+    },
+    onError: (error) => {
+      console.error('Failed to export database:', error);
+    },
+  });
+};
+
+/**
  * Progress information for file uploads
  */
 export interface FileUploadProgress {

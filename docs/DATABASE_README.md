@@ -211,21 +211,30 @@ const results = await database.executeQuery(sqlQuery);
 ## Data Migration and Backup
 
 ### Export Functionality
-```typescript
-// Export entire database
-const binaryData = database.export();
 
-// Save to file
-const blob = new Blob([binaryData], { type: 'application/octet-stream' });
+The live OPFS database can be exported as a raw SQLite file for inspection in
+offline tools (sqlite3 CLI, [DB Browser for SQLite](https://sqlitebrowser.org/),
+DataGrip, etc.).
+
+```typescript
+// CCFDatabase facade
+const buffer: ArrayBuffer = await database.exportDatabase();
+const blob = new Blob([buffer], { type: 'application/x-sqlite3' });
+// triggerBlobDownload in src/hooks/use-ccf-data.ts does the anchor click
 ```
 
-### Import Functionality
-```typescript
-// Import from binary data
-const database = new CCFDatabase(config);
-await database.initialize();
-await database.import(binaryData);
-```
+In the UI, an **Export Database** button is exposed in the Database section of
+the Configuration page (`/config`). It produces a file named
+`ccf-ledger-YYYYMMDD-HHmmss.sqlite3`. The export uses sqlite-wasm's built-in
+`sqlite3_js_db_export` and is safe to call while the database is in use — no
+close/reopen cycle is required.
+
+**Caveats:**
+- The export is the **raw on-disk SQLite file** with all indexes. No `VACUUM`
+  is performed, so the file size matches the OPFS storage cost.
+- Peak memory is approximately one DB-sized buffer; for very large MST ledgers
+  (multi-GB indexed) the browser tab may briefly hold ~2-3 GB during the
+  download flow.
 
 ### Reset Operations
 ```typescript
@@ -233,7 +242,7 @@ await database.import(binaryData);
 await database.clearAllData();
 
 // Complete database reset
-await database.dropDatabase();
+await database.deleteAndRecreateDatabase();
 ```
 
 ## Error Handling and Recovery

@@ -154,6 +154,19 @@ export class CCFDatabase {
   }
 
   /**
+   * Export the live database to an ArrayBuffer containing the raw SQLite file.
+   * Suitable for downloading and opening in offline tools (sqlite3 CLI, DB
+   * Browser for SQLite, etc.). Safe to call while the database is in use.
+   *
+   * Peak memory cost is ~one DB-sized buffer; for very large MST ledgers this
+   * may approach 2-3 GB. The buffer is transferred zero-copy from the worker.
+   */
+  async exportDatabase(): Promise<ArrayBuffer> {
+    if (!this.client) throw new Error('Database not initialized');
+    return await this.client.exportDatabase();
+  }
+
+  /**
    * Close the database connection.
    */
   async close(): Promise<void> {

@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase' | 'exportDatabase';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -208,6 +208,23 @@ export class DatabaseWorkerClient {
    */
   async analyzeDatabase(): Promise<void> {
     await this.sendMessage('analyzeDatabase', {});
+  }
+
+  /**
+   * Export the live database to an ArrayBuffer containing the raw SQLite file.
+   * Uses sqlite-wasm's sqlite3_js_db_export under the hood; safe to call while
+   * the database is open.
+   *
+   * The returned ArrayBuffer is transferred zero-copy from the worker, so the
+   * worker no longer owns it — peak memory cost is ~one DB-sized buffer until
+   * the caller releases its reference.
+   */
+  async exportDatabase(): Promise<ArrayBuffer> {
+    const response = await this.sendMessage('exportDatabase', {}) as {
+      bytes: ArrayBuffer;
+      byteLength: number;
+    };
+    return response.bytes;
   }
 
   /**

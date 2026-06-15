@@ -175,6 +175,9 @@ export const TelemetryEvents = {
   // File operations
   FILE_UPLOADED: 'FileUploaded',
   FILE_DELETED: 'FileDeleted',
+
+  // Database operations
+  DATABASE_EXPORTED: 'DatabaseExported',
   
   // Table operations
   TABLE_VIEWED: 'TableViewed',

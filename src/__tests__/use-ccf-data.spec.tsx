@@ -18,6 +18,7 @@ const dbSpies = vi.hoisted(() => ({
   resetMerkleState: vi.fn().mockResolvedValue(undefined),
   insertLedgerFileWithData: vi.fn().mockResolvedValue({ fileId: 1, transactionsInserted: 1 }),
   analyzeDatabase: vi.fn().mockResolvedValue(undefined),
+  exportDatabase: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
 }));
 
 vi.mock('@microsoft/ccf-database', () => {
@@ -28,6 +29,7 @@ vi.mock('@microsoft/ccf-database', () => {
       resetMerkleState = dbSpies.resetMerkleState;
       insertLedgerFileWithData = dbSpies.insertLedgerFileWithData;
       analyzeDatabase = dbSpies.analyzeDatabase;
+      exportDatabase = dbSpies.exportDatabase;
     },
   };
 });
@@ -35,7 +37,7 @@ vi.mock('@microsoft/ccf-database', () => {
 // Telemetry — irrelevant noise for these tests.
 vi.mock('../services/telemetry', () => ({
   trackEvent: vi.fn(),
-  TelemetryEvents: { FILE_UPLOADED: 'file_uploaded' },
+  TelemetryEvents: { FILE_UPLOADED: 'file_uploaded', DATABASE_EXPORTED: 'database_exported' },
 }));
 
 // Verification service — unused by handleFiles paths under test, but imported by the module.
@@ -57,8 +59,12 @@ vi.mock('../utils/storage-quota', () => ({
 import {
   invalidateAfterImport,
   useFileDrop,
+  useExportDatabase,
+  triggerBlobDownload,
   queryKeys,
 } from '../hooks/use-ccf-data';
+
+import { trackEvent } from '../services/telemetry';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -78,7 +84,9 @@ beforeEach(() => {
   dbSpies.resetMerkleState.mockClear();
   dbSpies.insertLedgerFileWithData.mockClear();
   dbSpies.analyzeDatabase.mockClear();
+  dbSpies.exportDatabase.mockClear();
   dbSpies.insertLedgerFileWithData.mockResolvedValue({ fileId: 1, transactionsInserted: 1 });
+  dbSpies.exportDatabase.mockResolvedValue(new ArrayBuffer(0));
 });
 
 afterEach(() => {
@@ -288,6 +296,113 @@ describe('useFileDrop.handleFilesStream', () => {
     // the post-try block. The next successful import will refresh stats.
     expect(dbSpies.analyzeDatabase).not.toHaveBeenCalled();
 
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useExportDatabase + triggerBlobDownload
+// ---------------------------------------------------------------------------
+
+describe('triggerBlobDownload', () => {
+  it('creates an object URL, clicks an anchor with the filename, and revokes the URL', () => {
+    const fakeUrl = 'blob:fake-url';
+    const createObjectURL = vi.fn(() => fakeUrl);
+    const revokeObjectURL = vi.fn();
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+
+    let clickedHref: string | undefined;
+    let clickedDownload: string | undefined;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clickedHref = this.href;
+      clickedDownload = this.download;
+    });
+
+    vi.useFakeTimers();
+    try {
+      const blob = new Blob([new Uint8Array([0, 1, 2, 3])]);
+      triggerBlobDownload(blob, 'ccf-ledger-test.sqlite3');
+
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      // jsdom resolves anchor.href to a fully-qualified URL; check the suffix.
+      expect(clickedHref).toContain(fakeUrl);
+      expect(clickedDownload).toBe('ccf-ledger-test.sqlite3');
+
+      // The revoke happens via setTimeout so the browser can keep the URL
+      // alive long enough to start the download.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith(fakeUrl);
+    } finally {
+      vi.useRealTimers();
+      clickSpy.mockRestore();
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+    }
+  });
+});
+
+describe('useExportDatabase', () => {
+  it('exports the database, triggers a download with a timestamped filename, and tracks telemetry', async () => {
+    const fakeUrl = 'blob:fake-url';
+    const createObjectURL = vi.fn(() => fakeUrl);
+    const revokeObjectURL = vi.fn();
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+
+    let capturedFilename: string | undefined;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      capturedFilename = this.download;
+    });
+
+    // Return a 7-byte buffer so we can also assert byteLength telemetry.
+    dbSpies.exportDatabase.mockResolvedValue(new ArrayBuffer(7));
+
+    const client = new QueryClient();
+    const { result } = renderHook(() => useExportDatabase(), {
+      wrapper: createWrapper(client),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    try {
+      expect(dbSpies.exportDatabase).toHaveBeenCalledTimes(1);
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      // Filename matches `ccf-ledger-YYYYMMDD-HHmmss.sqlite3` exactly.
+      expect(capturedFilename).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
+      expect(trackEvent).toHaveBeenCalledWith('database_exported', { byteLength: 7 });
+    } finally {
+      clickSpy.mockRestore();
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+    }
+  });
+
+  it('surfaces export failures as a mutation error and skips telemetry', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    dbSpies.exportDatabase.mockRejectedValue(new Error('worker boom'));
+
+    const client = new QueryClient();
+    const { result } = renderHook(() => useExportDatabase(), {
+      wrapper: createWrapper(client),
+    });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync();
+      }),
+    ).rejects.toThrow('worker boom');
+
+    expect(trackEvent).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
 });
