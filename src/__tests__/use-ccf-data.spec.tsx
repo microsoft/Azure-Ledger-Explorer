@@ -213,3 +213,81 @@ describe('useFileDrop.handleFiles batch invalidation', () => {
     consoleErrorSpy.mockRestore();
   });
 });
+
+describe('useFileDrop.handleFilesStream', () => {
+  it('streams files lazily, invalidates once, and runs ANALYZE once', async () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+
+    const { result } = renderHook(() => useFileDrop(), {
+      wrapper: createWrapper(client),
+    });
+
+    // Track the order in which the generator is pulled vs. the worker is
+    // called, to prove the streaming contract: the (N+1)th file is not
+    // requested until the Nth file has been handed to the worker.
+    const events: string[] = [];
+    dbSpies.insertLedgerFileWithData.mockImplementation(async (filename: string) => {
+      events.push(`insert:${filename}`);
+      return { fileId: 1, transactionsInserted: 1 };
+    });
+
+    const filenames = ['a.ledger', 'b.ledger', 'c.ledger'];
+    async function* source(): AsyncGenerator<File> {
+      for (const name of filenames) {
+        events.push(`yield:${name}`);
+        yield makeFile(name);
+      }
+    }
+
+    await act(async () => {
+      await result.current.handleFilesStream(source(), filenames.length, filenames);
+    });
+
+    // Strict pull-then-insert interleaving — no eager prefetch of the next
+    // file before the current one is consumed.
+    expect(events).toEqual([
+      'yield:a.ledger', 'insert:a.ledger',
+      'yield:b.ledger', 'insert:b.ledger',
+      'yield:c.ledger', 'insert:c.ledger',
+    ]);
+
+    // Same single-invalidate + single-ANALYZE batch semantics as handleFiles.
+    expect(spy).toHaveBeenCalledTimes(6);
+    expect(dbSpies.analyzeDatabase).toHaveBeenCalledTimes(1);
+  });
+
+  it('still invalidates and clears progress when the underlying stream throws', async () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, 'invalidateQueries');
+
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useFileDrop(), {
+      wrapper: createWrapper(client),
+    });
+
+    const filenames = ['a.ledger', 'b.ledger', 'c.ledger'];
+    async function* failingSource(): AsyncGenerator<File> {
+      yield makeFile('a.ledger');
+      throw new Error('simulated download failure on file 2');
+    }
+
+    await expect(
+      act(async () => {
+        await result.current.handleFilesStream(failingSource(), filenames.length, filenames);
+      }),
+    ).rejects.toThrow('simulated download failure on file 2');
+
+    // File 1 was indexed before the throw → partial state is real → must
+    // still invalidate.
+    expect(dbSpies.insertLedgerFileWithData).toHaveBeenCalledTimes(1);
+    expect(spy).toHaveBeenCalledTimes(6);
+    // ANALYZE is intentionally skipped on partial-failure (matches the
+    // array-path behavior of handleFiles): the re-thrown error short-circuits
+    // the post-try block. The next successful import will refresh stats.
+    expect(dbSpies.analyzeDatabase).not.toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+});

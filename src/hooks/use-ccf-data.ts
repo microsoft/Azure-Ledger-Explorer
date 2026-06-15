@@ -486,20 +486,24 @@ export const useFileDrop = () => {
     getUploadProgressSnapshot
   );
 
-  const handleFiles = useCallback(async (
-    files: FileList | File[], 
-    options?: { shouldVerify?: boolean }
+  /**
+   * Shared per-batch processing core. Walks an async file source, runs each
+   * file through the upload worker, maintains the shared progress state,
+   * and on completion (success OR failure) invalidates queries and runs
+   * ANALYZE exactly once.
+   *
+   * The source is pulled lazily, so for the streaming MST download path,
+   * each `await source.next()` triggers the next chunk fetch. This caps
+   * peak memory at one in-flight file rather than the whole batch.
+   */
+  const processFiles = useCallback(async (
+    source: AsyncIterable<File>,
+    totalFiles: number,
+    allFileNames: string[],
+    options?: { shouldVerify?: boolean },
   ) => {
-    const fileArray = Array.from(files).filter(f => f.size > 0);
-    const totalFiles = fileArray.length;
-    const allFiles = fileArray.map(f => f.name);
     const completedFiles = new Set<string>();
     const shouldVerify = options?.shouldVerify !== false;
-
-    if (totalFiles === 0) {
-      // Nothing to import — no state changed, no invalidation needed.
-      return;
-    }
 
     // Reset Merkle tree state before starting a new import sequence
     // This ensures verification starts from a clean state
@@ -513,21 +517,28 @@ export const useFileDrop = () => {
       currentFileIndex: 0,
       totalFiles,
       currentFileName: '',
-      allFiles,
+      allFiles: allFileNames,
       completedFiles: new Set(),
       processingFile: null,
     });
 
+    let processedAny = false;
     try {
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
+      let i = 0;
+      for await (const file of source) {
+        if (file.size === 0) {
+          // Skip empty files (matches the original `f.size > 0` filter).
+          continue;
+        }
+        i++;
+
         try {
           // Update progress before processing
           setSharedUploadProgress({
-            currentFileIndex: i + 1,
+            currentFileIndex: i,
             totalFiles,
             currentFileName: file.name,
-            allFiles,
+            allFiles: allFileNames,
             completedFiles: new Set(completedFiles),
             processingFile: file.name,
           });
@@ -537,14 +548,15 @@ export const useFileDrop = () => {
             file,
             shouldVerify,
           });
+          processedAny = true;
 
           // Mark as completed
           completedFiles.add(file.name);
           setSharedUploadProgress({
-            currentFileIndex: i + 1,
+            currentFileIndex: i,
             totalFiles,
             currentFileName: file.name,
-            allFiles,
+            allFiles: allFileNames,
             completedFiles: new Set(completedFiles),
             processingFile: null,
           });
@@ -567,7 +579,7 @@ export const useFileDrop = () => {
     // Previously the worker ran ANALYZE per file; for a 50-file MST drop
     // that's 50 ANALYZE passes over a growing DB. One pass at the end is
     // both correct and dramatically faster.
-    if (totalFiles > 0) {
+    if (processedAny) {
       try {
         const db = await getDatabase();
         await db.analyzeDatabase();
@@ -579,6 +591,50 @@ export const useFileDrop = () => {
       }
     }
   }, [uploadMutation, queryClient]);
+
+  const handleFiles = useCallback(async (
+    files: FileList | File[], 
+    options?: { shouldVerify?: boolean }
+  ) => {
+    const fileArray = Array.from(files).filter(f => f.size > 0);
+    if (fileArray.length === 0) {
+      // Nothing to import — no state changed, no invalidation needed.
+      return;
+    }
+    // Wrap the eager array in an async iterable and route through the same
+    // streaming core. Memory and behavior are unchanged from the original
+    // array path because the iterable yields synchronously from a closure.
+    async function* asyncOfArray(): AsyncGenerator<File> {
+      for (const f of fileArray) yield f;
+    }
+    await processFiles(
+      asyncOfArray(),
+      fileArray.length,
+      fileArray.map(f => f.name),
+      options,
+    );
+  }, [processFiles]);
+
+  /**
+   * Streaming counterpart to {@link handleFiles}. Pulls files from `source`
+   * one at a time and processes each through the worker before requesting
+   * the next. Designed for the MST download path where eagerly holding all
+   * downloaded `Blob`s in memory (e.g., 1.47 GB across 46 chunks for
+   * esrp-cts-cp) OOMs the tab.
+   *
+   * Caller must provide `totalFiles` and `expectedFileNames` up front so the
+   * progress UI can show the full batch ("file 3 of 46") instead of
+   * counting up as downloads complete.
+   */
+  const handleFilesStream = useCallback(async (
+    source: AsyncIterable<File>,
+    totalFiles: number,
+    expectedFileNames: string[],
+    options?: { shouldVerify?: boolean },
+  ) => {
+    if (totalFiles <= 0) return;
+    await processFiles(source, totalFiles, expectedFileNames, options);
+  }, [processFiles]);
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -595,6 +651,7 @@ export const useFileDrop = () => {
     handleDrop,
     handleDragOver,
     handleFiles,
+    handleFilesStream,
     isUploading: uploadMutation.isPending,
     uploadError: uploadMutation.error,
     uploadProgress,
