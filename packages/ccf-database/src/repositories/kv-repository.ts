@@ -25,8 +25,27 @@ import {
  * Only add a map here if you can guarantee it by protocol — runtime detection
  * remains the safety net for anything not on this list.
  *
- * - `public:scitt.entry`: SCITT append-only transparency log; each receipt is
- *   a new sequence_no with a fresh key, never replaced or deleted.
+ * SAFETY RULES for adding to this set:
+ *   - The map must be a CCF `kv::Map<K, V>` (NOT a single-slot `kv::Value<T>`)
+ *     where each entry has a unique key by protocol — typically the transaction
+ *     sequence number or another monotonically-increasing identifier.
+ *   - Entries must never be deleted (no `kv_deletes` rows for this map).
+ *   - Entries must never be overwritten (no second write with the same key).
+ *
+ * If unsure, leave it off the list. The runtime EXISTS-pair check is correct;
+ * the allowlist is purely an optimisation. Marking a non-append-only map as
+ * append-only causes the UI to render duplicate stale rows because the fast
+ * path skips dedup.
+ *
+ * Maps known to look append-only but are NOT (do not add these):
+ *   - `public:scitt.operations` — `ccf::kv::Value<OperationLog>`, a single-slot
+ *     value with a fixed unit key. Every operation write overwrites the same
+ *     slot, so on a SCITT ledger this map has N writes to one key, not N keys.
+ *     See microsoft/scitt-ccf-ledger app/src/kv_types.h for the schema.
+ *
+ * Currently allowlisted:
+ *   - `public:scitt.entry` — SCITT append-only transparency log; each receipt
+ *     is a new sequence_no with a fresh key, never replaced or deleted.
  */
 const KNOWN_APPEND_ONLY_MAPS = new Set<string>([
   'public:scitt.entry',
