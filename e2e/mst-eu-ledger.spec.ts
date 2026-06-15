@@ -52,15 +52,16 @@ test('finds maa entries', async ({ page }) => {
   const rowCount = await rows.count();
   expect(rowCount).toBe(8);
 
-  // first row contains the transaction id 350.8006 in the second column from the left
+  // first row contains the transaction id 368.8148 in the second column from the left
+  // (DESC sort by sequence is the default — newest first)
   const firstRow = rows.nth(0);
   const firstSecondCell = firstRow.getByRole('cell').nth(1);
-  await expect(firstSecondCell).toHaveText('350.8006');
+  await expect(firstSecondCell).toHaveText('368.8148');
 
-  // last row contains the transaction id 368.8148 in the second column from the left
+  // last row contains the transaction id 350.8006 in the second column from the left
   const lastRow = rows.nth(rowCount - 1);
   const secondCell = lastRow.getByRole('cell').nth(1);
-  await expect(secondCell).toHaveText('368.8148');
+  await expect(secondCell).toHaveText('350.8006');
 
   // check transaction renders data correctly when clicked
   await page.locator('[data-testid="details-button-8148"]').click();
