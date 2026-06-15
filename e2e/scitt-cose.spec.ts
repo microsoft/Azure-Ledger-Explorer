@@ -83,11 +83,15 @@ test.describe('SCITT COSE entry decoding', () => {
     const editorContent = page.locator('.view-lines').first();
     await expect(editorContent).toBeVisible({ timeout: 10000 });
 
-    const editorText = await editorContent.innerText();
+    // Read Monaco's full model text via the global `monaco` namespace.
+    // `.view-lines` only contains the virtualised viewport — short JSON above
+    // the fold or a not-yet-laid-out viewport can return as little as "{" and
+    // miss fields that exist in the model. Polling the model text avoids that
+    // race entirely.
+    const editorText = await getMonacoEditorText(page);
 
     // cborArrayToText decodes COSE Sign1 into a JSON object.
     // Verify key structural fields are present in the rendered output.
-    // Note: Monaco only renders visible lines, so check fields that appear early.
     expect(editorText).toContain('"protected"');
     expect(editorText).toContain('"alg"');
     // CWT Claims should be decoded with a human-readable issuer DID
@@ -96,3 +100,24 @@ test.describe('SCITT COSE entry decoding', () => {
     expect(editorText).toContain('"iat"');
   });
 });
+
+/**
+ * Read the full text of the first Monaco editor on the page by going through
+ * the editor model (not the rendered `.view-lines` viewport). Polls for up to
+ * 10s while waiting for Monaco's loader to attach `window.monaco` and for the
+ * first editor instance to exist with a non-empty model.
+ */
+async function getMonacoEditorText(page: import('@playwright/test').Page): Promise<string> {
+  return await page.waitForFunction(() => {
+    const w = window as unknown as {
+      monaco?: { editor?: { getEditors: () => Array<{ getValue: () => string }> } };
+    };
+    const editors = w.monaco?.editor?.getEditors?.() ?? [];
+    if (editors.length === 0) return false;
+    const value = editors[0].getValue();
+    return value && value.length > 1 ? value : false;
+  }, undefined, { timeout: 10000 }).then(async (handle) => {
+    const text = await handle.jsonValue();
+    return typeof text === 'string' ? text : '';
+  });
+}

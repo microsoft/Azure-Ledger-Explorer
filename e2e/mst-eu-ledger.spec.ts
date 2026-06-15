@@ -49,18 +49,24 @@ test('finds maa entries', async ({ page }) => {
   const groups = table.getByRole('rowgroup');
   const bodyGroup = groups.nth(1);
   const rows = bodyGroup.getByRole('row');
-  const rowCount = await rows.count();
-  expect(rowCount).toBe(8);
+  // Use the auto-retrying `toHaveCount` rather than a one-shot
+  // `expect(await rows.count()).toBe(8)`. After Tier A perf, the unfiltered
+  // table query returns the first page (50 rows) almost instantly, so a
+  // one-shot read can race the search-filter requery and observe the
+  // pre-filter row count.
+  await expect(rows).toHaveCount(8, { timeout: 15000 });
 
-  // first row contains the transaction id 350.8006 in the second column from the left
+  // first row contains the transaction id 368.8148 in the second column from the left
+  // (DESC sort by sequence is the default — newest first)
   const firstRow = rows.nth(0);
   const firstSecondCell = firstRow.getByRole('cell').nth(1);
-  await expect(firstSecondCell).toHaveText('350.8006');
+  await expect(firstSecondCell).toHaveText('368.8148');
 
-  // last row contains the transaction id 368.8148 in the second column from the left
+  // last row contains the transaction id 350.8006 in the second column from the left
+  const rowCount = await rows.count();
   const lastRow = rows.nth(rowCount - 1);
   const secondCell = lastRow.getByRole('cell').nth(1);
-  await expect(secondCell).toHaveText('368.8148');
+  await expect(secondCell).toHaveText('350.8006');
 
   // check transaction renders data correctly when clicked
   await page.locator('[data-testid="details-button-8148"]').click();
@@ -75,7 +81,15 @@ test('finds maa entries', async ({ page }) => {
 
   const valueViewers = page.getByTestId('value-viewer-editor');
   await expect(valueViewers.first()).toBeVisible({ timeout: 15000 });
-  await expect(valueViewers.first()).toContainText('did:x509:0:sha256:I__iuL25oXEVFdTP_aBLx_eT1RPHbCQ_ECBQfYZpt9s::eku:1.3.6.1.4.1.311.76.59.1.1');
-  await expect(valueViewers.first()).toContainText('"iss": "did:x509:0:sha256:I__iuL25oXEVFdTP_aBLx_eT1RPHbCQ_ECBQfYZpt9s::eku:1.3.6.1.4.1.311.76.59.1.1"');
+  // Monaco shows "Loading..." while bootstrapping on CI; give the
+  // content-text assertions a longer timeout so they wait through that.
+  await expect(valueViewers.first()).toContainText(
+    'did:x509:0:sha256:I__iuL25oXEVFdTP_aBLx_eT1RPHbCQ_ECBQfYZpt9s::eku:1.3.6.1.4.1.311.76.59.1.1',
+    { timeout: 30000 },
+  );
+  await expect(valueViewers.first()).toContainText(
+    '"iss": "did:x509:0:sha256:I__iuL25oXEVFdTP_aBLx_eT1RPHbCQ_ECBQfYZpt9s::eku:1.3.6.1.4.1.311.76.59.1.1"',
+    { timeout: 30000 },
+  );
   
 });
