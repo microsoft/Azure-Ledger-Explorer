@@ -5,20 +5,13 @@
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations/migrations';
-import { DATABASE_PATH } from '../constants';
+import { DATABASE_PATH, DATABASE_FILENAME } from '../constants';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 import { LedgerChunkV2, MerkleTree, cborArrayToText } from '@microsoft/ccf-ledger-parser';
 
 const log = (...args: unknown[]) => console.warn('[DB Worker]', ...args);
 const error = (...args: unknown[]) => console.error('[DB Worker]', ...args);
-
-type Sqlite3Module = Awaited<ReturnType<typeof sqlite3InitModule>>;
-
-// Module-level reference to the sqlite3 module. Set by initializeSQLite() so
-// later message handlers (exportDatabase, deleteDatabase) can reuse the
-// already-initialised module without paying the wasm load cost again.
-let sqlite3Module: Sqlite3Module | undefined;
 
 // Initialize the SQLite worker
 const initializeSQLite = async () => {
@@ -30,7 +23,6 @@ const initializeSQLite = async () => {
       print: log,
       printErr: error
     });
-    sqlite3Module = sqlite3;
 
     log('Running SQLite3 version', sqlite3.version.libVersion);
 
@@ -483,28 +475,45 @@ self.onmessage = async (event: MessageEvent) => {
       }
 
       case 'exportDatabase': {
-        // Snapshot the live database to a Uint8Array using sqlite-wasm's
-        // built-in serialise helper. Works on the open OPFS DB without
-        // requiring close/reopen; sqlite3_serialize() copies the page cache
-        // and any uncommitted pages internally.
-        log('Exporting database snapshot...');
-        if (!sqlite3Module) {
-          throw new Error('sqlite3 module not initialised');
-        }
-        const bytes = sqlite3Module.capi.sqlite3_js_db_export(db);
-        log(`Exported database: ${bytes.byteLength} bytes`);
+        // Stream the live database to the main thread in chunks rather than
+        // allocating the entire file as a single Uint8Array (which OOMs on
+        // multi-GB databases). Strategy:
+        //   1. Checkpoint WAL so the OPFS file is fully up to date.
+        //   2. Get a File snapshot from the OPFS directory handle.
+        //   3. Read + transfer chunks (64 MB each) so peak memory stays bounded.
+        log('Exporting database (streaming)...');
 
-        // Transfer the ArrayBuffer zero-copy back to the main thread. Returns
-        // early so we can pass the transfer list — the default postMessage at
-        // the bottom of this handler does not support it.
-        postMessage(
-          {
-            type: 'response',
-            id,
-            result: { bytes: bytes.buffer, byteLength: bytes.byteLength },
-          },
-          [bytes.buffer]
-        );
+        // Flush WAL to the OPFS file
+        db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+
+        const opfsRoot = await navigator.storage.getDirectory();
+        const fileHandle = await opfsRoot.getFileHandle(DATABASE_FILENAME);
+        const file = await fileHandle.getFile();
+        const totalSize = file.size;
+        log(`Database file size: ${totalSize} bytes, streaming in chunks...`);
+
+        const CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
+        let offset = 0;
+        while (offset < totalSize) {
+          const end = Math.min(offset + CHUNK_SIZE, totalSize);
+          const slice = file.slice(offset, end);
+          const arrayBuffer = await slice.arrayBuffer();
+          postMessage(
+            {
+              type: 'exportChunk',
+              id,
+              chunk: arrayBuffer,
+              offset,
+              totalSize,
+              done: end >= totalSize,
+            },
+            [arrayBuffer]
+          );
+          offset = end;
+        }
+
+        log(`Export streaming complete: ${totalSize} bytes sent`);
+        // Do NOT fall through to default postMessage — chunks already sent.
         return;
       }
 

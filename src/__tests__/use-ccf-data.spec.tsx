@@ -18,7 +18,11 @@ const dbSpies = vi.hoisted(() => ({
   resetMerkleState: vi.fn().mockResolvedValue(undefined),
   insertLedgerFileWithData: vi.fn().mockResolvedValue({ fileId: 1, transactionsInserted: 1 }),
   analyzeDatabase: vi.fn().mockResolvedValue(undefined),
-  exportDatabase: vi.fn().mockResolvedValue(new ArrayBuffer(0)),
+  exportDatabase: vi.fn().mockImplementation(async (onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>) => {
+    const fakeChunk = new ArrayBuffer(7);
+    if (onChunk) await onChunk(fakeChunk, 0, 7, true);
+    return { totalSize: 7 };
+  }),
 }));
 
 vi.mock('@microsoft/ccf-database', () => {
@@ -86,7 +90,11 @@ beforeEach(() => {
   dbSpies.analyzeDatabase.mockClear();
   dbSpies.exportDatabase.mockClear();
   dbSpies.insertLedgerFileWithData.mockResolvedValue({ fileId: 1, transactionsInserted: 1 });
-  dbSpies.exportDatabase.mockResolvedValue(new ArrayBuffer(0));
+  dbSpies.exportDatabase.mockImplementation(async (onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>) => {
+    const fakeChunk = new ArrayBuffer(7);
+    if (onChunk) await onChunk(fakeChunk, 0, 7, true);
+    return { totalSize: 7 };
+  });
 });
 
 afterEach(() => {
@@ -348,7 +356,10 @@ describe('triggerBlobDownload', () => {
 });
 
 describe('useExportDatabase', () => {
-  it('exports the database, triggers a download with a timestamped filename, and tracks telemetry', async () => {
+  it('exports the database via Blob fallback, triggers a download with a timestamped filename, and tracks telemetry', async () => {
+    // Ensure the Blob fallback path is exercised (no showSaveFilePicker)
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+
     const fakeUrl = 'blob:fake-url';
     const createObjectURL = vi.fn(() => fakeUrl);
     const revokeObjectURL = vi.fn();
@@ -361,9 +372,6 @@ describe('useExportDatabase', () => {
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       capturedFilename = this.download;
     });
-
-    // Return a 7-byte buffer so we can also assert byteLength telemetry.
-    dbSpies.exportDatabase.mockResolvedValue(new ArrayBuffer(7));
 
     const client = new QueryClient();
     const { result } = renderHook(() => useExportDatabase(), {
@@ -388,6 +396,7 @@ describe('useExportDatabase', () => {
   });
 
   it('surfaces export failures as a mutation error and skips telemetry', async () => {
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     dbSpies.exportDatabase.mockRejectedValue(new Error('worker boom'));
 

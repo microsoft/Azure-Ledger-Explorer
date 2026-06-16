@@ -481,23 +481,59 @@ export const triggerBlobDownload = (blob: Blob, filename: string): void => {
  * Produces a `ccf-ledger-YYYYMMDD-HHmmss.sqlite3` file suitable for opening in
  * offline tools (sqlite3 CLI, DB Browser for SQLite, DataGrip, etc.).
  *
- * Peak memory cost is ~one DB-sized buffer; for very large MST ledgers the
- * exported file may be 2-3 GB and the browser tab may briefly hold both the
- * worker-transferred buffer and the Blob backing it. If this becomes a
- * problem, a future streaming-via-OPFS path can be added.
+ * Uses streaming export: the worker reads 64 MB chunks from the OPFS file and
+ * transfers them to the main thread. On browsers that support the File System
+ * Access API (Chrome/Edge), chunks are streamed directly to disk via
+ * `showSaveFilePicker()` so peak memory stays ~64 MB regardless of DB size.
+ * On browsers without that API (Firefox), chunks are accumulated into a Blob
+ * and downloaded via anchor click (peak memory = DB size, same as before).
  */
 export const useExportDatabase = () => {
   return useMutation({
     mutationFn: async () => {
       const db = await getDatabase();
-      const buffer = await db.exportDatabase();
-      const blob = new Blob([buffer], { type: 'application/x-sqlite3' });
       const filename = `ccf-ledger-${formatTimestampForFilename(new Date())}.sqlite3`;
+
+      // Try the streaming File System Access API path (Chrome/Edge 86+)
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as unknown as {
+            showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle>;
+          }).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+              description: 'SQLite Database',
+              accept: { 'application/x-sqlite3': ['.sqlite3'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          const { totalSize } = await db.exportDatabase(async (chunk) => {
+            await writable.write(chunk);
+          });
+          await writable.close();
+          return { filename, byteLength: totalSize };
+        } catch (err) {
+          // User cancelled the save dialog — not an error
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            return { filename, byteLength: 0, cancelled: true };
+          }
+          throw err;
+        }
+      }
+
+      // Fallback: accumulate chunks into a Blob (peak memory = DB size)
+      const chunks: ArrayBuffer[] = [];
+      const { totalSize } = await db.exportDatabase(async (chunk) => {
+        chunks.push(chunk);
+      });
+      const blob = new Blob(chunks, { type: 'application/x-sqlite3' });
       triggerBlobDownload(blob, filename);
-      return { filename, byteLength: buffer.byteLength };
+      return { filename, byteLength: totalSize };
     },
-    onSuccess: ({ byteLength }) => {
-      trackEvent(TelemetryEvents.DATABASE_EXPORTED, { byteLength });
+    onSuccess: ({ byteLength, cancelled }) => {
+      if (!cancelled) {
+        trackEvent(TelemetryEvents.DATABASE_EXPORTED, { byteLength });
+      }
     },
     onError: (error) => {
       console.error('Failed to export database:', error);

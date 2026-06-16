@@ -158,12 +158,16 @@ export class CCFDatabase {
    * Suitable for downloading and opening in offline tools (sqlite3 CLI, DB
    * Browser for SQLite, etc.). Safe to call while the database is in use.
    *
-   * Peak memory cost is ~one DB-sized buffer; for very large MST ledgers this
-   * may approach 2-3 GB. The buffer is transferred zero-copy from the worker.
+   * Streams 64 MB chunks from the OPFS file so peak memory stays bounded
+   * even for multi-GB databases. Accepts an optional onChunk callback for
+   * progressive writing (e.g. to a File System Access API writable stream).
+   * Returns total file size once complete.
    */
-  async exportDatabase(): Promise<ArrayBuffer> {
+  async exportDatabase(
+    onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>
+  ): Promise<{ totalSize: number }> {
     if (!this.client) throw new Error('Database not initialized');
-    return await this.client.exportDatabase();
+    return await this.client.exportDatabase(onChunk);
   }
 
   /**

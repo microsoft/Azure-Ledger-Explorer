@@ -217,24 +217,33 @@ offline tools (sqlite3 CLI, [DB Browser for SQLite](https://sqlitebrowser.org/),
 DataGrip, etc.).
 
 ```typescript
-// CCFDatabase facade
-const buffer: ArrayBuffer = await database.exportDatabase();
-const blob = new Blob([buffer], { type: 'application/x-sqlite3' });
-// triggerBlobDownload in src/hooks/use-ccf-data.ts does the anchor click
+// CCFDatabase facade — streams 64 MB chunks via callback
+await database.exportDatabase(async (chunk, offset, totalSize, done) => {
+  await writableStream.write(chunk);
+  if (done) await writableStream.close();
+});
 ```
 
 In the UI, an **Export Database** button is exposed in the Database section of
 the Configuration page (`/config`). It produces a file named
-`ccf-ledger-YYYYMMDD-HHmmss.sqlite3`. The export uses sqlite-wasm's built-in
-`sqlite3_js_db_export` and is safe to call while the database is in use — no
-close/reopen cycle is required.
+`ccf-ledger-YYYYMMDD-HHmmss.sqlite3`.
+
+The export works by:
+1. Flushing the WAL (`PRAGMA wal_checkpoint(TRUNCATE)`) to ensure the OPFS file
+   is consistent.
+2. Reading the OPFS file in 64 MB chunks and transferring each chunk zero-copy
+   to the main thread.
+3. On Chrome/Edge, chunks are piped directly to disk via the File System Access
+   API (`showSaveFilePicker`), keeping peak memory at ~64 MB regardless of DB
+   size.
+4. On Firefox (no File System Access API), chunks are accumulated into a Blob
+   and downloaded via anchor click (peak memory = DB size).
 
 **Caveats:**
 - The export is the **raw on-disk SQLite file** with all indexes. No `VACUUM`
   is performed, so the file size matches the OPFS storage cost.
-- Peak memory is approximately one DB-sized buffer; for very large MST ledgers
-  (multi-GB indexed) the browser tab may briefly hold ~2-3 GB during the
-  download flow.
+- On Chrome/Edge: peak memory ~64 MB (streaming to disk). On Firefox: peak
+  memory ≈ DB size (Blob accumulation fallback).
 
 ### Reset Operations
 ```typescript

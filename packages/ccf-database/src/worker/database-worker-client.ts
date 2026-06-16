@@ -211,20 +211,48 @@ export class DatabaseWorkerClient {
   }
 
   /**
-   * Export the live database to an ArrayBuffer containing the raw SQLite file.
-   * Uses sqlite-wasm's sqlite3_js_db_export under the hood; safe to call while
-   * the database is open.
+   * Export the live database as a streaming download. The worker sends chunks
+   * (64 MB each) so peak memory stays bounded even for multi-GB databases.
    *
-   * The returned ArrayBuffer is transferred zero-copy from the worker, so the
-   * worker no longer owns it — peak memory cost is ~one DB-sized buffer until
-   * the caller releases its reference.
+   * Accepts a callback that receives each chunk, its offset, total size, and
+   * whether it is the final chunk. The callback can write the chunk to a
+   * writable stream or accumulate it as needed.
+   *
+   * Returns the total byte length once all chunks have been delivered.
    */
-  async exportDatabase(): Promise<ArrayBuffer> {
-    const response = await this.sendMessage('exportDatabase', {}) as {
-      bytes: ArrayBuffer;
-      byteLength: number;
-    };
-    return response.bytes;
+  async exportDatabase(
+    onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>
+  ): Promise<{ totalSize: number }> {
+    await this.readyPromise;
+
+    const id = this.messageId++;
+
+    return new Promise((resolve, reject) => {
+      const handler = async (event: MessageEvent) => {
+        const data = event.data;
+        if (data.id !== id) return;
+
+        if (data.type === 'exportChunk') {
+          try {
+            if (onChunk) {
+              await onChunk(data.chunk, data.offset, data.totalSize, data.done);
+            }
+            if (data.done) {
+              this.worker.removeEventListener('message', handler);
+              resolve({ totalSize: data.totalSize });
+            }
+          } catch (err) {
+            this.worker.removeEventListener('message', handler);
+            reject(err);
+          }
+        } else if (data.type === 'error' && data.id === id) {
+          this.worker.removeEventListener('message', handler);
+          reject(new Error(data.error || 'Export failed'));
+        }
+      };
+      this.worker.addEventListener('message', handler);
+      this.worker.postMessage({ type: 'exportDatabase', id, payload: {} });
+    });
   }
 
   /**
