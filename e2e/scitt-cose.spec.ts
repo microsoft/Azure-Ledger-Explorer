@@ -102,22 +102,25 @@ test.describe('SCITT COSE entry decoding', () => {
 });
 
 /**
- * Read the full text of the first Monaco editor on the page by going through
- * the editor model (not the rendered `.view-lines` viewport). Polls for up to
+ * Read the full text of the first Monaco editor model on the page (not the
+ * rendered `.view-lines` viewport, which is virtualised). Polls for up to
  * 10s while waiting for Monaco's loader to attach `window.monaco` and for the
- * first editor instance to exist with a non-empty model.
+ * first model to exist with non-empty content.
+ *
+ * Uses `monaco.editor.getModels()` rather than `getEditors()` because
+ * `getModels()` is part of Monaco's documented public API across all 0.x
+ * versions, whereas `getEditors()` is newer and considered internal.
  */
 async function getMonacoEditorText(page: import('@playwright/test').Page): Promise<string> {
-  return await page.waitForFunction(() => {
+  const handle = await page.waitForFunction(() => {
     const w = window as unknown as {
-      monaco?: { editor?: { getEditors: () => Array<{ getValue: () => string }> } };
+      monaco?: { editor?: { getModels: () => Array<{ getValue: () => string }> } };
     };
-    const editors = w.monaco?.editor?.getEditors?.() ?? [];
-    if (editors.length === 0) return false;
-    const value = editors[0].getValue();
+    const models = w.monaco?.editor?.getModels?.() ?? [];
+    if (models.length === 0) return false;
+    const value = models[0].getValue();
     return value && value.length > 1 ? value : false;
-  }, undefined, { timeout: 10000 }).then(async (handle) => {
-    const text = await handle.jsonValue();
-    return typeof text === 'string' ? text : '';
-  });
+  }, undefined, { timeout: 10000 });
+  const text = await handle.jsonValue();
+  return typeof text === 'string' ? text : '';
 }
