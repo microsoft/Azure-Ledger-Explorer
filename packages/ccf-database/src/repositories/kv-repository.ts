@@ -15,6 +15,43 @@ import {
 } from '../queries/table-latest-state-queries';
 
 /**
+ * Map names that are guaranteed append-only by CCF protocol design.
+ *
+ * These maps never receive deletes and never overwrite an existing key, so the
+ * `(no kv_deletes) AND (no duplicate key_names)` detection query would always
+ * return true. Hardcoding them lets us skip that ~1-2s EXISTS check on every
+ * `getTableLatestState` / `getTableLatestStateCount` call.
+ *
+ * Only add a map here if you can guarantee it by protocol — runtime detection
+ * remains the safety net for anything not on this list.
+ *
+ * SAFETY RULES for adding to this set:
+ *   - The map must be a CCF `kv::Map<K, V>` (NOT a single-slot `kv::Value<T>`)
+ *     where each entry has a unique key by protocol — typically the transaction
+ *     sequence number or another monotonically-increasing identifier.
+ *   - Entries must never be deleted (no `kv_deletes` rows for this map).
+ *   - Entries must never be overwritten (no second write with the same key).
+ *
+ * If unsure, leave it off the list. The runtime EXISTS-pair check is correct;
+ * the allowlist is purely an optimisation. Marking a non-append-only map as
+ * append-only causes the UI to render duplicate stale rows because the fast
+ * path skips dedup.
+ *
+ * Maps known to look append-only but are NOT (do not add these):
+ *   - `public:scitt.operations` — `ccf::kv::Value<OperationLog>`, a single-slot
+ *     value with a fixed unit key. Every operation write overwrites the same
+ *     slot, so on a SCITT ledger this map has N writes to one key, not N keys.
+ *     See microsoft/scitt-ccf-ledger app/src/kv_types.h for the schema.
+ *
+ * Currently allowlisted:
+ *   - `public:scitt.entry` — SCITT append-only transparency log; each receipt
+ *     is a new sequence_no with a fresh key, never replaced or deleted.
+ */
+const KNOWN_APPEND_ONLY_MAPS = new Set<string>([
+  'public:scitt.entry',
+]);
+
+/**
  * Repository for key-value (CCF table) operations
  */
 export class KVRepository extends BaseRepository {
@@ -123,11 +160,19 @@ export class KVRepository extends BaseRepository {
    * fast path: the map has no kv_deletes and no duplicate key_names (so every
    * row IS its own latest version).
    *
-   * Result is cached per-instance in `appendOnlyCache`. The cache is cleared
-   * by `invalidateAppendOnlyCache()`, which CCFDatabase calls on every write
-   * path. See the field comment for the correctness argument.
+   * For maps listed in `KNOWN_APPEND_ONLY_MAPS`, returns true immediately
+   * without hitting the database — these are append-only by CCF protocol
+   * design and the detection query (~1-2s on large ledgers) would always
+   * return true anyway.
+   *
+   * For all other maps, the result is cached per-instance in `appendOnlyCache`.
+   * The cache is cleared by `invalidateAppendOnlyCache()`, which CCFDatabase
+   * calls on every write path. See the field comment for the correctness argument.
    */
   async isAppendOnlyMap(mapName: string): Promise<boolean> {
+    if (KNOWN_APPEND_ONLY_MAPS.has(mapName)) {
+      return true;
+    }
     const cached = this.appendOnlyCache.get(mapName);
     if (cached !== undefined) {
       return cached;

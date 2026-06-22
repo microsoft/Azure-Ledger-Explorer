@@ -180,7 +180,7 @@ describe('KVRepository.getTableLatestState — routing', () => {
       return [];
     });
 
-    await repo.getTableLatestState('public:scitt.entry', 100, 423700);
+    await repo.getTableLatestState('public:some.other.map', 100, 423700);
 
     expect(captured).toHaveLength(2);
     // Detection first
@@ -249,7 +249,7 @@ describe('KVRepository.getTableLatestStateCount — routing', () => {
       return [{ count: 12345 }];
     });
 
-    const count = await repo.getTableLatestStateCount('public:scitt.entry');
+    const count = await repo.getTableLatestStateCount('public:some.other.map');
 
     expect(count).toBe(12345);
     expect(captured).toHaveLength(2);
@@ -327,6 +327,28 @@ describe('KVRepository.getTableLatestState — row mapping', () => {
 });
 
 describe('KVRepository.isAppendOnlyMap', () => {
+  it('returns true without hitting the database for public:scitt.entry (protocol-known append-only)', async () => {
+    let calls = 0;
+    const { repo } = makeRepo(async () => {
+      calls += 1;
+      return [];
+    });
+
+    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
+    expect(calls).toBe(0);
+  });
+
+  it('still runs detection for unknown maps even when the answer is true', async () => {
+    let calls = 0;
+    const { repo } = makeRepo(async () => {
+      calls += 1;
+      return [{ has_deletes: 0, has_duplicate_keys: 0 }];
+    });
+
+    expect(await repo.isAppendOnlyMap('public:custom.map')).toBe(true);
+    expect(calls).toBe(1);
+  });
+
   it('returns true only when both EXISTS flags are 0', async () => {
     const cases: Array<[number, number, boolean]> = [
       [0, 0, true],
@@ -351,6 +373,29 @@ describe('KVRepository.isAppendOnlyMap', () => {
   });
 });
 
+describe('KVRepository routing — protocol-known append-only maps', () => {
+  it('getTableLatestState skips detection for public:scitt.entry and goes straight to the append-only page query', async () => {
+    const { repo, captured } = makeRepo(async () => []);
+
+    await repo.getTableLatestState('public:scitt.entry', 100, 423700);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).not.toMatch(/has_deletes/i);
+    expect(captured[0].sql).toMatch(/WITH\s+page\s+AS/i);
+  });
+
+  it('getTableLatestStateCount skips detection for public:scitt.entry and goes straight to the COUNT(*) fast path', async () => {
+    const { repo, captured } = makeRepo(async () => [{ count: 401234 }]);
+
+    const count = await repo.getTableLatestStateCount('public:scitt.entry');
+
+    expect(count).toBe(401234);
+    expect(captured).toHaveLength(1);
+    expect(captured[0].sql).not.toMatch(/has_deletes/i);
+    expect(captured[0].sql).toMatch(/^\s*SELECT\s+COUNT\(\*\)\s+AS\s+count\s+FROM\s+kv_writes/i);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Detection caching — avoid re-running the EXISTS pair on every page click
 // ---------------------------------------------------------------------------
@@ -366,9 +411,9 @@ describe('KVRepository.isAppendOnlyMap — caching', () => {
       return [];
     });
 
-    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
-    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
-    expect(await repo.isAppendOnlyMap('public:scitt.entry')).toBe(true);
+    expect(await repo.isAppendOnlyMap('public:custom.map')).toBe(true);
+    expect(await repo.isAppendOnlyMap('public:custom.map')).toBe(true);
+    expect(await repo.isAppendOnlyMap('public:custom.map')).toBe(true);
 
     expect(detectionCalls).toBe(1);
   });
@@ -461,9 +506,9 @@ describe('KVRepository.isAppendOnlyMap — caching', () => {
       return [];
     });
 
-    await repo.getTableLatestState('public:scitt.entry', 100, 0);
-    await repo.getTableLatestState('public:scitt.entry', 100, 100);
-    await repo.getTableLatestState('public:scitt.entry', 100, 200);
+    await repo.getTableLatestState('public:custom.map', 100, 0);
+    await repo.getTableLatestState('public:custom.map', 100, 100);
+    await repo.getTableLatestState('public:custom.map', 100, 200);
 
     expect(detectionCalls).toBe(1);
     expect(pageCalls).toBe(3);
@@ -481,9 +526,9 @@ describe('KVRepository.isAppendOnlyMap — caching', () => {
       return [{ count: 42 }];
     });
 
-    await repo.getTableLatestStateCount('public:scitt.entry');
-    await repo.getTableLatestStateCount('public:scitt.entry');
-    await repo.getTableLatestStateCount('public:scitt.entry');
+    await repo.getTableLatestStateCount('public:custom.map');
+    await repo.getTableLatestStateCount('public:custom.map');
+    await repo.getTableLatestStateCount('public:custom.map');
 
     expect(detectionCalls).toBe(1);
     expect(countCalls).toBe(3);
