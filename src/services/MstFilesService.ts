@@ -26,6 +26,8 @@ interface FileInfo {
   name: string;
   kind: 'file' | 'directory';
   url: string;
+  /** File size in bytes (from the NGINX directory listing). */
+  size?: number;
 }
 
 interface IMstClient {
@@ -256,6 +258,7 @@ class MstClient implements IMstClient {
           name: entry.name,
           kind: entry.type,
           url: `${this.ledgerFilesUrl}${fullPath.startsWith('/') ? fullPath.slice(1) : fullPath}`,
+          size: entry.size,
         };
 
         if (entry.type === 'file') {
@@ -308,17 +311,18 @@ export class MstFilesService {
     }
   }
 
-  async listLedgerFiles(): Promise<LedgerFileInfo[]> {
+  async listLedgerFiles(): Promise<(LedgerFileInfo & { size?: number })[]> {
     if (!this.mstClient) {
       throw new Error('File share client not initialized');
     }
 
-    const files: LedgerFileInfo[] = [];
+    const files: (LedgerFileInfo & { size?: number })[] = [];
 
     for await (const f of this.mstClient.listAllLedgerFiles()) {
       if (f.kind === "file" && f.name.endsWith('.committed')) {
         files.push({
-          ...parseLedgerFilename(f.name)
+          ...parseLedgerFilename(f.name),
+          size: f.size,
         });
       }
     }

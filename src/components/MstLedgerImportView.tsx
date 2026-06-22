@@ -182,6 +182,7 @@ export const MstLedgerImportView: React.FC<MstLedgerImportViewProps> = ({ onImpo
         return ledgerFiles.map(file => ({
             ...file,
             id: file.filename, // Use filename as unique ID
+            size: (file as { size?: number }).size,
         }));
     }, [ledgerFiles]);
 
