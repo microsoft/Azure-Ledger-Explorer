@@ -154,7 +154,7 @@ export class CCFDatabase {
   }
 
   /**
-   * Export the live database to an ArrayBuffer containing the raw SQLite file.
+   * Export the live database as a raw SQLite file stream.
    * Suitable for downloading and opening in offline tools (sqlite3 CLI, DB
    * Browser for SQLite, etc.). Safe to call while the database is in use.
    *
