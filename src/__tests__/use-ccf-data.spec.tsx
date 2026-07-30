@@ -421,4 +421,68 @@ describe('useExportDatabase', () => {
     expect(trackEvent).not.toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
   });
+
+  it('streams chunks to disk via the File System Access API when available', async () => {
+    const writes: number[] = [];
+    const write = vi.fn(async (chunk: ArrayBuffer) => {
+      writes.push(chunk.byteLength);
+    });
+    const close = vi.fn(async () => {});
+    const createWritable = vi.fn(async () => ({ write, close }));
+    const showSaveFilePicker = vi.fn(async () => ({ createWritable }));
+    (window as unknown as Record<string, unknown>).showSaveFilePicker = showSaveFilePicker;
+
+    // The FSA path must never fall back to an anchor download.
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    try {
+      const client = new QueryClient();
+      const { result } = renderHook(() => useExportDatabase(), {
+        wrapper: createWrapper(client),
+      });
+
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      expect(showSaveFilePicker).toHaveBeenCalledTimes(1);
+      const opts = showSaveFilePicker.mock.calls[0][0] as { suggestedName: string };
+      expect(opts.suggestedName).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
+      expect(dbSpies.exportDatabase).toHaveBeenCalledTimes(1);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(writes).toEqual([7]);
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(clickSpy).not.toHaveBeenCalled();
+      expect(trackEvent).toHaveBeenCalledWith('database_exported', { byteLength: 7 });
+    } finally {
+      clickSpy.mockRestore();
+      delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+    }
+  });
+
+  it('treats a cancelled save dialog as a no-op and skips telemetry', async () => {
+    const showSaveFilePicker = vi.fn(async () => {
+      throw new DOMException('The user aborted a request.', 'AbortError');
+    });
+    (window as unknown as Record<string, unknown>).showSaveFilePicker = showSaveFilePicker;
+
+    try {
+      const client = new QueryClient();
+      const { result } = renderHook(() => useExportDatabase(), {
+        wrapper: createWrapper(client),
+      });
+
+      // Cancelling the picker resolves the mutation (not an error).
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      expect(showSaveFilePicker).toHaveBeenCalledTimes(1);
+      // We never touched the database or emitted telemetry.
+      expect(dbSpies.exportDatabase).not.toHaveBeenCalled();
+      expect(trackEvent).not.toHaveBeenCalled();
+    } finally {
+      delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+    }
+  });
 });
