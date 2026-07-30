@@ -105,6 +105,17 @@ let db: SQLiteDB;
 // This avoids expensive serialization/deserialization via postMessage.
 let currentMerkleTree: InstanceType<typeof MerkleTree> | null = null;
 
+// Resolvers for streaming-export backpressure ACKs, keyed by message id.
+// The export loop parks a resolver here after posting each chunk and awaits
+// it; the matching 'exportAck' message resolves it so the next chunk is sent.
+// The resolver reports whether the wait ended via a client abort.
+const pendingExportAcks = new Map<number, (aborted: boolean) => void>();
+
+// Export ids the client has abandoned (consumer error / stopped reading).
+// Recorded so an abort that races ahead of the parked resolver still stops
+// the loop on its next iteration instead of hanging forever.
+const abortedExports = new Set<number>();
+
 initializeSQLite().then((database) => {
   db = database;
 
@@ -120,6 +131,30 @@ initializeSQLite().then((database) => {
 // Handle messages from the main thread
 self.onmessage = async (event: MessageEvent) => {
   const { type, id, payload } = event.data;
+
+  // Backpressure ACK for streaming export — resolve the parked chunk sender
+  // so it may read and post the next chunk. Handled outside the try/switch
+  // because it produces no response of its own.
+  if (type === 'exportAck') {
+    const resolveAck = pendingExportAcks.get(id);
+    if (resolveAck) {
+      pendingExportAcks.delete(id);
+      resolveAck(false);
+    }
+    return;
+  }
+
+  // Client abandoned the export (consumer error or stopped reading). Unpark
+  // the loop so it stops reading chunks and releases the OPFS file handle.
+  if (type === 'exportAbort') {
+    abortedExports.add(id);
+    const resolveAck = pendingExportAcks.get(id);
+    if (resolveAck) {
+      pendingExportAcks.delete(id);
+      resolveAck(true);
+    }
+    return;
+  }
 
   try {
     let result;
@@ -514,6 +549,7 @@ self.onmessage = async (event: MessageEvent) => {
           const end = Math.min(offset + CHUNK_SIZE, totalSize);
           const slice = file.slice(offset, end);
           const arrayBuffer = await slice.arrayBuffer();
+          const done = end >= totalSize;
           postMessage(
             {
               type: 'exportChunk',
@@ -521,13 +557,34 @@ self.onmessage = async (event: MessageEvent) => {
               chunk: arrayBuffer,
               offset,
               totalSize,
-              done: end >= totalSize,
+              done,
             },
             [arrayBuffer]
           );
           offset = end;
+
+          // Backpressure: wait for the client to ACK (i.e. finish writing) this
+          // chunk before reading and posting the next one. This bounds peak
+          // memory to a single in-flight chunk even for multi-GB databases.
+          if (!done) {
+            // Abort may have arrived before we parked; bail without waiting.
+            if (abortedExports.has(id)) {
+              abortedExports.delete(id);
+              log('Export aborted by client; releasing file handle');
+              return;
+            }
+            const aborted = await new Promise<boolean>((resolveAck) => {
+              pendingExportAcks.set(id, resolveAck);
+            });
+            if (aborted) {
+              abortedExports.delete(id);
+              log('Export aborted by client; releasing file handle');
+              return;
+            }
+          }
         }
 
+        abortedExports.delete(id);
         log(`Export streaming complete: ${totalSize} bytes sent`);
         // Do NOT fall through to default postMessage — chunks already sent.
         return;

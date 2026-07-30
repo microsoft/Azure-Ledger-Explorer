@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase' | 'exportDatabase';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase' | 'exportDatabase' | 'exportAck' | 'exportAbort';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -228,7 +228,6 @@ export class DatabaseWorkerClient {
     const id = this.messageId++;
 
     return new Promise((resolve, reject) => {
-      let chain: Promise<void> = Promise.resolve();
       let settled = false;
 
       const handler = (event: MessageEvent) => {
@@ -236,21 +235,32 @@ export class DatabaseWorkerClient {
         if (settled || data.id !== id) return;
 
         if (data.type === 'exportChunk') {
-          chain = chain
+          // Process this chunk, then ACK so the worker releases the next one.
+          // Backpressure keeps at most one chunk in flight, so queued chunks
+          // can't accumulate in main-thread memory regardless of DB size.
+          Promise.resolve()
             .then(async () => {
               if (onChunk) {
                 await onChunk(data.chunk, data.offset, data.totalSize, data.done);
               }
-              if (data.done && !settled) {
+            })
+            .then(() => {
+              if (settled) return;
+              if (data.done) {
                 settled = true;
                 this.worker.removeEventListener('message', handler);
                 resolve({ totalSize: data.totalSize });
+              } else {
+                this.worker.postMessage({ type: 'exportAck', id });
               }
             })
             .catch((err) => {
               if (!settled) {
                 settled = true;
                 this.worker.removeEventListener('message', handler);
+                // Tell the worker to stop streaming and release the file handle,
+                // otherwise it stays parked waiting for an ACK that never comes.
+                this.worker.postMessage({ type: 'exportAbort', id });
                 reject(err instanceof Error ? err : new Error(String(err)));
               }
             });
