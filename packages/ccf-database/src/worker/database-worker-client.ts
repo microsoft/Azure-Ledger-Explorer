@@ -228,28 +228,39 @@ export class DatabaseWorkerClient {
     const id = this.messageId++;
 
     return new Promise((resolve, reject) => {
-      const handler = async (event: MessageEvent) => {
+      let chain: Promise<void> = Promise.resolve();
+      let settled = false;
+
+      const handler = (event: MessageEvent) => {
         const data = event.data;
-        if (data.id !== id) return;
+        if (settled || data.id !== id) return;
 
         if (data.type === 'exportChunk') {
-          try {
-            if (onChunk) {
-              await onChunk(data.chunk, data.offset, data.totalSize, data.done);
-            }
-            if (data.done) {
-              this.worker.removeEventListener('message', handler);
-              resolve({ totalSize: data.totalSize });
-            }
-          } catch (err) {
-            this.worker.removeEventListener('message', handler);
-            reject(err);
-          }
-        } else if (data.type === 'error' && data.id === id) {
+          chain = chain
+            .then(async () => {
+              if (onChunk) {
+                await onChunk(data.chunk, data.offset, data.totalSize, data.done);
+              }
+              if (data.done && !settled) {
+                settled = true;
+                this.worker.removeEventListener('message', handler);
+                resolve({ totalSize: data.totalSize });
+              }
+            })
+            .catch((err) => {
+              if (!settled) {
+                settled = true;
+                this.worker.removeEventListener('message', handler);
+                reject(err instanceof Error ? err : new Error(String(err)));
+              }
+            });
+        } else if (data.type === 'error') {
+          settled = true;
           this.worker.removeEventListener('message', handler);
           reject(new Error(data.error || 'Export failed'));
         }
       };
+
       this.worker.addEventListener('message', handler);
       this.worker.postMessage({ type: 'exportDatabase', id, payload: {} });
     });
