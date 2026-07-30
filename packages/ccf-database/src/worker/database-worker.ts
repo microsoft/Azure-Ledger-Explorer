@@ -486,9 +486,11 @@ self.onmessage = async (event: MessageEvent) => {
         // Flush WAL to the OPFS file
         db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
 
+        if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
+          throw new Error('Database export requires OPFS support (navigator.storage.getDirectory is unavailable).');
+        }
         const opfsRoot = await navigator.storage.getDirectory();
         const fileHandle = await opfsRoot.getFileHandle(DATABASE_FILENAME);
-        const file = await fileHandle.getFile();
         const totalSize = file.size;
         log(`Database file size: ${totalSize} bytes, streaming in chunks...`);
 
