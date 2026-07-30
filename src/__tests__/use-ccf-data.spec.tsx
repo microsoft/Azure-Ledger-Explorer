@@ -373,22 +373,29 @@ describe('useExportDatabase', () => {
       capturedFilename = this.download;
     });
 
-    const client = new QueryClient();
-    const { result } = renderHook(() => useExportDatabase(), {
-      wrapper: createWrapper(client),
-    });
-
-    await act(async () => {
-      await result.current.mutateAsync();
-    });
-
+    vi.useFakeTimers();
     try {
+      const client = new QueryClient();
+      const { result } = renderHook(() => useExportDatabase(), {
+        wrapper: createWrapper(client),
+      });
+
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      // Flush the next-tick revoke scheduled by triggerBlobDownload().
+      vi.runAllTimers();
+
       expect(dbSpies.exportDatabase).toHaveBeenCalledTimes(1);
       expect(createObjectURL).toHaveBeenCalledTimes(1);
       // Filename matches `ccf-ledger-YYYYMMDD-HHmmss.sqlite3` exactly.
       expect(capturedFilename).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
+      expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith(fakeUrl);
       expect(trackEvent).toHaveBeenCalledWith('database_exported', { byteLength: 7 });
     } finally {
+      vi.useRealTimers();
       clickSpy.mockRestore();
       URL.createObjectURL = origCreate;
       URL.revokeObjectURL = origRevoke;
