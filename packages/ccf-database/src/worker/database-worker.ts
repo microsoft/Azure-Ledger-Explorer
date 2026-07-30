@@ -136,8 +136,9 @@ self.onmessage = async (event: MessageEvent) => {
   // so it may read and post the next chunk. Handled outside the try/switch
   // because it produces no response of its own.
   if (type === 'exportAck') {
+    if (typeof id !== 'number' || !Number.isFinite(id)) return;
     const resolveAck = pendingExportAcks.get(id);
-    if (resolveAck) {
+    if (typeof resolveAck === 'function') {
       pendingExportAcks.delete(id);
       resolveAck(false);
     }
@@ -147,9 +148,10 @@ self.onmessage = async (event: MessageEvent) => {
   // Client abandoned the export (consumer error or stopped reading). Unpark
   // the loop so it stops reading chunks and releases the OPFS file handle.
   if (type === 'exportAbort') {
+    if (typeof id !== 'number' || !Number.isFinite(id)) return;
     abortedExports.add(id);
     const resolveAck = pendingExportAcks.get(id);
-    if (resolveAck) {
+    if (typeof resolveAck === 'function') {
       pendingExportAcks.delete(id);
       resolveAck(true);
     }
