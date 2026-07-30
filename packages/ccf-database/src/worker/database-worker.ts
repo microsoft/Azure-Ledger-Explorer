@@ -491,6 +491,7 @@ self.onmessage = async (event: MessageEvent) => {
         }
         const opfsRoot = await navigator.storage.getDirectory();
         const fileHandle = await opfsRoot.getFileHandle(DATABASE_FILENAME);
+        const file = await fileHandle.getFile();
         const totalSize = file.size;
         log(`Database file size: ${totalSize} bytes, streaming in chunks...`);
 
