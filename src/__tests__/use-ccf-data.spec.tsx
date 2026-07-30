@@ -429,7 +429,7 @@ describe('useExportDatabase', () => {
     });
     const close = vi.fn(async () => {});
     const createWritable = vi.fn(async () => ({ write, close }));
-    const showSaveFilePicker = vi.fn(async () => ({ createWritable }));
+    const showSaveFilePicker = vi.fn(async (_opts: { suggestedName: string }) => ({ createWritable }));
     (window as unknown as Record<string, unknown>).showSaveFilePicker = showSaveFilePicker;
 
     // The FSA path must never fall back to an anchor download.
@@ -446,7 +446,7 @@ describe('useExportDatabase', () => {
       });
 
       expect(showSaveFilePicker).toHaveBeenCalledTimes(1);
-      const opts = showSaveFilePicker.mock.calls[0][0] as { suggestedName: string };
+      const opts = showSaveFilePicker.mock.calls[0][0];
       expect(opts.suggestedName).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
       expect(dbSpies.exportDatabase).toHaveBeenCalledTimes(1);
       expect(write).toHaveBeenCalledTimes(1);
