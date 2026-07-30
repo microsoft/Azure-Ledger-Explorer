@@ -494,6 +494,19 @@ self.onmessage = async (event: MessageEvent) => {
         const totalSize = file.size;
         log(`Database file size: ${totalSize} bytes, streaming in chunks...`);
 
+        if (totalSize === 0) {
+          postMessage({
+            type: 'exportChunk',
+            id,
+            chunk: new ArrayBuffer(0),
+            offset: 0,
+            totalSize: 0,
+            done: true,
+          });
+          log('Export streaming complete: 0 bytes sent');
+          return;
+        }
+
         const CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
         let offset = 0;
         while (offset < totalSize) {
