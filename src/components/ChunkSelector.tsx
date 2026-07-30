@@ -14,6 +14,9 @@ import {
   RadioGroup,
   Radio,
   Badge,
+  MessageBar,
+  MessageBarBody,
+  MessageBarTitle,
   tokens,
 } from '@fluentui/react-components';
 import {
@@ -25,6 +28,7 @@ import {
 } from '@fluentui/react-icons';
 import { analyzeLedgerSequence, type SequenceGap, type RangeGroup } from '@microsoft/ccf-ledger-parser';
 import type { ChunkFileInfo } from '../types/chunk-types';
+import { IMPORT_SIZE_WARNING_BYTES } from '../constants/import';
 
 const useStyles = makeStyles({
   container: {
@@ -654,10 +658,9 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
     );
   };
 
-  // Build the display list with gaps and overlaps inserted
+  // Build the display list with gaps and overlaps inserted (latest chunks first)
   const displayItems = useMemo(() => {
     const items: React.ReactNode[] = [];
-    let gapIndex = 0;
 
     // Build a map of overlaps keyed by the "second" chunk's range for quick lookup
     const overlapsBySecond = new Map<string, typeof selectedOverlaps[0]>();
@@ -666,12 +669,9 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
       overlapsBySecond.set(secondKey, overlap);
     }
 
-    for (const group of chunkGroups) {
-      // Insert any gaps before this group
-      while (gapIndex < gaps.length && gaps[gapIndex].endNo < group.startNo) {
-        items.push(renderGap(gaps[gapIndex]));
-        gapIndex++;
-      }
+    // Iterate in reverse (latest/highest-numbered chunks first)
+    for (let i = chunkGroups.length - 1; i >= 0; i--) {
+      const group = chunkGroups[i];
 
       // Insert overlap indicator if this group is the "second" in an overlap pair
       const overlap = overlapsBySecond.get(group.rangeKey);
@@ -680,6 +680,18 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
       }
 
       items.push(renderChunkGroup(group));
+
+      // Insert gaps that sit between this group and the one below it.
+      // When i > 0, the "group below" is chunkGroups[i-1]; when i === 0
+      // there's nothing below, so render any gap whose endNo < group.startNo.
+      const lowerGroup = i > 0 ? chunkGroups[i - 1] : undefined;
+      for (const gap of gaps) {
+        const aboveLower = lowerGroup ? gap.startNo > lowerGroup.endNo : true;
+        const belowCurrent = gap.endNo < group.startNo;
+        if (aboveLower && belowCurrent) {
+          items.push(renderGap(gap));
+        }
+      }
     }
 
     return items;
@@ -688,6 +700,21 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
 
   const selectedCount = selection.checkedRanges.size;
   const canImport = selectedCount > 0 && validation.state !== 'error';
+
+  // Compute total selected size for the warning threshold
+  const totalSelectedSize = useMemo(() => {
+    let total = 0;
+    for (const group of chunkGroups) {
+      if (!selection.checkedRanges.has(group.rangeKey)) continue;
+      if (existingRanges.has(group.rangeKey)) continue;
+      const selectedId = selection.selectedVersions.get(group.rangeKey);
+      const file = group.files.find(f => f.id === selectedId) || group.files[0];
+      if (file.size) total += file.size;
+    }
+    return total;
+  }, [chunkGroups, selection, existingRanges]);
+
+  const sizeWarning = totalSelectedSize > IMPORT_SIZE_WARNING_BYTES;
 
   const existingCount = existingRanges.size;
 
@@ -801,6 +828,16 @@ export const ChunkSelector: React.FC<ChunkSelectorProps> = ({
                 : "Verify ledger integrity after import (requires contiguous ledger starting from sequence 1)"
             }
           />
+        )}
+
+        {/* Large import size warning */}
+        {sizeWarning && (
+          <MessageBar intent="warning">
+            <MessageBarBody>
+              <MessageBarTitle>Large import</MessageBarTitle>
+              The selected chunks total {formatSize(totalSelectedSize)}, which exceeds the recommended {formatSize(IMPORT_SIZE_WARNING_BYTES)} limit. Importing this much data may cause the application to become slow or unresponsive.
+            </MessageBarBody>
+          </MessageBar>
         )}
 
         {/* Actions */}
