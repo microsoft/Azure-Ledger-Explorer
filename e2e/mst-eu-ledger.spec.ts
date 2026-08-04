@@ -6,6 +6,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 
 const testfilepath = path.dirname(fileURLToPath(import.meta.url));
 
@@ -93,3 +94,36 @@ test('finds maa entries', async ({ page }) => {
   );
   
 });
+
+test('exports the loaded ledger as a downloadable SQLite database', async ({ page }) => {
+  // The File System Access save picker is a native dialog Playwright cannot
+  // drive. Force the Blob-download fallback so the export surfaces as a normal
+  // browser download that `waitForEvent('download')` can capture.
+  await page.addInitScript(() => {
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+  });
+
+  // Reload so the init script applies; the imported ledger persists in OPFS.
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Configuration' }).click();
+  await expect(page.getByText('Ledger data configuration')).toBeVisible({ timeout: 15000 });
+
+  const exportButton = page.getByRole('button', { name: 'Export Database' });
+  await expect(exportButton).toBeVisible({ timeout: 15000 });
+
+  const downloadPromise = page.waitForEvent('download');
+  await exportButton.click();
+  const download = await downloadPromise;
+
+  // Filename is timestamped: ccf-ledger-YYYYMMDD-HHmmss.sqlite3
+  expect(download.suggestedFilename()).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
+
+  // The downloaded file must be a real, non-empty SQLite database. Every
+  // SQLite file begins with the 16-byte header "SQLite format 3\0".
+  const downloadPath = await download.path();
+  expect(downloadPath).toBeTruthy();
+  const bytes = await readFile(downloadPath);
+  expect(bytes.byteLength).toBeGreaterThan(0);
+  expect(bytes.subarray(0, 16).toString('latin1')).toBe('SQLite format 3\u0000');
+});
+

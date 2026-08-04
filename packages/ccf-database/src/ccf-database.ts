@@ -154,6 +154,23 @@ export class CCFDatabase {
   }
 
   /**
+   * Export the live database as a raw SQLite file stream.
+   * Suitable for downloading and opening in offline tools (sqlite3 CLI, DB
+   * Browser for SQLite, etc.). Safe to call while the database is in use.
+   *
+   * Streams 64 MB chunks from the OPFS file so peak memory stays bounded
+   * even for multi-GB databases. Accepts an optional onChunk callback for
+   * progressive writing (e.g. to a File System Access API writable stream).
+   * Returns total file size once complete.
+   */
+  async exportDatabase(
+    onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>
+  ): Promise<{ totalSize: number }> {
+    if (!this.client) throw new Error('Database not initialized');
+    return await this.client.exportDatabase(onChunk);
+  }
+
+  /**
    * Close the database connection.
    */
   async close(): Promise<void> {

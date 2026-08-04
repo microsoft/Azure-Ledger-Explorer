@@ -211,21 +211,39 @@ const results = await database.executeQuery(sqlQuery);
 ## Data Migration and Backup
 
 ### Export Functionality
-```typescript
-// Export entire database
-const binaryData = database.export();
 
-// Save to file
-const blob = new Blob([binaryData], { type: 'application/octet-stream' });
+The live OPFS database can be exported as a raw SQLite file for inspection in
+offline tools (sqlite3 CLI, [DB Browser for SQLite](https://sqlitebrowser.org/),
+DataGrip, etc.).
+
+```typescript
+// CCFDatabase facade — streams 64 MB chunks via callback
+await database.exportDatabase(async (chunk, offset, totalSize, done) => {
+  await writableStream.write(chunk);
+  if (done) await writableStream.close();
+});
 ```
 
-### Import Functionality
-```typescript
-// Import from binary data
-const database = new CCFDatabase(config);
-await database.initialize();
-await database.import(binaryData);
-```
+In the UI, an **Export Database** button is exposed in the Database section of
+the Configuration page (`/config`). It produces a file named
+`ccf-ledger-YYYYMMDD-HHmmss.sqlite3`.
+
+The export works by:
+1. Flushing the WAL (`PRAGMA wal_checkpoint(TRUNCATE)`) to ensure the OPFS file
+   is consistent.
+2. Reading the OPFS file in 64 MB chunks and transferring each chunk zero-copy
+   to the main thread.
+3. On Chrome/Edge, chunks are piped directly to disk via the File System Access
+   API (`showSaveFilePicker`), keeping peak memory at ~64 MB regardless of DB
+   size.
+4. On Firefox (no File System Access API), chunks are accumulated into a Blob
+   and downloaded via anchor click (peak memory = DB size).
+
+**Caveats:**
+- The export is the **raw on-disk SQLite file** with all indexes. No `VACUUM`
+  is performed, so the file size matches the OPFS storage cost.
+- On Chrome/Edge: peak memory ~64 MB (streaming to disk). On Firefox: peak
+  memory ≈ DB size (Blob accumulation fallback).
 
 ### Reset Operations
 ```typescript
@@ -233,7 +251,7 @@ await database.import(binaryData);
 await database.clearAllData();
 
 // Complete database reset
-await database.dropDatabase();
+await database.deleteAndRecreateDatabase();
 ```
 
 ## Error Handling and Recovery

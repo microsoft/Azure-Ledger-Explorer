@@ -5,7 +5,7 @@
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { runMigrations, dropAllTables, clearAllTables, verifyTables } from '../migrations/migrations';
-import { DATABASE_PATH } from '../constants';
+import { DATABASE_PATH, DATABASE_FILENAME } from '../constants';
 import type { Database as SQLiteDB } from '@sqlite.org/sqlite-wasm';
 import { shouldDecodeCborValue } from '../utilities/decode-cbor-tables';
 import { LedgerChunkV2, MerkleTree, cborArrayToText } from '@microsoft/ccf-ledger-parser';
@@ -105,6 +105,17 @@ let db: SQLiteDB;
 // This avoids expensive serialization/deserialization via postMessage.
 let currentMerkleTree: InstanceType<typeof MerkleTree> | null = null;
 
+// Resolvers for streaming-export backpressure ACKs, keyed by message id.
+// The export loop parks a resolver here after posting each chunk and awaits
+// it; the matching 'exportAck' message resolves it so the next chunk is sent.
+// The resolver reports whether the wait ended via a client abort.
+const pendingExportAcks = new Map<number, (aborted: boolean) => void>();
+
+// Export ids the client has abandoned (consumer error / stopped reading).
+// Recorded so an abort that races ahead of the parked resolver still stops
+// the loop on its next iteration instead of hanging forever.
+const abortedExports = new Set<number>();
+
 initializeSQLite().then((database) => {
   db = database;
 
@@ -120,6 +131,32 @@ initializeSQLite().then((database) => {
 // Handle messages from the main thread
 self.onmessage = async (event: MessageEvent) => {
   const { type, id, payload } = event.data;
+
+  // Backpressure ACK for streaming export — resolve the parked chunk sender
+  // so it may read and post the next chunk. Handled outside the try/switch
+  // because it produces no response of its own.
+  if (type === 'exportAck') {
+    if (typeof id !== 'number' || !Number.isFinite(id)) return;
+    const resolveAck = pendingExportAcks.get(id);
+    if (typeof resolveAck === 'function') {
+      pendingExportAcks.delete(id);
+      resolveAck(false);
+    }
+    return;
+  }
+
+  // Client abandoned the export (consumer error or stopped reading). Unpark
+  // the loop so it stops reading chunks and releases the OPFS file handle.
+  if (type === 'exportAbort') {
+    if (typeof id !== 'number' || !Number.isFinite(id)) return;
+    abortedExports.add(id);
+    const resolveAck = pendingExportAcks.get(id);
+    if (typeof resolveAck === 'function') {
+      pendingExportAcks.delete(id);
+      resolveAck(true);
+    }
+    return;
+  }
 
   try {
     let result;
@@ -472,6 +509,87 @@ self.onmessage = async (event: MessageEvent) => {
         log('ANALYZE complete');
         result = { success: true };
         break;
+      }
+
+      case 'exportDatabase': {
+        // Stream the live database to the main thread in chunks rather than
+        // allocating the entire file as a single Uint8Array (which OOMs on
+        // multi-GB databases). Strategy:
+        //   1. Checkpoint WAL so the OPFS file is fully up to date.
+        //   2. Get a File snapshot from the OPFS directory handle.
+        //   3. Read + transfer chunks (64 MB each) so peak memory stays bounded.
+        log('Exporting database (streaming)...');
+
+        // Flush WAL to the OPFS file
+        db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+
+        if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
+          throw new Error('Database export requires OPFS support (navigator.storage.getDirectory is unavailable).');
+        }
+        const opfsRoot = await navigator.storage.getDirectory();
+        const fileHandle = await opfsRoot.getFileHandle(DATABASE_FILENAME);
+        const file = await fileHandle.getFile();
+        const totalSize = file.size;
+        log(`Database file size: ${totalSize} bytes, streaming in chunks...`);
+
+        if (totalSize === 0) {
+          postMessage({
+            type: 'exportChunk',
+            id,
+            chunk: new ArrayBuffer(0),
+            offset: 0,
+            totalSize: 0,
+            done: true,
+          });
+          log('Export streaming complete: 0 bytes sent');
+          return;
+        }
+
+        const CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
+        let offset = 0;
+        while (offset < totalSize) {
+          const end = Math.min(offset + CHUNK_SIZE, totalSize);
+          const slice = file.slice(offset, end);
+          const arrayBuffer = await slice.arrayBuffer();
+          const done = end >= totalSize;
+          postMessage(
+            {
+              type: 'exportChunk',
+              id,
+              chunk: arrayBuffer,
+              offset,
+              totalSize,
+              done,
+            },
+            [arrayBuffer]
+          );
+          offset = end;
+
+          // Backpressure: wait for the client to ACK (i.e. finish writing) this
+          // chunk before reading and posting the next one. This bounds peak
+          // memory to a single in-flight chunk even for multi-GB databases.
+          if (!done) {
+            // Abort may have arrived before we parked; bail without waiting.
+            if (abortedExports.has(id)) {
+              abortedExports.delete(id);
+              log('Export aborted by client; releasing file handle');
+              return;
+            }
+            const aborted = await new Promise<boolean>((resolveAck) => {
+              pendingExportAcks.set(id, resolveAck);
+            });
+            if (aborted) {
+              abortedExports.delete(id);
+              log('Export aborted by client; releasing file handle');
+              return;
+            }
+          }
+        }
+
+        abortedExports.delete(id);
+        log(`Export streaming complete: ${totalSize} bytes sent`);
+        // Do NOT fall through to default postMessage — chunks already sent.
+        return;
       }
 
       case 'deleteDatabase': {

@@ -34,6 +34,7 @@ import {
   Delete24Regular,
   DatabaseArrowDownRegular,
   DocumentAdd24Regular,
+  ArrowDownload24Regular,
   ErrorCircle16Regular,
   Checkmark16Regular,
   Key24Regular,
@@ -44,6 +45,7 @@ import {
   useStats, 
   useClearAllData,
   useDropDatabase,
+  useExportDatabase,
 } from '../hooks/use-ccf-data';
 import { AddFilesWizard } from '../components/AddFilesWizard';
 import { useApiHealth } from '../hooks/use-api-health';
@@ -182,6 +184,7 @@ export const ConfigPage: React.FC = () => {
   const { data: stats } = useStats();
   const clearAllDataMutation = useClearAllData();
   const dropDatabaseMutation = useDropDatabase();
+  const exportDatabaseMutation = useExportDatabase();
   
   // Telemetry
   const { isTelemetryEnabled, setTelemetryEnabled, trackEvent, TelemetryEvents } = useTelemetry();
@@ -224,6 +227,14 @@ export const ConfigPage: React.FC = () => {
       setDropDbDialogOpen(false);
     } catch (error) {
       console.error('Failed to drop database:', error);
+    }
+  };
+
+  const handleExportDatabase = async () => {
+    try {
+      await exportDatabaseMutation.mutateAsync();
+    } catch (error) {
+      console.error('Failed to export database:', error);
     }
   };
 
@@ -338,6 +349,18 @@ export const ConfigPage: React.FC = () => {
                   </DialogSurface>
                 </Dialog>
                 }
+
+                { hasData && (
+                  <Button
+                    appearance="outline"
+                    icon={<ArrowDownload24Regular />}
+                    onClick={handleExportDatabase}
+                    disabled={exportDatabaseMutation.isPending}
+                    title="Download the SQLite database file for offline inspection"
+                  >
+                    {exportDatabaseMutation.isPending ? 'Exporting...' : 'Export Database'}
+                  </Button>
+                )}
 
                 <Dialog 
                   open={dropDbDialogOpen} 

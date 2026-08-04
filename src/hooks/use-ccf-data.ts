@@ -436,6 +436,112 @@ export const useDropDatabase = () => {
 };
 
 /**
+ * Format a Date as `YYYYMMDD-HHmmss` in local time, suitable for filenames.
+ */
+const formatTimestampForFilename = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    '-',
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join('');
+};
+
+/**
+ * Trigger a browser file download for the given Blob using a synthesized
+ * anchor element. The created object URL is revoked after the click so the
+ * browser can release the backing buffer once the download is flushed.
+ *
+ * Exposed via a helper rather than inlined so tests can stub it.
+ */
+export const triggerBlobDownload = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.rel = 'noopener';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  } finally {
+    // Revoke on the next tick so the browser has a chance to start the
+    // download before we drop the URL reference.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+};
+
+/**
+ * Hook to export the live SQLite database as a downloadable file.
+ *
+ * Produces a `ccf-ledger-YYYYMMDD-HHmmss.sqlite3` file suitable for opening in
+ * offline tools (sqlite3 CLI, DB Browser for SQLite, DataGrip, etc.).
+ *
+ * Uses streaming export: the worker reads 64 MB chunks from the OPFS file and
+ * transfers them to the main thread. On browsers that support the File System
+ * Access API (Chrome/Edge), chunks are streamed directly to disk via
+ * `showSaveFilePicker()` so peak memory stays ~64 MB regardless of DB size.
+ * On browsers without that API (Firefox), chunks are accumulated into a Blob
+ * and downloaded via anchor click (peak memory = DB size, same as before).
+ */
+export const useExportDatabase = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const db = await getDatabase();
+      const filename = `ccf-ledger-${formatTimestampForFilename(new Date())}.sqlite3`;
+
+      // Try the streaming File System Access API path (Chrome/Edge 86+)
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as unknown as {
+            showSaveFilePicker: (opts: unknown) => Promise<FileSystemFileHandle>;
+          }).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{
+              description: 'SQLite Database',
+              accept: { 'application/x-sqlite3': ['.sqlite3'] },
+            }],
+          });
+          const writable = await handle.createWritable();
+          const { totalSize } = await db.exportDatabase(async (chunk) => {
+            await writable.write(chunk);
+          });
+          await writable.close();
+          return { filename, byteLength: totalSize };
+        } catch (err) {
+          // User cancelled the save dialog — not an error
+          if (err instanceof DOMException && err.name === 'AbortError') {
+            return { filename, byteLength: 0, cancelled: true };
+          }
+          throw err;
+        }
+      }
+
+      // Fallback: accumulate chunks into a Blob (peak memory = DB size)
+      const chunks: ArrayBuffer[] = [];
+      const { totalSize } = await db.exportDatabase(async (chunk) => {
+        chunks.push(chunk);
+      });
+      const blob = new Blob(chunks, { type: 'application/x-sqlite3' });
+      triggerBlobDownload(blob, filename);
+      return { filename, byteLength: totalSize };
+    },
+    onSuccess: ({ byteLength, cancelled }) => {
+      if (!cancelled) {
+        trackEvent(TelemetryEvents.DATABASE_EXPORTED, { byteLength });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to export database:', error);
+    },
+  });
+};
+
+/**
  * Progress information for file uploads
  */
 export interface FileUploadProgress {

@@ -18,6 +18,11 @@ const dbSpies = vi.hoisted(() => ({
   resetMerkleState: vi.fn().mockResolvedValue(undefined),
   insertLedgerFileWithData: vi.fn().mockResolvedValue({ fileId: 1, transactionsInserted: 1 }),
   analyzeDatabase: vi.fn().mockResolvedValue(undefined),
+  exportDatabase: vi.fn().mockImplementation(async (onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>) => {
+    const fakeChunk = new ArrayBuffer(7);
+    if (onChunk) await onChunk(fakeChunk, 0, 7, true);
+    return { totalSize: 7 };
+  }),
 }));
 
 vi.mock('@microsoft/ccf-database', () => {
@@ -28,6 +33,7 @@ vi.mock('@microsoft/ccf-database', () => {
       resetMerkleState = dbSpies.resetMerkleState;
       insertLedgerFileWithData = dbSpies.insertLedgerFileWithData;
       analyzeDatabase = dbSpies.analyzeDatabase;
+      exportDatabase = dbSpies.exportDatabase;
     },
   };
 });
@@ -35,7 +41,7 @@ vi.mock('@microsoft/ccf-database', () => {
 // Telemetry — irrelevant noise for these tests.
 vi.mock('../services/telemetry', () => ({
   trackEvent: vi.fn(),
-  TelemetryEvents: { FILE_UPLOADED: 'file_uploaded' },
+  TelemetryEvents: { FILE_UPLOADED: 'file_uploaded', DATABASE_EXPORTED: 'database_exported' },
 }));
 
 // Verification service — unused by handleFiles paths under test, but imported by the module.
@@ -57,8 +63,12 @@ vi.mock('../utils/storage-quota', () => ({
 import {
   invalidateAfterImport,
   useFileDrop,
+  useExportDatabase,
+  triggerBlobDownload,
   queryKeys,
 } from '../hooks/use-ccf-data';
+
+import { trackEvent } from '../services/telemetry';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -78,7 +88,13 @@ beforeEach(() => {
   dbSpies.resetMerkleState.mockClear();
   dbSpies.insertLedgerFileWithData.mockClear();
   dbSpies.analyzeDatabase.mockClear();
+  dbSpies.exportDatabase.mockClear();
   dbSpies.insertLedgerFileWithData.mockResolvedValue({ fileId: 1, transactionsInserted: 1 });
+  dbSpies.exportDatabase.mockImplementation(async (onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>) => {
+    const fakeChunk = new ArrayBuffer(7);
+    if (onChunk) await onChunk(fakeChunk, 0, 7, true);
+    return { totalSize: 7 };
+  });
 });
 
 afterEach(() => {
@@ -289,5 +305,184 @@ describe('useFileDrop.handleFilesStream', () => {
     expect(dbSpies.analyzeDatabase).not.toHaveBeenCalled();
 
     consoleErrorSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useExportDatabase + triggerBlobDownload
+// ---------------------------------------------------------------------------
+
+describe('triggerBlobDownload', () => {
+  it('creates an object URL, clicks an anchor with the filename, and revokes the URL', () => {
+    const fakeUrl = 'blob:fake-url';
+    const createObjectURL = vi.fn(() => fakeUrl);
+    const revokeObjectURL = vi.fn();
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+
+    let clickedHref: string | undefined;
+    let clickedDownload: string | undefined;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clickedHref = this.href;
+      clickedDownload = this.download;
+    });
+
+    vi.useFakeTimers();
+    try {
+      const blob = new Blob([new Uint8Array([0, 1, 2, 3])]);
+      triggerBlobDownload(blob, 'ccf-ledger-test.sqlite3');
+
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      expect(createObjectURL).toHaveBeenCalledWith(blob);
+      // jsdom resolves anchor.href to a fully-qualified URL; check the suffix.
+      expect(clickedHref).toContain(fakeUrl);
+      expect(clickedDownload).toBe('ccf-ledger-test.sqlite3');
+
+      // The revoke happens via setTimeout so the browser can keep the URL
+      // alive long enough to start the download.
+      expect(revokeObjectURL).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith(fakeUrl);
+    } finally {
+      vi.useRealTimers();
+      clickSpy.mockRestore();
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+    }
+  });
+});
+
+describe('useExportDatabase', () => {
+  it('exports the database via Blob fallback, triggers a download with a timestamped filename, and tracks telemetry', async () => {
+    // Ensure the Blob fallback path is exercised (no showSaveFilePicker)
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+
+    const fakeUrl = 'blob:fake-url';
+    const createObjectURL = vi.fn(() => fakeUrl);
+    const revokeObjectURL = vi.fn();
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjectURL as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL as unknown as typeof URL.revokeObjectURL;
+
+    let capturedFilename: string | undefined;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      capturedFilename = this.download;
+    });
+
+    vi.useFakeTimers();
+    try {
+      const client = new QueryClient();
+      const { result } = renderHook(() => useExportDatabase(), {
+        wrapper: createWrapper(client),
+      });
+
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      // Flush the next-tick revoke scheduled by triggerBlobDownload().
+      vi.runAllTimers();
+
+      expect(dbSpies.exportDatabase).toHaveBeenCalledTimes(1);
+      expect(createObjectURL).toHaveBeenCalledTimes(1);
+      // Filename matches `ccf-ledger-YYYYMMDD-HHmmss.sqlite3` exactly.
+      expect(capturedFilename).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
+      expect(revokeObjectURL).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURL).toHaveBeenCalledWith(fakeUrl);
+      expect(trackEvent).toHaveBeenCalledWith('database_exported', { byteLength: 7 });
+    } finally {
+      vi.useRealTimers();
+      clickSpy.mockRestore();
+      URL.createObjectURL = origCreate;
+      URL.revokeObjectURL = origRevoke;
+    }
+  });
+
+  it('surfaces export failures as a mutation error and skips telemetry', async () => {
+    delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    dbSpies.exportDatabase.mockRejectedValue(new Error('worker boom'));
+
+    const client = new QueryClient();
+    const { result } = renderHook(() => useExportDatabase(), {
+      wrapper: createWrapper(client),
+    });
+
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync();
+      }),
+    ).rejects.toThrow('worker boom');
+
+    expect(trackEvent).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('streams chunks to disk via the File System Access API when available', async () => {
+    const writes: number[] = [];
+    const write = vi.fn(async (chunk: ArrayBuffer) => {
+      writes.push(chunk.byteLength);
+    });
+    const close = vi.fn(async () => {});
+    const createWritable = vi.fn(async () => ({ write, close }));
+    const showSaveFilePicker = vi.fn(async (_opts: { suggestedName: string }) => ({ createWritable }));
+    (window as unknown as Record<string, unknown>).showSaveFilePicker = showSaveFilePicker;
+
+    // The FSA path must never fall back to an anchor download.
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    try {
+      const client = new QueryClient();
+      const { result } = renderHook(() => useExportDatabase(), {
+        wrapper: createWrapper(client),
+      });
+
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      expect(showSaveFilePicker).toHaveBeenCalledTimes(1);
+      const opts = showSaveFilePicker.mock.calls[0][0];
+      expect(opts.suggestedName).toMatch(/^ccf-ledger-\d{8}-\d{6}\.sqlite3$/);
+      expect(dbSpies.exportDatabase).toHaveBeenCalledTimes(1);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(writes).toEqual([7]);
+      expect(close).toHaveBeenCalledTimes(1);
+      expect(clickSpy).not.toHaveBeenCalled();
+      expect(trackEvent).toHaveBeenCalledWith('database_exported', { byteLength: 7 });
+    } finally {
+      clickSpy.mockRestore();
+      delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+    }
+  });
+
+  it('treats a cancelled save dialog as a no-op and skips telemetry', async () => {
+    const showSaveFilePicker = vi.fn(async () => {
+      throw new DOMException('The user aborted a request.', 'AbortError');
+    });
+    (window as unknown as Record<string, unknown>).showSaveFilePicker = showSaveFilePicker;
+
+    try {
+      const client = new QueryClient();
+      const { result } = renderHook(() => useExportDatabase(), {
+        wrapper: createWrapper(client),
+      });
+
+      // Cancelling the picker resolves the mutation (not an error).
+      await act(async () => {
+        await result.current.mutateAsync();
+      });
+
+      expect(showSaveFilePicker).toHaveBeenCalledTimes(1);
+      // We never touched the database or emitted telemetry.
+      expect(dbSpies.exportDatabase).not.toHaveBeenCalled();
+      expect(trackEvent).not.toHaveBeenCalled();
+    } finally {
+      delete (window as unknown as Record<string, unknown>).showSaveFilePicker;
+    }
   });
 });

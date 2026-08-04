@@ -8,7 +8,7 @@
 /**
  * Message types for worker communication
  */
-type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase';
+type WorkerMessageType = 'exec' | 'execBatch' | 'execBatchOptimized' | 'insertLedgerFile' | 'close' | 'clearAllData' | 'deleteDatabase' | 'resetMerkleState' | 'analyzeDatabase' | 'exportDatabase' | 'exportAck' | 'exportAbort';
 
 interface WorkerMessage {
   type: WorkerMessageType;
@@ -208,6 +208,72 @@ export class DatabaseWorkerClient {
    */
   async analyzeDatabase(): Promise<void> {
     await this.sendMessage('analyzeDatabase', {});
+  }
+
+  /**
+   * Export the live database as a streaming download. The worker sends chunks
+   * (64 MB each) so peak memory stays bounded even for multi-GB databases.
+   *
+   * Accepts a callback that receives each chunk, its offset, total size, and
+   * whether it is the final chunk. The callback can write the chunk to a
+   * writable stream or accumulate it as needed.
+   *
+   * Returns the total byte length once all chunks have been delivered.
+   */
+  async exportDatabase(
+    onChunk?: (chunk: ArrayBuffer, offset: number, totalSize: number, done: boolean) => void | Promise<void>
+  ): Promise<{ totalSize: number }> {
+    await this.readyPromise;
+
+    const id = this.messageId++;
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const handler = (event: MessageEvent) => {
+        const data = event.data;
+        if (settled || data.id !== id) return;
+
+        if (data.type === 'exportChunk') {
+          // Process this chunk, then ACK so the worker releases the next one.
+          // Backpressure keeps at most one chunk in flight, so queued chunks
+          // can't accumulate in main-thread memory regardless of DB size.
+          Promise.resolve()
+            .then(async () => {
+              if (onChunk) {
+                await onChunk(data.chunk, data.offset, data.totalSize, data.done);
+              }
+            })
+            .then(() => {
+              if (settled) return;
+              if (data.done) {
+                settled = true;
+                this.worker.removeEventListener('message', handler);
+                resolve({ totalSize: data.totalSize });
+              } else {
+                this.worker.postMessage({ type: 'exportAck', id });
+              }
+            })
+            .catch((err) => {
+              if (!settled) {
+                settled = true;
+                this.worker.removeEventListener('message', handler);
+                // Tell the worker to stop streaming and release the file handle,
+                // otherwise it stays parked waiting for an ACK that never comes.
+                this.worker.postMessage({ type: 'exportAbort', id });
+                reject(err instanceof Error ? err : new Error(String(err)));
+              }
+            });
+        } else if (data.type === 'error') {
+          settled = true;
+          this.worker.removeEventListener('message', handler);
+          reject(new Error(data.error || 'Export failed'));
+        }
+      };
+
+      this.worker.addEventListener('message', handler);
+      this.worker.postMessage({ type: 'exportDatabase', id, payload: {} });
+    });
   }
 
   /**
