@@ -1,0 +1,12 @@
+# These are wasm-pack build outputs, not hand-edited sources.
+#
+# The .wasm module must never be line-ending converted. Git's binary heuristic
+# would almost certainly catch it, but a silently CRLF-mangled .wasm fails at
+# instantiation with an opaque error, so pin it explicitly rather than rely on
+# detection.
+*.wasm binary
+
+# Keep the generated JS/TS glue at LF so the checked-in bytes match wasm-pack
+# output exactly and re-running the build produces an empty diff on Windows.
+*.js text eol=lf
+*.d.ts text eol=lf
