@@ -55,7 +55,10 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // `wasm` matters: the SCITT verifier and sqlite both ship as WebAssembly,
+        // and without it here they are fetched from the network on every load and
+        // the app stops working offline.
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2,wasm}'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB to accommodate large bundles
         runtimeCaching: [
           {

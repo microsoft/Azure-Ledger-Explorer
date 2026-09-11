@@ -1,0 +1,30 @@
+{
+  "name": "@microsoft/scitt-wasm",
+  "version": "0.2.0",
+  "description": "Prebuilt WebAssembly bindings for microsoft/scitt-verifier's SCITT transparent statement verification core",
+  "license": "MIT",
+  "type": "module",
+  "main": "./scitt_wasm.js",
+  "module": "./scitt_wasm.js",
+  "types": "./scitt_wasm.d.ts",
+  "exports": {
+    ".": {
+      "import": "./scitt_wasm.js",
+      "types": "./scitt_wasm.d.ts"
+    },
+    "./scitt_wasm_bg.wasm": "./scitt_wasm_bg.wasm"
+  },
+  "files": [
+    "scitt_wasm_bg.wasm",
+    "scitt_wasm.js",
+    "scitt_wasm.d.ts",
+    "scitt_wasm_bg.wasm.d.ts"
+  ],
+  "sideEffects": [
+    "./scitt_wasm.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/scitt-verifier"
+  }
+}
