@@ -5,7 +5,7 @@
 
 import { afterEach, beforeAll } from 'vitest'
 import { cleanup } from '@testing-library/react'
-import '@testing-library/jest-dom';
+import '@testing-library/jest-dom/vitest';
 
 // Mock localStorage for jsdom environment
 beforeAll(() => {
