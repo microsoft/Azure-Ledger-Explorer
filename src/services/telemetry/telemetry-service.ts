@@ -197,6 +197,11 @@ export const TelemetryEvents = {
   TELEMETRY_TOGGLED: 'TelemetryToggled',
   THEME_CHANGED: 'ThemeChanged',
 
+  // Governance timeline
+  GOVERNANCE_PAGE_OPENED: 'GovernancePageOpened',
+  GOVERNANCE_EVENT_CLICKED: 'GovernanceEventClicked',
+  GOVERNANCE_FILTER_APPLIED: 'GovernanceFilterApplied',
+
   // Onboarding
   ONBOARDING_PATH_CLICKED: 'OnboardingPathClicked',
   ONBOARDING_SAMPLE_LOADED: 'OnboardingSampleLoaded',
