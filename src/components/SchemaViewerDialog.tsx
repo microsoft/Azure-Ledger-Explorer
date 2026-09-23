@@ -248,7 +248,7 @@ export const SchemaViewerDialog: React.FC<SchemaViewerDialogProps> = ({
                                         <LightbulbRegular className={classes.exampleIcon} />
                                         <div className={classes.exampleContent}>
                                             <span className={classes.exampleLabel}>Example Query</span>
-                                            <code className={classes.exampleCode}>SELECT * FROM transactions ORDER BY sequence_no DESC LIMIT 10;</code>
+                                            <code className={classes.exampleCode}>SELECT sequence_no, key_name, json_extract(value_text, '$.protected."CWT Claims".sub') AS sub FROM kv_writes WHERE map_name = 'public:scitt.entry' AND json_extract(value_text, '$.protected."CWT Claims".sub') IS NOT NULL LIMIT 10;</code>
                                         </div>
                                     </div>
                                 </div>
