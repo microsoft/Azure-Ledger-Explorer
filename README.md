@@ -6,6 +6,7 @@ A TypeScript/React application for exploring and analyzing CCF (Confidential Con
 
 - **Ledger File Parsing**: Import and parse CCF ledger files with full transaction details
 - **Transaction Visualization**: Browse transactions with detailed information and search capabilities
+- **Governance Timeline**: Dedicated `/governance` view that groups member, node, service, proposal, and constitution events by sequence number with filter chips and drill-down
 - **Azure Integration**: Direct import from Azure File Shares using SAS tokens
 - **Persistent Storage**: Client-side SQLite database with OPFS VFS
 - **Progressive Web App**: Install to your device, work offline, and get automatic updates
