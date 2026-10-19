@@ -10,3 +10,10 @@
 # output exactly and re-running the build produces an empty diff on Windows.
 *.js text eol=lf
 *.d.ts text eol=lf
+
+# Mark the build outputs as generated so GitHub collapses them in diffs and
+# leaves them out of language statistics. Fixes belong upstream in
+# microsoft/scitt-verifier or wasm-bindgen, not in these files.
+*.wasm linguist-generated=true
+*.js linguist-generated=true
+*.d.ts linguist-generated=true
