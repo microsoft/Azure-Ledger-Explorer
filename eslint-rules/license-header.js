@@ -18,7 +18,9 @@ export default {
   create(context) {
     return {
       Program(node) {
-        const source = context.sourceCode.getText();
+        // Normalize CRLF so the rule checks the header text, not the checkout's
+        // line endings. Without this every file fails on a Windows working tree.
+        const source = context.sourceCode.getText().replace(/\r\n/g, "\n");
 
         if (!source.startsWith(REQUIRED_HEADER)) {
           context.report({

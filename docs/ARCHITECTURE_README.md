@@ -4,10 +4,11 @@
 
 Azure Ledger Explorer is a modern, client-side React application built with TypeScript that enables users to parse, store, and analyze CCF (Confidential Consortium Framework) ledger data entirely within their browser. The application follows a layered architecture pattern with clear separation of concerns.
 
-The project is organized as an **npm workspaces monorepo** with two internal packages:
+The project is organized as an **npm workspaces monorepo** with three internal packages:
 
 - **`packages/ledger-parser`** (`@microsoft/ccf-ledger-parser`): Binary parser for the CCF LedgerChunkV2 format, Merkle tree utilities, CBOR decoding, and ledger validation logic.
 - **`packages/ccf-database`** (`@microsoft/ccf-database`): Browser SQLite database facade backed by `@sqlite.org/sqlite-wasm` and OPFS, exposing typed repositories and a dedicated database Web Worker.
+- **`packages/scitt-wasm`** (`@microsoft/scitt-wasm`): Vendored WebAssembly build of [microsoft/scitt-verifier](https://github.com/microsoft/scitt-verifier)'s verification core, for SCITT transparent statements. Generated artifacts only; see its README to regenerate.
 
 The main application (`src/`) consumes these packages as workspace dependencies.
 
@@ -105,25 +106,26 @@ CCF-Ledger-Explorer/
 │   │       ├── cose-signature-time.ts # COSE signature parsing
 │   │       ├── table-names.ts        # CCF table name constants
 │   │       └── types.ts              # Shared types
-│   └── ccf-database/           # @microsoft/ccf-database
-│       └── src/
-│           ├── ccf-database.ts       # Public CCFDatabase facade
-│           ├── constants.ts          # DATABASE_FILENAME etc.
-│           ├── migrations/           # SQLite schema migrations
-│           ├── repositories/         # FileRepository, TransactionRepository,
-│           │                         # KVRepository, StatsRepository
-│           ├── types/                # DatabaseConfig, query/repository types
-│           ├── utilities/            # decode-cbor-tables.ts
-│           └── worker/
-│               ├── database-worker.ts        # sqlite-wasm Web Worker
-│               └── database-worker-client.ts # Message-passing client
+│   ├── ccf-database/           # @microsoft/ccf-database
+│   │   └── src/
+│   │       ├── ccf-database.ts       # Public CCFDatabase facade
+│   │       ├── constants.ts          # DATABASE_FILENAME etc.
+│   │       ├── migrations/           # SQLite schema migrations
+│   │       ├── repositories/         # FileRepository, TransactionRepository,
+│   │       │                         # KVRepository, StatsRepository
+│   │       ├── types/                # DatabaseConfig, query/repository types
+│   │       ├── utilities/            # decode-cbor-tables.ts
+│   │       └── worker/
+│   │           ├── database-worker.ts        # sqlite-wasm Web Worker
+│   │           └── database-worker-client.ts # Message-passing client
+│   └── scitt-wasm/             # @microsoft/scitt-wasm (generated, vendored)
 └── src/                        # Main React application
     ├── App.tsx                  # Root: FluentProvider + QueryClientProvider + Router
     ├── components/              # Reusable UI components
     ├── pages/                   # Route-level page components
     ├── hooks/                   # Custom React hooks
     ├── services/                # External-service clients
-    ├── workers/                 # verification-worker.ts
+    ├── workers/                 # verification-worker.ts, scitt-verification-worker.ts
     ├── types/                   # Shared TypeScript types
     ├── utils/                   # Pure utility functions
     └── constants/               # Application-wide constants
@@ -204,7 +206,7 @@ The AI chat UI is split into single-responsibility components:
 | **AIPage.tsx** | `/chat` | AI assistant (Sage API or OpenAI BYOK) |
 | **VerificationPage.tsx** | `/verification` | Chunk-based Merkle tree verification |
 | **WriteReceiptVerificationPage.tsx** | `/write-receipt` | Write-receipt signature verification |
-| **MstReceiptVerificationPage.tsx** | `/mst-receipt` | MST receipt verification guidance |
+| **MstReceiptVerificationPage.tsx** | `/mst-receipt` | SCITT transparent statement verification (scitt-wasm, in a worker) |
 | **CoseViewerPage.tsx** | `/cose-viewer` | COSE signature / envelope viewer |
 | **TransactionDetailsPage.tsx** | `/transaction/:id` | Single-transaction deep dive |
 | **ConfigPage.tsx** | `/config` | Settings: API keys, models, data management |
@@ -303,6 +305,7 @@ All query keys are centralised in the exported `queryKeys` object in `src/hooks/
 | **use-ccf-data.ts** | All database query and mutation hooks; `initializeDatabase` / `resetDatabase` exports |
 | **use-chat.ts** | Chat state management |
 | **use-verification.ts** | Merkle verification state (wraps `VerificationService`) |
+| **use-scitt-verification.ts** | SCITT transparent statement verification mutations (wraps `ScittVerificationService`) |
 | **use-api-health.ts** | Polls the Sage API health endpoint |
 | **use-openai-key-validation.ts** | Validates an OpenAI API key against the API |
 | **write-receipt-verification.ts** | Write-receipt signature verification logic |
@@ -372,6 +375,25 @@ VerificationService          (src/services/verification-service.ts)
 - Verification is chunk-based: only the **last signature transaction** in each chunk is verified against the accumulated Merkle root, dramatically reducing verification time.
 - Supports **pause / resume / stop** with progress saved to `localStorage`.
 - Results (per-chunk `verified` flag + error) are persisted back to the database via the `VerificationService`.
+
+#### SCITT Transparent Statement Verification
+
+A separate verifier from the Merkle verification above and from ACL write receipts (`src/utils/receipt-verification.ts`): it checks SCITT transparent statements (RFC 9943) using `@microsoft/scitt-wasm`.
+
+```
+useScittVerification hook      (src/hooks/use-scitt-verification.ts)
+      │
+      ▼
+ScittVerificationService       (src/services/scitt-verification-service.ts)
+  ├── spawns Worker ────────▶ scitt-verification-worker.ts
+  │                              • its own wasm instance, separate from sqlite-wasm
+  │                              • verifyStatement(statement, keySet, trustedRoots?)
+  └── deriveOutcome(facts)    • the app's verdict; the wasm core reports facts only
+```
+
+- Every check is tri-state (`true` / `false` / `null` = did not run); `null` is never rendered as a pass or a failure.
+- `deriveOutcome` mirrors the upstream CLI's `decide()`: a failed statement signature or an `invalid` signer chain is *not transparent*; supplied trusted roots that cannot anchor the chain, or receipts that cannot be verified, are *cannot evaluate*.
+- Types for the JSON boundary live in `src/types/scitt-types.ts` and must track the vendored package version.
 
 #### Azure Integration (`src/services/AzureFileShareService.ts`)
 
