@@ -32,8 +32,19 @@ import type {
  * forgery — the bytes may be exactly what the Issuer signed, with only the
  * proof of registration missing. An unproven claim is not a disproven one, and
  * collapsing the two would report a rotation as an attack.
+ *
+ * The certificate chain is handled as the upstream CLI's `decide()` handles it.
+ * An `invalid` chain indicts the statement: `x5chain` is a protected header the
+ * Issuer signed, so a chain that does not hold is a claim about identity the
+ * statement cannot support. A chain that could not be *anchored* only matters
+ * when the user supplied trusted roots — they asked a question, and an
+ * unanswered question must not read as a pass. Without roots, an unanchored
+ * chain is a declared gap that the summary names, not a failure.
  */
-export const deriveOutcome = (facts: StatementFacts): { outcome: ScittOutcome; summary: string } => {
+export const deriveOutcome = (
+  facts: StatementFacts,
+  { anchoringRequested = false }: { anchoringRequested?: boolean } = {},
+): { outcome: ScittOutcome; summary: string } => {
   if (facts.signatureValid === false) {
     return {
       outcome: 'not-transparent',
@@ -42,11 +53,29 @@ export const deriveOutcome = (facts: StatementFacts): { outcome: ScittOutcome; s
     };
   }
 
+  const chain = facts.chainValidation;
+  if (chain.status === 'evaluated' && chain.outcome === 'invalid') {
+    return {
+      outcome: 'not-transparent',
+      summary: anchoringRequested
+        ? `The signer's certificate chain does not lead to any of the trusted roots supplied: ${chain.reason}.`
+        : `The signer's certificate chain did not validate: ${chain.reason}.`,
+    };
+  }
+
   if (facts.signatureValid === null) {
     return {
       outcome: 'unsigned',
       summary:
         'The statement carries no usable certificate chain, so its signature could not be checked at all.',
+    };
+  }
+
+  if (anchoringRequested && !(chain.status === 'evaluated' && chain.outcome === 'valid')) {
+    const reason = chain.status === 'evaluated' ? `: ${chain.reason}` : '';
+    return {
+      outcome: 'cannot-evaluate',
+      summary: `Trusted roots were supplied, but the signer's certificate chain could not be anchored to them${reason}. This result cannot say whether the signer is one you trust.`,
     };
   }
 
@@ -59,12 +88,13 @@ export const deriveOutcome = (facts: StatementFacts): { outcome: ScittOutcome; s
   }
 
   if (facts.anyReceiptVerified) {
-    const scoped = facts.keySet.scoped
-      ? ''
-      : ' The key set was not scoped to an issuer, which is weaker evidence: an unscoped set will match a receipt from any ledger.';
+    const anchored = chain.status === 'evaluated' && chain.outcome === 'valid' && chain.anchoredExternally;
+    const signer = anchored
+      ? " The signer's certificate chain leads to a trusted root you supplied."
+      : " The signer's certificate chain is not anchored to a root you trust, so this shows the statement was registered, not who signed it.";
     return {
       outcome: 'transparent',
-      summary: `Registered on a transparency service, and the receipt commits to this exact statement.${scoped}`,
+      summary: `Registered on a transparency service, and the receipt commits to this exact statement.${signer}`,
     };
   }
 
@@ -83,15 +113,6 @@ export const deriveOutcome = (facts: StatementFacts): { outcome: ScittOutcome; s
       outcome: 'cannot-evaluate',
       summary:
         'The signing key named by this receipt is not in the key set supplied. Transparency services rotate keys; this usually means the key set is stale rather than that anything is wrong.',
-    };
-  }
-
-  const mismatched = facts.receipts.some((r) => r.keyLookup === 'issuer-mismatch');
-  if (mismatched) {
-    return {
-      outcome: 'cannot-evaluate',
-      summary:
-        'The key set is scoped to a different transparency service than the one that issued this receipt.',
     };
   }
 
@@ -160,22 +181,24 @@ export class ScittVerificationService {
   /**
    * Verify a transparent statement against a COSE_KeySet.
    *
-   * `issuer` scopes the key set to one transparency service. Omitting it still
-   * verifies, but the result records that the evidence is weaker.
+   * `trustedRoots` is optional PEM holding one or more CA certificates. Without
+   * it the signer's chain is still validated, but only to the root the
+   * statement carries, and the result says the signer is not anchored. Roots
+   * that cannot be read are rejected rather than ignored.
    */
   async verify(
     statement: ArrayBuffer,
     keySet: ArrayBuffer,
-    issuer?: string,
+    trustedRoots?: string,
   ): Promise<ScittVerificationResult> {
     const facts = await this.request<StatementFacts>(
-      (requestId) => ({ type: 'verify', requestId, statement, keySet, issuer }),
+      (requestId) => ({ type: 'verify', requestId, statement, keySet, trustedRoots }),
       // Transferred, not copied: statements run to tens of kilobytes and the
       // caller has no use for the buffers afterwards.
       [statement, keySet],
     );
 
-    return { facts, ...deriveOutcome(facts) };
+    return { facts, ...deriveOutcome(facts, { anchoringRequested: trustedRoots !== undefined }) };
   }
 
   /** Describe a statement with no trust material. Establishes nothing. */

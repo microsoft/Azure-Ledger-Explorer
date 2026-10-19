@@ -52,7 +52,7 @@ self.onmessage = async (event: MessageEvent<ScittWorkerInMessage>) => {
           verifyStatement(
             new Uint8Array(message.statement),
             new Uint8Array(message.keySet),
-            message.issuer,
+            message.trustedRoots,
           ),
         ) as StatementFacts;
         post({ type: 'verified', requestId: message.requestId, facts });
@@ -70,8 +70,9 @@ self.onmessage = async (event: MessageEvent<ScittWorkerInMessage>) => {
   } catch (error) {
     // A statement that parses but fails verification is a *result*, not an
     // error, and never lands here. This path means the bytes were not a
-    // statement, or the key set was unusable — both worth showing verbatim,
-    // since the core's messages already explain what was wrong.
+    // statement, or the key set or trusted roots were unusable — all worth
+    // showing verbatim, since the core's messages already explain what was
+    // wrong.
     post({
       type: 'error',
       requestId: message.requestId,

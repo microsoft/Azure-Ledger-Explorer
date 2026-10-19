@@ -10,7 +10,8 @@ import type { ScittVerificationResult, StatementInspection } from '../types/scit
 export interface VerifyInput {
   statement: ArrayBuffer;
   keySet: ArrayBuffer;
-  issuer?: string;
+  /** PEM holding one or more CA certificates to anchor the signer's chain. */
+  trustedRoots?: string;
 }
 
 /**
@@ -23,8 +24,8 @@ export interface VerifyInput {
  */
 export const useScittVerification = () =>
   useMutation<ScittVerificationResult, Error, VerifyInput>({
-    mutationFn: ({ statement, keySet, issuer }) =>
-      scittVerificationService.verify(statement, keySet, issuer),
+    mutationFn: ({ statement, keySet, trustedRoots }) =>
+      scittVerificationService.verify(statement, keySet, trustedRoots),
     retry: false,
   });
 

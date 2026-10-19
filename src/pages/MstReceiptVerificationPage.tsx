@@ -10,7 +10,6 @@ import {
   Card,
   Text,
   Button,
-  Input,
   Field,
   Spinner,
   MessageBar,
@@ -27,7 +26,7 @@ import {
   QuestionCircle16Regular,
 } from '@fluentui/react-icons';
 import { useScittVerification } from '../hooks/use-scitt-verification';
-import type { ReceiptFacts, ScittOutcome, TriState } from '../types/scitt-types';
+import type { ChainValidation, ReceiptFacts, ScittOutcome, TriState } from '../types/scitt-types';
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto' },
@@ -88,7 +87,11 @@ const useStyles = makeStyles({
  * did not run has established nothing, and showing it as a failure would
  * report a stale key set as a bad signature.
  */
-const CheckRow: React.FC<{ label: string; state: TriState }> = ({ label, state }) => {
+const CheckRow: React.FC<{ label: string; state: TriState; skipReason?: string }> = ({
+  label,
+  state,
+  skipReason = 'did not run',
+}) => {
   const styles = useStyles();
   const { icon, className, suffix } =
     state === true
@@ -98,7 +101,7 @@ const CheckRow: React.FC<{ label: string; state: TriState }> = ({ label, state }
         : {
             icon: <QuestionCircle16Regular />,
             className: styles.skip,
-            suffix: ' — did not run',
+            suffix: ` — ${skipReason}`,
           };
 
   return (
@@ -110,6 +113,36 @@ const CheckRow: React.FC<{ label: string; state: TriState }> = ({ label, state }
       </Text>
     </div>
   );
+};
+
+/**
+ * Splits chain validation into the two questions a user actually has: does the
+ * chain hold together, and does it lead somewhere they trust. Without trusted
+ * roots the second never ran, and must say so rather than read as a failure.
+ */
+const chainChecks = (
+  chain: ChainValidation,
+  anchoringRequested: boolean,
+): { holds: TriState; holdsReason?: string; anchored: TriState; anchoredReason?: string } => {
+  if (chain.status === 'notEvaluated') {
+    return { holds: null, anchored: null };
+  }
+  if (chain.outcome === 'valid') {
+    return {
+      holds: true,
+      anchored: chain.anchoredExternally ? true : null,
+      anchoredReason: 'no trusted roots supplied',
+    };
+  }
+  if (chain.outcome === 'invalid') {
+    return { holds: false, anchored: anchoringRequested ? false : null, anchoredReason: 'no trusted roots supplied' };
+  }
+  return {
+    holds: null,
+    holdsReason: chain.reason,
+    anchored: null,
+    anchoredReason: anchoringRequested ? chain.reason : 'no trusted roots supplied',
+  };
 };
 
 const OUTCOME_INTENT: Record<ScittOutcome, 'success' | 'error' | 'warning'> = {
@@ -213,24 +246,32 @@ export const MstReceiptVerificationPage: React.FC = () => {
 
   const [statement, setStatement] = React.useState<File | null>(null);
   const [keySet, setKeySet] = React.useState<File | null>(null);
-  const [issuer, setIssuer] = React.useState('');
+  const [trustedRoots, setTrustedRoots] = React.useState<File | null>(null);
 
   const { mutate } = verification;
 
   const onVerify = React.useCallback(async () => {
     if (!statement || !keySet) return;
-    const [statementBytes, keySetBytes] = await Promise.all([
+    const [statementBytes, keySetBytes, rootsPem] = await Promise.all([
       statement.arrayBuffer(),
       keySet.arrayBuffer(),
+      trustedRoots?.text(),
     ]);
     mutate({
       statement: statementBytes,
       keySet: keySetBytes,
-      issuer: issuer.trim() || undefined,
+      trustedRoots: rootsPem,
     });
-  }, [statement, keySet, issuer, mutate]);
+  }, [statement, keySet, trustedRoots, mutate]);
 
   const result = verification.data;
+  const chain = result
+    ? chainChecks(result.facts.chainValidation, verification.variables?.trustedRoots !== undefined)
+    : null;
+  const chainReason =
+    result?.facts.chainValidation.status === 'evaluated' && result.facts.chainValidation.outcome === 'invalid'
+      ? result.facts.chainValidation.reason
+      : null;
 
   return (
     <div className={styles.container}>
@@ -280,13 +321,13 @@ export const MstReceiptVerificationPage: React.FC = () => {
               </div>
               <div className={styles.inputCol}>
                 <Field
-                  label="Issuer (optional)"
-                  hint="Scopes the key set to one transparency service. Without it, a key set will match a receipt from any ledger."
+                  label="Trusted roots (optional, PEM)"
+                  hint="CA certificates that should anchor the signer's chain. Without them the chain is checked only against the root the statement carries, which anyone can mint."
                 >
-                  <Input
-                    value={issuer}
-                    placeholder="contoso.confidential-ledger.azure.com"
-                    onChange={(_, data) => setIssuer(data.value)}
+                  <input
+                    type="file"
+                    accept=".pem,.crt,.cer"
+                    onChange={(e) => setTrustedRoots(e.target.files?.[0] ?? null)}
                   />
                 </Field>
               </div>
@@ -331,7 +372,28 @@ export const MstReceiptVerificationPage: React.FC = () => {
                     label="Issuer's signature over the statement"
                     state={result.facts.signatureValid}
                   />
+                  {chain && (
+                    <>
+                      <CheckRow
+                        label="Signer's certificate chain validates"
+                        state={chain.holds}
+                        skipReason={chain.holdsReason}
+                      />
+                      <CheckRow
+                        label="Signer's chain is anchored to a trusted root"
+                        state={chain.anchored}
+                        skipReason={chain.anchoredReason}
+                      />
+                    </>
+                  )}
+                  <CheckRow
+                    label="Certificates valid at registration time"
+                    state={result.facts.certificatesValidAtRegistration}
+                  />
                 </div>
+                {chainReason && (
+                  <Text className={styles.mono}>Chain: {chainReason}</Text>
+                )}
                 <Divider />
                 <div className={styles.grid}>
                   <div>
@@ -384,11 +446,17 @@ export const MstReceiptVerificationPage: React.FC = () => {
                     <Text weight="semibold" block size={300}>
                       Keys in set
                     </Text>
-                    <Text className={styles.mono}>
-                      {result.facts.keySet.keyCount}
-                      {result.facts.keySet.scoped ? ' (scoped)' : ' (unscoped)'}
-                    </Text>
+                    <Text className={styles.mono}>{result.facts.keySet.keyCount}</Text>
                   </div>
+                  {result.facts.chainValidation.status === 'evaluated' &&
+                    result.facts.chainValidation.outcome === 'valid' && (
+                      <div>
+                        <Text weight="semibold" block size={300}>
+                          Chain root (SHA-256)
+                        </Text>
+                        <Text className={styles.mono}>{result.facts.chainValidation.rootSha256}</Text>
+                      </div>
+                    )}
                 </div>
 
                 {result.facts.problems.length > 0 && (

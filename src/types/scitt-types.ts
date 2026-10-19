@@ -41,7 +41,7 @@ export type TriState = boolean | null;
  * events. One is an operational chore, the other is an incident, and a UI that
  * renders them identically teaches its users to ignore both.
  */
-export type KeyLookup = 'found' | 'unknown-kid' | 'revoked' | 'issuer-mismatch';
+export type KeyLookup = 'found' | 'unknown-kid' | 'revoked';
 
 export interface CwtClaims {
   iss: string | null;
@@ -99,15 +99,49 @@ export interface ReceiptFacts {
   problems: string[];
 }
 
+/**
+ * The key set is deliberately not scoped to an issuer. A receipt from another
+ * transparency service is signed by that service's key and fails verification
+ * on its own merits; which issuer to accept is the caller's judgement, made on
+ * `ReceiptFacts.issuer`.
+ */
 export interface KeySetSummary {
-  issuer: string | null;
   keyCount: number;
   revokedKids: string[];
   /** Entries that could not be parsed. A rotation must not become an outage. */
   skipped: string[];
-  /** Unscoped key sets are weaker evidence: they match any issuer. */
-  scoped: boolean;
 }
+
+/**
+ * Validation of the signer's certificate chain (the statement's `x5chain`).
+ *
+ * Always runs. Without trusted roots the chain is validated only up to the
+ * root the statement itself carries, and `anchoredExternally` is `false`: a
+ * consistent chain, not an identified signer, because anyone can mint a root.
+ */
+export type ChainValidation =
+  | { status: 'notEvaluated' }
+  | {
+      status: 'evaluated';
+      outcome: 'valid';
+      rootSha256: string;
+      /** True only when the chain leads to a root the caller supplied. */
+      anchoredExternally: boolean;
+      validatedAt: number;
+      pathLength: number;
+      pathNotBefore: number;
+      pathNotAfter: number;
+    }
+  | {
+      status: 'evaluated';
+      /**
+       * `invalid` indicts the statement. `insufficient` (too few certificates)
+       * and `unsupported` (an algorithm this build cannot validate) mean the
+       * question was not answered.
+       */
+      outcome: 'invalid' | 'insufficient' | 'unsupported';
+      reason: string;
+    };
 
 export interface StatementFacts {
   algorithm: CoseAlgorithm | null;
@@ -118,6 +152,13 @@ export interface StatementFacts {
   /** Whether the Issuer's signature over the statement verified. */
   signatureValid: TriState;
   certificateChainLength: number;
+  chainValidation: ChainValidation;
+  /**
+   * Whether every certificate in the chain was within its validity period at
+   * the ledger's countersigned registration time — never the statement's own
+   * `iat`, which the signer chooses.
+   */
+  certificatesValidAtRegistration: TriState;
   leafSubject: string | null;
   leafIssuer: string | null;
   /**
@@ -158,6 +199,7 @@ export interface ReceiptSummary {
   ccfTxId: string | null;
   claimsDigest: string | null;
   commitEvidence: string | null;
+  registrationTxId: string | null;
   writeSetDigest: string | null;
   pathLength: number | null;
   protectedLabels: string[];
@@ -211,7 +253,8 @@ export type ScittWorkerInMessage =
       requestId: number;
       statement: ArrayBuffer;
       keySet: ArrayBuffer;
-      issuer?: string;
+      /** PEM holding one or more CA certificates to anchor the signer's chain. */
+      trustedRoots?: string;
     }
   | { type: 'inspect'; requestId: number; statement: ArrayBuffer };
 
