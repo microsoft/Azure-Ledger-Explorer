@@ -16,5 +16,9 @@ jobs:
         name: Run linter
       - run: npm run build
         name: Build app
+      - run: npm run build
+        name: Build app for GitHub Pages (includes MST lookup page)
+        env:
+          DEPLOY_TARGET: github-pages
       - run: npm test
         name: Run tests

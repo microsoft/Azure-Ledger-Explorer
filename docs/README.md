@@ -8,6 +8,7 @@
 - [AI Assistant](./AI_ASSISTANT_README.md)
 - [PWA](./PWA_README.md)
 - [Verification](./VERIFICATION_FEATURE.md)
+- [MST Statement Lookup](./MST_LOOKUP_README.md)
 - [Deployment](./DEPLOYMENT_README.md)
 - [Testing](./TESTING_README.md)
 
