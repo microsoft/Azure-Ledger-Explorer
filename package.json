@@ -37,6 +37,8 @@
     "@types/jsrsasign": "^10.5.15",
     "buffer": "^6.0.3",
     "cbor2": "^2.0.1",
+    "hyparquet": "^1.31.4",
+    "hyparquet-compressors": "^1.1.2",
     "js-base64": "^3.9.4",
     "jsrsasign": "^11.1.5",
     "react": "^19.3.0",

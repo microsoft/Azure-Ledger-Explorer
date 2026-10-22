@@ -1,0 +1,44 @@
+{
+ "builder": "mst-parquet-emitter@0.1.0",
+ "canonical_seqno": 45,
+ "chunk_count": 5,
+ "entries_count": 41,
+ "first_seqno": 1,
+ "latest_attestation": null,
+ "ledger_id": "fixture-a",
+ "manifest_root": "sha256:1432f299cd4ee258d6f6902cabb14285fd96210386fbccd4160f4b86140229ca",
+ "schema": "mst.index.manifest.v1",
+ "segments": [
+  {
+   "chunk_count": 2,
+   "file": "manifest/seg-000000.json",
+   "first_seqno": 1,
+   "last_seqno": 20,
+   "sha256": "f59132e5c7a3d645227331e14183c776b8207bf6d87585bb829cc8818ab155ec"
+  },
+  {
+   "chunk_count": 2,
+   "file": "manifest/seg-000001.json",
+   "first_seqno": 21,
+   "last_seqno": 40,
+   "sha256": "f9927a40342bb66760f251a45517c7dbc1210ce79aa60ed923ac9c07e5a19193"
+  }
+ ],
+ "service_url": "",
+ "tail": [
+  {
+   "chunk_name": "ledger_41-45.committed",
+   "end_seqno": 45,
+   "entries_root": "sha256:bc0b42eb72afc36ccbf79a995a55df3e23fae2db5aa1ddbea64d173594df92d6",
+   "file": "chunks/ledger_41-45.parquet",
+   "file_bytes": 7149,
+   "file_sha256": "8cad04bde317fe94e876545d310117c8412223456195e57135d72704d168edec",
+   "repr_sha256": "XefdSWsSsMtmV5UmS+L2wuFzBvTjG67I9kgaOCYNVAY=",
+   "row_count": 5,
+   "signed_at_max": "2026-09-21T14:20:50.000000Z",
+   "signed_at_min": "2026-09-21T14:20:10.000000Z",
+   "start_seqno": 41
+  }
+ ],
+ "updated_at": "2026-10-22T20:12:16.646619Z"
+}

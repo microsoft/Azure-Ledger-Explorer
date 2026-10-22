@@ -14,6 +14,7 @@ import {
 } from '@fluentui/react-icons';
 import type { EntryRef, SearchBy } from '../types/lookup-types';
 import { parseEntry, parseLedgerName } from '../utils/lookup-verdict';
+import { defaultEndpoints } from '../services/mst-lookup-service';
 
 const useStyles = makeStyles({
   form: {
@@ -28,7 +29,9 @@ const useStyles = makeStyles({
   submit: { marginTop: '26px' },
 });
 
-const INDEX_HINT = 'Searches the MST indexer; works only for ledgers onboarded to it.';
+const INDEX_HINT = defaultEndpoints.parquetIndexBase
+  ? 'Searches the Parquet ledger index; works only for ledgers it covers.'
+  : 'Searches the MST indexer; works only for ledgers onboarded to it.';
 
 const SEARCH_TYPES: Record<SearchBy, { label: string; placeholder: string; invalid: string; hint?: string }> = {
   txId: {

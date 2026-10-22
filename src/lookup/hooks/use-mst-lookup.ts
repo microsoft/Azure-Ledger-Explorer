@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { searchIndex } from '../services/indexer-search-service';
+import { searchParquetIndex } from '../services/parquet-index-service';
 import { defaultEndpoints, lookupStatement } from '../services/mst-lookup-service';
 import type { DirectSearchBy, EntryRef, IndexSearchBy, SearchBy } from '../types/lookup-types';
 import { parseEntry, parseLedgerName } from '../utils/lookup-verdict';
@@ -48,8 +49,9 @@ export const useMstLookup = (ledger: string | null, entry: EntryRef<DirectSearch
 
 /**
  * Search a ledger's index by issuer, subject or payload hash, a page at a
- * time. Works only for ledgers onboarded to the mst-indexer; others fail with
- * a `notFound` error explaining that.
+ * time. Reads the Parquet index when `VITE_MST_PARQUET_INDEX_BASE` is set, and
+ * the mst-indexer otherwise. Works only for ledgers with an index; others fail
+ * with a `notIndexed` error explaining that.
  *
  * @param ledger - Bare ledger name, or `null` to stay idle.
  * @param entry - The search, or `null` to stay idle.
@@ -59,7 +61,10 @@ export const useIndexSearch = (ledger: string | null, entry: EntryRef<IndexSearc
     queryKey: lookupQueryKeys.search(ledger ?? '', entry ?? { by: 'subject', value: '' }),
     queryFn: ({ pageParam, signal }) => {
       if (!ledger || !entry) throw new Error('A ledger name and a search are required.');
-      return searchIndex(ledger, entry.by, entry.value, pageParam, defaultEndpoints, { signal });
+      const { parquetIndexBase } = defaultEndpoints;
+      return parquetIndexBase
+        ? searchParquetIndex(parquetIndexBase, ledger, entry.by, entry.value, pageParam, { signal })
+        : searchIndex(ledger, entry.by, entry.value, pageParam, defaultEndpoints, { signal });
     },
     initialPageParam: null as number | null,
     getNextPageParam: (last) => last.nextBefore ?? undefined,

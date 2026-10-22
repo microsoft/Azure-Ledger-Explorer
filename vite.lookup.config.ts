@@ -21,7 +21,7 @@ export default defineConfig({
   publicDir: false,
   plugins: [react()],
   server: {
-    proxy: mstLookupDevProxy,
+    proxy: mstLookupDevProxy(),
   },
   build: {
     outDir: path.resolve(__dirname, 'dist-lookup'),

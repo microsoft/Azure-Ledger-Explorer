@@ -3,6 +3,8 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
+/// <reference types="node" />
+
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';

@@ -44,6 +44,12 @@ export interface LookupEndpoints {
   identityBase: string;
   /** Base of the mst-indexer read API; `/{ledger}/entries` is appended. */
   indexerBase: string;
+  /**
+   * Base of a Parquet index (`mst.index.parquet.v1`); `/{ledger}/v1/...` is
+   * appended. When set, issuer, subject and payload-hash searches read it
+   * instead of the mst-indexer.
+   */
+  parquetIndexBase?: string;
 }
 
 export { CONTROL_PLANE_HOST, IDENTITY_HOST };
@@ -58,6 +64,7 @@ export const defaultEndpoints: LookupEndpoints = {
   indexerBase:
     import.meta.env.VITE_MST_INDEXER_BASE ??
     (import.meta.env.DEV ? '/mst-dev/indexer' : `${IDENTITY_HOST}/odata/ledgers`),
+  parquetIndexBase: import.meta.env.VITE_MST_PARQUET_INDEX_BASE || undefined,
 };
 
 /** A lookup that produced nothing to verify, with which request failed and why. */

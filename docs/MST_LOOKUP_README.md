@@ -3,7 +3,7 @@
 A small standalone page, at `/lookup/`, that fetches one transparent statement from a Microsoft Signing Transparency (MST) ledger and verifies it in the browser. It takes the **ledger name** and a search, chosen with a **Search by** selector:
 
 - **Transaction ID** (the one returned when the statement was registered): answered by the ledger, for any ledger. Opens the verified result.
-- **Issuer**, **subject** or **payload hash**: answered by the mst-indexer, only for ledgers onboarded to it. Lists matching entries; opening one verifies it.
+- **Issuer**, **subject** or **payload hash**: answered by the mst-indexer, only for ledgers onboarded to it, or by a Parquet index when one is configured (see [Searching a Parquet index](#searching-a-parquet-index-prototype)). Lists matching entries; opening one verifies it.
 
 The search is kept in the URL so a result can be shared:
 
@@ -41,6 +41,7 @@ The browser cannot reach a ledger directly: the ledger's TLS certificate is issu
 | Signing key set | Control-plane proxy, `GET https://centraluseuap.controlplane.confidential-ledger.core.azure.com/api/Proxy/{ledger}/.well-known/scitt-keys` | Nothing |
 | Statement | Control-plane proxy, `GET .../api/Proxy/{ledger}/entries/{txId}/statement` | Nothing |
 | Search results | mst-indexer, `GET https://centraluseuap.identity.confidential-ledger.core.azure.com/odata/ledgers/{ledger}/entries?$filter=...` | Nothing |
+| Search results (Parquet index, when configured) | Static files under `{VITE_MST_PARQUET_INDEX_BASE}/{ledger}/v1/` | Internal consistency only; see below |
 
 The statement endpoint requires the full `<view>.<seqno>`, so there is no search by bare sequence number: scitt-ccf-ledger is removing the `/entries/txIds` listing that resolved one ([microsoft/scitt-ccf-ledger#476](https://github.com/microsoft/scitt-ccf-ledger/pull/476)). For an indexed ledger, an issuer, subject or payload-hash search lists each entry's transaction ID.
 
@@ -53,6 +54,20 @@ Issuer, subject and payload-hash searches query the mst-indexer read API, hosted
 - Results are newest first, 20 per page, with **Load more**. The indexer returns a bare array without a count or next link, so the page asks for one extra row to tell whether another page exists. Each page starts below the last sequence number shown (`SequenceNo lt <n>`) instead of using `$skip`. That avoids the indexer's 10,000-row `$skip` limit, and entries indexed while you page don't repeat rows. Rows that share a sequence number are kept on the same page; if they alone fill a page, the page fetches all of them (up to 500) with `SequenceNo eq <n>`.
 
 Index rows are pointers, not evidence. The list says so, and each entry is fetched from the ledger and verified only when it is opened.
+
+### Searching a Parquet index (prototype)
+
+When `VITE_MST_PARQUET_INDEX_BASE` is set, issuer, subject and payload-hash searches read a static Parquet index instead of calling the mst-indexer. An emitter outside the ledger reads committed ledger chunks and writes, per ledger, under `{base}/{ledger}/v1/`:
+
+- `chunks/<ledger chunk>.parquet`: one immutable file per committed ledger chunk, one row per registered statement.
+- `manifest/seg-NNNNNN.json`: immutable segments listing chunk files, their SHA-256, row count, sequence-number range and `entries_root`.
+- `manifest/head.json`: the only mutable file. It lists the segments with their SHA-256 and states `canonical_seqno` (the last sequence number covered), the chunk and entry counts, and `manifest_root`.
+
+The page checks everything it reads before using it: segment and chunk digests, that chunks are contiguous and gapless, the recomputed `manifest_root`, each chunk's Parquet key-value metadata, row count and sequence-number range, and the recomputed `entries_root` of its rows. Any mismatch is shown as "Index failed verification". A ledger with no `head.json` is reported as not indexed.
+
+These checks show the files are consistent with each other and with `head.json`; they do not show that `head.json` came from the ledger, since it is not yet attested. The results say "not attested". As with the mst-indexer, rows are pointers, and opening an entry verifies it against the ledger.
+
+Search is newest first, 20 per page. Chunks are fetched only as far back as needed to fill a page and are cached, and rows that share a sequence number stay on the same page. Issuer and subject are case-sensitive substring matches, and payload hash is an exact, case-insensitive match, the same as the mst-indexer. Above the results the page shows the index snapshot it searched: the covered sequence number, entry and chunk counts, update time, chunks read and the `manifest_root` prefix.
 
 Verification uses only the key in the served key set whose key ID matches the service certificate's public key (`verifyStatementWithServiceCert` in scitt-wasm). If the key set does not contain that key, nothing is verified. Receipts signed by other keys, for example ones in use before a key rotation, are reported as "cannot evaluate" rather than trusted. The page also checks that the receipt covers the requested transaction. It reads the entry's transaction ID from the receipt's CCF commit evidence (`ce:<view>.<seqno>:<nonce>`), which the receipt's Merkle leaf commits to. The receipt's own `txid` header is the later signature transaction and is shown for information only.
 
@@ -71,6 +86,25 @@ npm run dev
 
 Neither service sends CORS headers for `localhost`, so in development the page calls `/mst-dev/proxy`, `/mst-dev/identity` and `/mst-dev/indexer`, which the Vite dev server forwards to the canary hosts (see `vite.lookup-proxy.ts`). The hosts are defined once, in `src/lookup/config/endpoints.ts`.
 
+The dev proxy also reads these optional variables from the shell environment, which are useful for a test ledger outside canary:
+
+| Variable | Effect |
+|---|---|
+| `MST_DEV_IDENTITY_HOST` | Identity host for `/mst-dev/identity`, for example `https://identity.confidential-ledger-staging.core.azure.com` |
+| `MST_DEV_LEDGER_URL`, `MST_DEV_LEDGER_CA` | Send `/mst-dev/proxy/{ledger}/...` straight to this one ledger, trusting only the PEM at `MST_DEV_LEDGER_CA` (the ledger's `ledgerTlsCertificate`), instead of the control-plane proxy |
+| `MST_DEV_PARQUET_URL` | Serve a Parquet index at `/mst-dev/parquet` from this URL, for example a Blob container |
+| `MST_DEV_PARQUET_AUTH=azcli` | Add an Azure CLI token for `https://storage.azure.com/` to Parquet requests, for a private container |
+
+For example, to search a Parquet index in a private Blob container:
+
+```powershell
+$env:VITE_MST_PARQUET_INDEX_BASE = '/mst-dev/parquet'
+$env:MST_DEV_PARQUET_URL = 'https://<account>.blob.core.windows.net/<container>'
+$env:MST_DEV_PARQUET_AUTH = 'azcli'
+npm run dev
+```
+
+In production the index would be served from a public-read container with CORS for the page's origin; no credential is ever placed in the page.
 ## Production dependency
 
 A production build calls these services directly from the browser. That works only from origins the services' CORS policy allows: `https://microsoft.github.io` and `https://vibehub.microsoft.com`. Other origins, including Azure Static Web Apps deployments of the explorer and forks published to other GitHub Pages accounts, are not supported, so the main build includes the lookup page only for GitHub Pages (`DEPLOY_TARGET=github-pages`). The page uses the canary (`centraluseuap`) hosts of both services, which allow these origins; the global hosts route to regions that may not yet. Switch the defaults to the global hosts once every region allows them. Endpoints can be overridden at build time; the page header then shows "custom endpoints" instead of "canary":
@@ -80,6 +114,7 @@ A production build calls these services directly from the browser. That works on
 | `VITE_MST_PROXY_BASE` | `https://centraluseuap.controlplane.confidential-ledger.core.azure.com/api/Proxy` |
 | `VITE_MST_IDENTITY_BASE` | `https://centraluseuap.identity.confidential-ledger.core.azure.com/ledgerIdentity` |
 | `VITE_MST_INDEXER_BASE` | `https://centraluseuap.identity.confidential-ledger.core.azure.com/odata/ledgers` |
+| `VITE_MST_PARQUET_INDEX_BASE` | Unset (search uses the mst-indexer) |
 | `VITE_EXPLORER_URL` | `../` (target of the "CCF Ledger Explorer" footer link) |
 
 Both builds read these from the environment or from `.env*` files at the repository root.
@@ -112,6 +147,7 @@ npx vitest run src/__tests__/lookup
 | `src/lookup/config/endpoints.ts` | Canary service hosts, shared with the dev proxy |
 | `src/lookup/services/mst-lookup-service.ts` | Fetching, retries, error mapping, verification |
 | `src/lookup/services/indexer-search-service.ts` | mst-indexer search |
+| `src/lookup/services/parquet-index-service.ts` | Parquet index verification and search |
 | `src/lookup/services/scitt-wasm-loader.ts` | WASM initialisation |
 | `src/lookup/utils/lookup-verdict.ts` | Input parsing and verdict |
 | `src/lookup/utils/claim-decode.ts` | Payload claim decoding |

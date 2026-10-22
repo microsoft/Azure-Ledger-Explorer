@@ -98,6 +98,8 @@ CCF Ledger Explorer is built on the shoulders of many excellent open source proj
 | [js-base64](https://github.com/dankogai/js-base64) | Base64 transcoder |
 | [buffer](https://github.com/feross/buffer) | Node.js Buffer API for the browser |
 | [scitt-verifier](https://github.com/microsoft/scitt-verifier) | SCITT transparent statement verifier; its `scitt-wasm` build is vendored for the MST lookup page (MIT) |
+| [hyparquet](https://github.com/hyparam/hyparquet) | Parquet reader for the browser, used by the MST lookup page's Parquet index search (MIT) |
+| [hyparquet-compressors](https://github.com/hyparam/hyparquet-compressors) | Compression codecs for hyparquet, with [fzstd](https://github.com/101arrowz/fzstd) and [hysnappy](https://github.com/hyparam/hysnappy) (MIT) |
 
 ### Markdown Rendering
 

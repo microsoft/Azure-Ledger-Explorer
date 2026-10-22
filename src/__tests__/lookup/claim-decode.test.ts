@@ -3,6 +3,8 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
+/// <reference types="node" />
+
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

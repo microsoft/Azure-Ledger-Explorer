@@ -21,7 +21,7 @@ import {
   tokens,
 } from '@fluentui/react-components';
 import { lookupHref } from '../hooks/use-mst-lookup';
-import type { IndexedEntry } from '../types/lookup-types';
+import type { IndexedEntry, IndexSnapshot } from '../types/lookup-types';
 import { CopyButton } from './CopyButton';
 
 const useStyles = makeStyles({
@@ -37,6 +37,8 @@ const useStyles = makeStyles({
 interface IndexSearchResultsProps {
   ledger: string;
   entries: IndexedEntry[];
+  /** What a Parquet index search read; absent for the mst-indexer. */
+  snapshot?: IndexSnapshot;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -49,6 +51,22 @@ function formatSignedAt(value: string | null | undefined): string {
   return Number.isNaN(date.getTime()) ? value : date.toISOString().replace('T', ' ').replace(/\.\d+Z$/, 'Z');
 }
 
+/** How current the Parquet index is, and what was checked. */
+const SnapshotNote: React.FC<{ snapshot: IndexSnapshot }> = ({ snapshot }) => {
+  const styles = useStyles();
+  return (
+    <Text size={200} className={styles.muted}>
+      Parquet index up to sequence number {snapshot.canonicalSeqno} ({snapshot.entriesCount} entries in{' '}
+      {snapshot.chunkCount} chunks, updated {formatSignedAt(snapshot.updatedAt)}). The manifest and the{' '}
+      {snapshot.chunksRead} chunk {snapshot.chunksRead === 1 ? 'file' : 'files'} read matched root{' '}
+      <span className={styles.mono}>{snapshot.manifestRoot.slice(0, 19)}…</span>.{' '}
+      {snapshot.attested
+        ? 'The ledger attests to this root.'
+        : 'The ledger does not attest to this root yet, so the index is consistent but not vouched for.'}
+    </Text>
+  );
+};
+
 /**
  * Entries the index says match a search. These are unverified pointers:
  * opening one fetches the statement from the ledger and verifies it.
@@ -56,6 +74,7 @@ function formatSignedAt(value: string | null | undefined): string {
 export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
   ledger,
   entries,
+  snapshot,
   hasMore,
   loadingMore,
   onLoadMore,
@@ -65,9 +84,12 @@ export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
 
   if (entries.length === 0) {
     return (
-      <MessageBar intent="info">
-        <MessageBarBody>No indexed entries match this search.</MessageBarBody>
-      </MessageBar>
+      <div className={styles.root}>
+        <MessageBar intent="info">
+          <MessageBarBody>No indexed entries match this search.</MessageBarBody>
+        </MessageBar>
+        {snapshot && <SnapshotNote snapshot={snapshot} />}
+      </div>
     );
   }
 
@@ -80,6 +102,7 @@ export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
         </Text>
         <CopyButton link value={() => window.location.href} what="link to this search" />
       </div>
+      {snapshot && <SnapshotNote snapshot={snapshot} />}
       <Table size="small" aria-label="Indexed entries">
         <TableHeader>
           <TableRow>

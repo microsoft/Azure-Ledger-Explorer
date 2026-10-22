@@ -188,6 +188,24 @@ export interface IndexedEntry {
   payloadHash?: string | null;
 }
 
+/**
+ * What a Parquet index search read, after checking it against the manifest.
+ * The manifest is internally consistent and unmodified, but `attested` says
+ * whether the ledger vouches for it; until then rows are still pointers.
+ */
+export interface IndexSnapshot {
+  source: 'parquet';
+  /** Highest sequence number the index covers. */
+  canonicalSeqno: number;
+  entriesCount: number;
+  chunkCount: number;
+  /** Chunk files read (and verified) for this page. */
+  chunksRead: number;
+  manifestRoot: string;
+  updatedAt: string;
+  attested: boolean;
+}
+
 /** One page of indexer results, newest first. */
 export interface IndexSearchPage {
   entries: IndexedEntry[];
@@ -196,6 +214,8 @@ export interface IndexSearchPage {
    * last page.
    */
   nextBefore: number | null;
+  /** Present for a Parquet index search. */
+  snapshot?: IndexSnapshot;
 }
 
 export type LookupStep = 'search' | 'identity' | 'keys' | 'statement' | 'verify';
@@ -208,4 +228,5 @@ export type LookupErrorKind =
   | 'unavailable'
   | 'network'
   | 'http'
-  | 'malformed';
+  | 'malformed'
+  | 'integrity';

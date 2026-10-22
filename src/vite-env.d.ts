@@ -15,6 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_MST_IDENTITY_BASE?: string;
   /** MST lookup: override the mst-indexer read API base URL. */
   readonly VITE_MST_INDEXER_BASE?: string;
+  /** MST lookup: search a Parquet index at this base instead of the mst-indexer. */
+  readonly VITE_MST_PARQUET_INDEX_BASE?: string;
   /** MST lookup: where the "CCF Ledger Explorer" footer link points (default `../`). */
   readonly VITE_EXPLORER_URL?: string;
 }

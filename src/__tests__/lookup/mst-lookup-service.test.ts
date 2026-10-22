@@ -3,6 +3,8 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
+/// <reference types="node" />
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fetchKeySet,

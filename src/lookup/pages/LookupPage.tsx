@@ -27,9 +27,10 @@ import type { DirectSearchBy, EntryRef, IndexSearchBy } from '../types/lookup-ty
 import { isIndexSearch } from '../utils/lookup-verdict';
 
 // The dev-server proxy (`/mst-dev/...`) forwards to the canary hosts too.
-const usesCanary = Object.values(defaultEndpoints).every(
+const usesCanary = [defaultEndpoints.proxyBase, defaultEndpoints.identityBase, defaultEndpoints.indexerBase].every(
   (base) => base.startsWith('/mst-dev/') || base.startsWith(CONTROL_PLANE_HOST) || base.startsWith(IDENTITY_HOST),
 );
+const indexBase = defaultEndpoints.parquetIndexBase ?? defaultEndpoints.indexerBase;
 
 const useStyles = makeStyles({
   page: {
@@ -68,7 +69,9 @@ const LookupPage: React.FC = () => {
     ? 'Lookup failed'
     : error.kind === 'notIndexed'
       ? 'Ledger not indexed'
-      : error.kind === 'notFound' && (error.step === 'search' || error.step === 'identity')
+      : error.kind === 'integrity'
+        ? 'Index failed verification'
+        : error.kind === 'notFound' && (error.step === 'search' || error.step === 'identity')
         ? 'Ledger not found'
         : error.kind === 'notFound' && error.step === 'statement' && error.status === 400
           ? 'Not a statement registration'
@@ -89,13 +92,18 @@ const LookupPage: React.FC = () => {
             content={
               usesCanary
                 ? 'Uses the canary (Central US EUAP) control-plane and identity endpoints.'
-                : `Uses ${defaultEndpoints.proxyBase}, ${defaultEndpoints.identityBase} and ${defaultEndpoints.indexerBase}.`
+                : `Uses ${defaultEndpoints.proxyBase}, ${defaultEndpoints.identityBase} and ${indexBase}.`
             }
             relationship="description"
             withArrow
           >
             <Badge appearance="tint" color="brand">{usesCanary ? 'Preview · canary' : 'Preview · custom endpoints'}</Badge>
           </Tooltip>
+          {defaultEndpoints.parquetIndexBase && (
+            <Tooltip content={`Searches read the Parquet index at ${defaultEndpoints.parquetIndexBase}.`} relationship="description" withArrow>
+              <Badge appearance="tint" color="informative">Parquet index</Badge>
+            </Tooltip>
+          )}
         </div>
         <Text className={styles.muted}>
           Fetch a transparent statement from Microsoft&apos;s Signing Transparency service and verify
@@ -135,6 +143,7 @@ const LookupPage: React.FC = () => {
         <IndexSearchResults
           ledger={ledger}
           entries={searchEntries}
+          snapshot={search.data.pages[0]?.snapshot}
           hasMore={search.hasNextPage}
           loadingMore={search.isFetchingNextPage}
           onLoadMore={() => void search.fetchNextPage()}
@@ -145,7 +154,7 @@ const LookupPage: React.FC = () => {
       {!ledger && !entry && (
         <Text className={styles.muted}>
           Enter the ledger name, then the transaction ID returned when the statement was registered.
-          Ledgers onboarded to the MST indexer can also be searched by issuer,
+          {defaultEndpoints.parquetIndexBase ? 'Ledgers covered by the Parquet index' : 'Ledgers onboarded to the MST indexer'} can also be searched by issuer,
           subject or payload hash. Results are shareable: the page URL carries the search.
         </Text>
       )}
