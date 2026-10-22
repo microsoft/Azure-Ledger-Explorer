@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearParquetIndexCache,
   formatMicros,
+  indexRoot,
   loadManifest,
   readChunk,
   searchParquetIndex,
@@ -76,6 +77,36 @@ async function expectIntegrityError(promise: Promise<unknown>, message: RegExp) 
   expect((error as LookupError).kind).toBe('integrity');
   expect((error as LookupError).message).toMatch(message);
 }
+
+describe('indexRoot', () => {
+  it('appends the ledger to a shared base', () => {
+    expect(indexRoot('https://acct.blob.core.windows.net/idx/', 'my-ledger')).toBe(
+      'https://acct.blob.core.windows.net/idx/my-ledger/v1',
+    );
+  });
+
+  it('substitutes the ledger into a per-ledger host', () => {
+    expect(indexRoot('https://ledger-files-{ledger}.example.com/index/', 'my-ledger')).toBe(
+      'https://ledger-files-my-ledger.example.com/index/v1',
+    );
+  });
+
+  it('refuses a ledger that is not a DNS label when it becomes part of a host', () => {
+    for (const ledger of ['evil.com#', 'a.b', 'UPPER', '-x', 'a/b']) {
+      expect(() => indexRoot('https://ledger-files-{ledger}.example.com/index', ledger)).toThrow(LookupError);
+    }
+  });
+
+  it('reads a per-ledger host index', async () => {
+    const host = 'https://ledger-files-fixture-a.example.com/index';
+    for (const [url, body] of [...files]) {
+      if (url.startsWith(`${BASE}/${LEDGER}/`)) files.set(url.replace(`${BASE}/${LEDGER}`, host), body);
+    }
+    const manifest = await loadManifest('https://ledger-files-{ledger}.example.com/index', LEDGER);
+    expect(manifest.entriesCount).toBe(41);
+    expect(requested[0]).toBe(`${host}/v1/manifest/head.json`);
+  });
+});
 
 describe('loadManifest', () => {
   it('verifies the head, sealed segments and manifest_root the emitter wrote', async () => {

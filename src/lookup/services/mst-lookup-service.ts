@@ -46,8 +46,10 @@ export interface LookupEndpoints {
   indexerBase: string;
   /**
    * Base of a Parquet index (`mst.index.parquet.v1`); `/{ledger}/v1/...` is
-   * appended. When set, issuer, subject and payload-hash searches read it
-   * instead of the mst-indexer.
+   * appended, or, when the base contains `{ledger}` (a per-ledger host such as
+   * `https://ledger-files-{ledger}.<domain>/index`), the ledger is substituted
+   * and `/v1/...` appended. When set, issuer, subject and payload-hash searches
+   * read it instead of the mst-indexer.
    */
   parquetIndexBase?: string;
 }

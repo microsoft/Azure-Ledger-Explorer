@@ -11,7 +11,8 @@ import { LookupError } from './mst-lookup-service';
 /**
  * Search a ledger's Parquet index (`mst.index.parquet.v1`) in the browser.
  *
- * The emitter publishes, per ledger, under `{base}/{ledger}/v1/`:
+ * The emitter publishes, per ledger, under `{base}/{ledger}/v1/` (or `{base}/v1/`
+ * when the base names a per-ledger host through a `{ledger}` placeholder):
  * - `manifest/head.json`: the mutable head, listing sealed segments, the open
  *   tail of chunk entries, and `manifest_root`.
  * - `manifest/seg-NNNNNN.json`: immutable, sealed groups of chunk entries.
@@ -185,7 +186,23 @@ async function fetchIndexFile(url: string, what: string, options: ParquetFetchOp
   throw new LookupError(kindForStatus(response.status), 'search', message, response.status);
 }
 
-function indexRoot(base: string, ledger: string): string {
+const LEDGER_PLACEHOLDER = '{ledger}';
+const DNS_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/**
+ * The ledger's index root. A base containing `{ledger}` names a per-ledger host,
+ * e.g. the ledger-files endpoint `https://ledger-files-{ledger}.<domain>/index`,
+ * and the ledger is substituted in; otherwise `/{ledger}` is appended to a shared
+ * base such as a Blob container.
+ */
+export function indexRoot(base: string, ledger: string): string {
+  if (base.includes(LEDGER_PLACEHOLDER)) {
+    // The ledger becomes part of a hostname, so accept only a DNS label.
+    if (!DNS_LABEL.test(ledger)) {
+      throw new LookupError('notIndexed', 'search', `"${ledger}" is not a valid ledger name.`);
+    }
+    return `${base.split(LEDGER_PLACEHOLDER).join(ledger).replace(/\/+$/, '')}/v1`;
+  }
   return `${base.replace(/\/+$/, '')}/${encodeURIComponent(ledger)}/v1`;
 }
 

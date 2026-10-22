@@ -57,7 +57,7 @@ Index rows are pointers, not evidence. The list says so, and each entry is fetch
 
 ### Searching a Parquet index (prototype)
 
-When `VITE_MST_PARQUET_INDEX_BASE` is set, issuer, subject and payload-hash searches read a static Parquet index instead of calling the mst-indexer. An emitter outside the ledger reads committed ledger chunks and writes, per ledger, under `{base}/{ledger}/v1/`:
+When `VITE_MST_PARQUET_INDEX_BASE` is set, issuer, subject and payload-hash searches read a static Parquet index instead of calling the mst-indexer. An emitter outside the ledger reads committed ledger chunks and writes, per ledger, under `{base}/{ledger}/v1/` (or `{base}/v1/` for a per-ledger host, see below):
 
 - `chunks/<ledger chunk>.parquet`: one immutable file per committed ledger chunk, one row per registered statement.
 - `manifest/seg-NNNNNN.json`: immutable segments listing chunk files, their SHA-256, row count, sequence-number range and `entries_root`.
@@ -105,6 +105,13 @@ npm run dev
 ```
 
 In production the index would be served from a public-read container with CORS for the page's origin; no credential is ever placed in the page.
+
+A CTS ledger can also serve its own index from its public ledger-files endpoint, next to `/ledger/`, when the CCFCommon chart sets `ledgerFiles.index.enabled`. That endpoint sends `Access-Control-Allow-Origin: *`, so no proxy is needed even in development. Put `{ledger}` in the base to name the per-ledger host; the page substitutes the ledger, which must be a DNS label, and reads `{base}/v1/...` with no ledger path segment:
+
+```powershell
+$env:VITE_MST_PARQUET_INDEX_BASE = 'https://ledger-files-{ledger}.confidential-ledger-staging.azure.com/index'
+npm run dev
+```
 ## Production dependency
 
 A production build calls these services directly from the browser. That works only from origins the services' CORS policy allows: `https://microsoft.github.io` and `https://vibehub.microsoft.com`. Other origins, including Azure Static Web Apps deployments of the explorer and forks published to other GitHub Pages accounts, are not supported, so the main build includes the lookup page only for GitHub Pages (`DEPLOY_TARGET=github-pages`). The page uses the canary (`centraluseuap`) hosts of both services, which allow these origins; the global hosts route to regions that may not yet. Switch the defaults to the global hosts once every region allows them. Endpoints can be overridden at build time; the page header then shows "custom endpoints" instead of "canary":
@@ -114,7 +121,7 @@ A production build calls these services directly from the browser. That works on
 | `VITE_MST_PROXY_BASE` | `https://centraluseuap.controlplane.confidential-ledger.core.azure.com/api/Proxy` |
 | `VITE_MST_IDENTITY_BASE` | `https://centraluseuap.identity.confidential-ledger.core.azure.com/ledgerIdentity` |
 | `VITE_MST_INDEXER_BASE` | `https://centraluseuap.identity.confidential-ledger.core.azure.com/odata/ledgers` |
-| `VITE_MST_PARQUET_INDEX_BASE` | Unset (search uses the mst-indexer) |
+| `VITE_MST_PARQUET_INDEX_BASE` | Unset (search uses the mst-indexer). `{ledger}` in the value is replaced with the ledger name |
 | `VITE_EXPLORER_URL` | `../` (target of the "CCF Ledger Explorer" footer link) |
 
 Both builds read these from the environment or from `.env*` files at the repository root.
