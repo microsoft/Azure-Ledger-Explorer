@@ -9,6 +9,7 @@ A TypeScript/React application for exploring and analyzing CCF (Confidential Con
 - **Azure Integration**: Direct import from Azure File Shares using SAS tokens
 - **Persistent Storage**: Client-side SQLite database with OPFS VFS
 - **Progressive Web App**: Install to your device, work offline, and get automatic updates
+- **MST Statement Lookup**: Fetch a transparent statement by ledger name and transaction ID and verify it in the browser (`/lookup/`)
 - **Clean UI**: Built with FluentUI React components and responsive design
 - **State Management**: Efficient data handling with TanStack Query and optimistic updates
 
@@ -52,6 +53,7 @@ A TypeScript/React application for exploring and analyzing CCF (Confidential Con
 - **[Database & Persistence](./docs/DATABASE_README.md)**
 - **[External Services](./docs/EXTERNAL_SERVICES_README.md)**
 - **[AI Assistant](./docs/AI_ASSISTANT_README.md)**
+- **[MST Statement Lookup](./docs/MST_LOOKUP_README.md)**
 
 ## Acknowledgements
 
@@ -95,6 +97,7 @@ CCF Ledger Explorer is built on the shoulders of many excellent open source proj
 | [jsrsasign](https://github.com/kjur/jsrsasign) | Pure JavaScript cryptographic library (RSA, ECDSA, X.509) |
 | [js-base64](https://github.com/dankogai/js-base64) | Base64 transcoder |
 | [buffer](https://github.com/feross/buffer) | Node.js Buffer API for the browser |
+| [scitt-verifier](https://github.com/microsoft/scitt-verifier) | SCITT transparent statement verifier; its `scitt-wasm` build is vendored for the MST lookup page (MIT) |
 
 ### Markdown Rendering
 

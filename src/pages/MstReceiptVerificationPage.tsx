@@ -20,6 +20,10 @@ import {
   Code24Regular,
 } from '@fluentui/react-icons';
 
+// The lookup page is built into the GitHub Pages deployment only (its
+// services allow that origin), so link there from every deployment.
+const MST_LOOKUP_URL = 'https://microsoft.github.io/CCF-Ledger-Explorer/lookup/';
+
 const useStyles = makeStyles({
   container: {
     display: 'flex',
@@ -137,14 +141,14 @@ export const MstReceiptVerificationPage: React.FC = () => {
             <Text className={styles.title}>Signing Transparency Receipt Verification</Text>
             <Badge 
               appearance="tint" 
-              color="informative"
+              color="brand"
               className={styles.badge}
             >
-              Coming Soon
+              Preview
             </Badge>
           </div>
           <Text className={styles.description}>
-            Verify transparent statements from Microsoft Signing Transparency (MST) using the Azure SDK for .NET
+            Verify transparent statements from Microsoft Signing Transparency (MST) in your browser, or with the Azure SDK for .NET
           </Text>
         </div>
 
@@ -155,9 +159,13 @@ export const MstReceiptVerificationPage: React.FC = () => {
           icon={<Info24Regular />}
         >
           <MessageBarBody>
-            <Text weight="semibold">Feature Under Development:</Text> Signing transparency receipt verification 
-            is not yet available in this web interface. Please use the Azure SDK for .NET to verify 
-            transparent statements programmatically.
+            <Text weight="semibold">Look up a statement:</Text> the{' '}
+            <Link href={MST_LOOKUP_URL} target="_blank" rel="noopener noreferrer" inline>
+              MST statement lookup
+            </Link>{' '}
+            fetches a transparent statement by ledger name and transaction ID, and verifies its
+            signature and receipt in the browser. To verify statements programmatically, use the
+            Azure SDK for .NET.
           </MessageBarBody>
         </MessageBar>
 

@@ -9,6 +9,14 @@
 // Vite environment variables
 interface ImportMetaEnv {
   readonly VITE_ENABLE_SAGE: string;
+  /** MST lookup: override the ledger proxy base URL. */
+  readonly VITE_MST_PROXY_BASE?: string;
+  /** MST lookup: override the identity service base URL. */
+  readonly VITE_MST_IDENTITY_BASE?: string;
+  /** MST lookup: override the mst-indexer read API base URL. */
+  readonly VITE_MST_INDEXER_BASE?: string;
+  /** MST lookup: where the "CCF Ledger Explorer" footer link points (default `../`). */
+  readonly VITE_EXPLORER_URL?: string;
 }
 
 interface ImportMeta {

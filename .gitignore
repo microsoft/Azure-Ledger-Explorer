@@ -10,3 +10,4 @@ node_modules/
 /playwright/.auth/
 .env.local
 .vscode/mcp.json
+dist-lookup

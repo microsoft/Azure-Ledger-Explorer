@@ -7,7 +7,7 @@ import { globalIgnores } from 'eslint/config'
 import licenseHeader from "./eslint-rules/license-header.js";
 
 export default tseslint.config([
-  globalIgnores(['dist', 'node_modules', 'coverage', '*.config.js', 'packages/*/dist']),
+  globalIgnores(['dist', 'node_modules', 'coverage', '*.config.js', 'packages/*/dist', 'src/lookup/vendor']),
 
   // Main TypeScript/React configuration
   {
@@ -77,7 +77,7 @@ export default tseslint.config([
 
   // Relaxed rules for hooks using TanStack Query (return types inferred from generics)
   {
-    files: ['src/hooks/**/*.ts'],
+    files: ['src/hooks/**/*.ts', 'src/lookup/hooks/**/*.ts'],
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'off',
     },

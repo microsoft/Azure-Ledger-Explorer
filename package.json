@@ -15,6 +15,7 @@
     "dev": "npm run build:packages && vite",
     "build": "npm run build:packages && tsc -b && vite build",
     "build:packages": "npm run build -w @microsoft/ccf-ledger-parser && npm run build -w @microsoft/ccf-database",
+    "build:lookup": "npm run build:packages && tsc -b && vite build --config vite.lookup.config.ts",
     "build:parser": "npm run build -w @microsoft/ccf-ledger-parser",
     "build:database": "npm run build -w @microsoft/ccf-database",
     "lint": "eslint .",

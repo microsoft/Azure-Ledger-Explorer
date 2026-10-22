@@ -16,5 +16,7 @@ jobs:
         name: Run linter
       - run: npm run build
         name: Build app
+      - run: npm run build:lookup
+        name: Build MST lookup page
       - run: npm test
         name: Run tests

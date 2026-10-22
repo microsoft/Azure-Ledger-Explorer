@@ -1,0 +1,2 @@
+# Vendored build output is checked against sha-256 hashes; keep its bytes exact.
+src/lookup/vendor/scitt-wasm/** -text

@@ -7,6 +7,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { mstLookupDevProxy } from './vite.lookup-proxy'
 
 const isGitHubPages = process.env.DEPLOY_TARGET === 'github-pages'
 
@@ -77,7 +78,8 @@ export default defineConfig({
           }
         ],
         // Exclude service worker from caching OPFS files
-        navigateFallbackDenylist: [/^\/opfs/]
+        // The MST lookup page is its own HTML entry, not a route of the SPA.
+        navigateFallbackDenylist: [/^\/opfs/, /^\/lookup/]
       },
       devOptions: {
         enabled: false,
@@ -90,6 +92,7 @@ export default defineConfig({
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
+    proxy: mstLookupDevProxy,
   },
   worker: {
     format: 'es'
@@ -102,6 +105,15 @@ export default defineConfig({
     // Insights symbolicated stack traces. Safe because the project is fully
     // open source and the workspace packages already emit TS sourcemaps.
     sourcemap: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        // The MST lookup page calls the ledger services from the browser, and
+        // they allow the GitHub Pages origin only. Other targets (Azure Static
+        // Web Apps, the PWA) would ship a page that cannot load anything.
+        ...(isGitHubPages && { lookup: path.resolve(__dirname, 'lookup/index.html') }),
+      },
+    },
   },
   optimizeDeps: {
     exclude: ['@sqlite.org/sqlite-wasm']

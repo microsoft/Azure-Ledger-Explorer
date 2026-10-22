@@ -40,6 +40,10 @@ $env:DEPLOY_TARGET = "github-pages"; npm run build; Remove-Item Env:DEPLOY_TARGE
 
 The build output in `dist/` will use `/CCF-Ledger-Explorer/` as the base path and exclude VitePWA.
 
+### MST Statement Lookup page
+
+GitHub Pages builds (`DEPLOY_TARGET=github-pages`) have a second entry, `lookup/index.html`, served at `/CCF-Ledger-Explorer/lookup/`. It is a real HTML file, so it needs no SPA fallback. It calls the ACC control-plane proxy, identity service and mst-indexer directly from the browser, and their CORS policy allows the `microsoft.github.io` origin but not Azure SWA, so other builds leave it out. Override the endpoints at build time with `VITE_MST_PROXY_BASE`, `VITE_MST_IDENTITY_BASE` and `VITE_MST_INDEXER_BASE`, and the page's footer link with `VITE_EXPLORER_URL`. `npm run build:lookup` builds the page on its own into `dist-lookup/`. See [MST Statement Lookup](./MST_LOOKUP_README.md).
+
 ## Azure Static Web Apps Deployment
 
 The project includes an automated PowerShell deployment script (`deploy-to-azure.ps1`) for deploying to Azure Static Web Apps.
