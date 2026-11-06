@@ -7,7 +7,9 @@
  * Types for the SCITT transparent statement verifier.
  *
  * These mirror the JSON emitted by `@microsoft/scitt-wasm`, which wraps the
- * `scitt-receipt` verification core from microsoft/scitt-verifier.
+ * `scitt-receipt` verification core from microsoft/scitt-verifier. The MST
+ * lookup page declares its own subset in `src/lookup/types/lookup-types.ts`;
+ * update both when the package changes.
  *
  * Note what is deliberately absent: there is no `isValid` boolean anywhere in
  * this file. The core reports facts and leaves the verdict to its consumer,

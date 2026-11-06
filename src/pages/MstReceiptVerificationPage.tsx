@@ -28,6 +28,10 @@ import {
 import { useScittVerification } from '../hooks/use-scitt-verification';
 import type { ChainValidation, ReceiptFacts, ScittOutcome, TriState } from '../types/scitt-types';
 
+// The lookup page is built into the GitHub Pages deployment only (its
+// services allow that origin), so link there from every deployment.
+const MST_LOOKUP_URL = 'https://microsoft.github.io/CCF-Ledger-Explorer/lookup/';
+
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', height: '100%', overflow: 'auto' },
   content: {
@@ -294,7 +298,12 @@ export const MstReceiptVerificationPage: React.FC = () => {
             >
               microsoft/scitt-verifier
             </Link>
-            , the same core the offline CLI uses. Nothing you select leaves this machine.
+            , the same core the offline CLI uses. Nothing you select leaves this machine. To fetch
+            a statement by ledger name and transaction ID instead, use the{' '}
+            <Link href={MST_LOOKUP_URL} target="_blank" rel="noopener noreferrer" inline>
+              MST statement lookup
+            </Link>
+            .
           </Text>
         </div>
 

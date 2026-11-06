@@ -119,8 +119,10 @@ CCF-Ledger-Explorer/
 │   │           ├── database-worker.ts        # sqlite-wasm Web Worker
 │   │           └── database-worker-client.ts # Message-passing client
 │   └── scitt-wasm/             # @microsoft/scitt-wasm (generated, vendored)
+├── lookup/index.html           # Second entry: MST statement lookup (GitHub Pages only)
 └── src/                        # Main React application
     ├── App.tsx                  # Root: FluentProvider + QueryClientProvider + Router
+    ├── lookup/                  # MST statement lookup page (see MST_LOOKUP_README.md)
     ├── components/              # Reusable UI components
     ├── pages/                   # Route-level page components
     ├── hooks/                   # Custom React hooks
@@ -211,6 +213,8 @@ The AI chat UI is split into single-responsibility components:
 | **TransactionDetailsPage.tsx** | `/transaction/:id` | Single-transaction deep dive |
 | **ConfigPage.tsx** | `/config` | Settings: API keys, models, data management |
 | **VisualizationPage.tsx** | `/visualization` | Interactive ledger-timeline visualization |
+
+The MST statement lookup (`src/lookup/pages/LookupPage.tsx`, served at `/lookup/`) is a separate Vite entry, not a route of this app. See [MST Statement Lookup](./MST_LOOKUP_README.md).
 
 #### Design System
 
