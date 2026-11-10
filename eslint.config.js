@@ -77,7 +77,7 @@ export default tseslint.config([
 
   // Relaxed rules for hooks using TanStack Query (return types inferred from generics)
   {
-    files: ['src/hooks/**/*.ts'],
+    files: ['src/hooks/**/*.ts', 'src/lookup/hooks/**/*.ts'],
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
