@@ -1,0 +1,6 @@
+# Exact bytes from microsoft/scitt-verifier's conformance corpus. A line-ending
+# rewrite changes what the receipts commit to and breaks every pinned value.
+*.cose binary
+*.cbor binary
+# PEM parsing tolerates CRLF, but pin LF so every checkout tests the same bytes.
+*.pem text eol=lf

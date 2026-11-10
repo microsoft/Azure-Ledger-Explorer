@@ -95,6 +95,7 @@ CCF Ledger Explorer is built on the shoulders of many excellent open source proj
 | [jsrsasign](https://github.com/kjur/jsrsasign) | Pure JavaScript cryptographic library (RSA, ECDSA, X.509) |
 | [js-base64](https://github.com/dankogai/js-base64) | Base64 transcoder |
 | [buffer](https://github.com/feross/buffer) | Node.js Buffer API for the browser |
+| [scitt-verifier](https://github.com/microsoft/scitt-verifier) | SCITT transparent statement and CCF receipt verification (MIT), compiled to WebAssembly and vendored as `packages/scitt-wasm` |
 
 ### Markdown Rendering
 
