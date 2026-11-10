@@ -169,8 +169,12 @@ const SectionHeader: React.FC<{ icon: React.ReactElement; title: string }> = ({ 
   );
 };
 
-const formatTime = (seconds: number | null | undefined) =>
-  seconds == null ? null : `${new Date(seconds * 1000).toISOString()} (${seconds})`;
+const formatTime = (seconds: number | null | undefined) => {
+  if (seconds == null) return null;
+  const date = new Date(seconds * 1000);
+  // Out-of-range timestamps would make toISOString throw during render.
+  return Number.isNaN(date.getTime()) ? String(seconds) : `${date.toISOString()} (${seconds})`;
+};
 
 /** Everything established about one entry: the verdict first, then the facts behind it. */
 export const LookupResultView: React.FC<{ result: LookupResult }> = ({ result }) => {
@@ -179,9 +183,13 @@ export const LookupResultView: React.FC<{ result: LookupResult }> = ({ result })
   // Show the receipt that verified, when one did. Verification skips receipts
   // it cannot parse, so its list is not index-aligned with the inspection's.
   const receipt = v.receipts?.find((r) => r.fullyVerified) ?? v.receipts?.[0];
-  const receiptSummary =
-    inspection.receipts.find((s) => receipt && s.kid === receipt.kid && s.registeredAt === receipt.registeredAt) ??
-    inspection.receipts[0];
+  // kid and registration time do not uniquely identify a receipt, so withhold the
+  // summary rather than pair the checks with metadata from a different receipt.
+  const summaryMatches = receipt
+    ? inspection.receipts.filter((s) => s.kid === receipt.kid && s.registeredAt === receipt.registeredAt)
+    : inspection.receipts.slice(0, 1);
+  const receiptSummary = summaryMatches.length === 1 ? summaryMatches[0] : undefined;
+  const summaryAmbiguous = summaryMatches.length > 1;
   const leaf = v.certificateChain?.[0];
   const fileStem = `${result.ledger}-${result.txId}`;
   const verifyCommand = `scitt-verifier verify --statement ${fileStem}.cose --policy policy.json --online`;
@@ -250,6 +258,12 @@ export const LookupResultView: React.FC<{ result: LookupResult }> = ({ result })
               : inspection.receiptsPresent}
           </Row>
         </div>
+        {summaryAmbiguous && (
+          <Text size={200} className={styles.label}>
+            Several receipts share this signing key and registration time, so their transaction details are not shown.
+            Download the statement to inspect each receipt.
+          </Text>
+        )}
       </Card>
 
       <Card>

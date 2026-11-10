@@ -63,7 +63,8 @@ export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
 }) => {
   const styles = useStyles();
 
-  if (entries.length === 0) {
+  // A page can be empty after malformed rows are dropped while later pages still exist.
+  if (entries.length === 0 && !hasMore) {
     return (
       <MessageBar intent="info">
         <MessageBarBody>No indexed entries match this search.</MessageBarBody>

@@ -130,7 +130,10 @@ const LookupPage: React.FC = () => {
         </MessageBar>
       )}
 
-      {lookup.data && !lookup.isFetching && <LookupResultView result={lookup.data} />}
+      {lookup.data && !lookup.isFetching && (
+        // Keyed so statement-specific state (e.g. a decoded claim) resets on navigation.
+        <LookupResultView key={`${lookup.data.ledger}|${lookup.data.txId}`} result={lookup.data} />
+      )}
 
       {ledger && indexEntry && search.data && !searchLoading && (
         <IndexSearchResults

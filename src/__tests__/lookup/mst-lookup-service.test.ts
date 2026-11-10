@@ -153,10 +153,12 @@ describe('fetchWithRetry', () => {
   });
 });
 
+const isIdentity = (url: string) => new URL(url).host === 'id.test';
+
 describe('endpoint fetchers', () => {
   it('builds the proxy and identity URLs', async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string) =>
-      url.startsWith('https://id.test')
+      isIdentity(url)
         ? respond(200, JSON.stringify({ ledgerTlsCertificate: '-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n' }))
         : respond(200, new Uint8Array([1, 2])),
     );
@@ -192,7 +194,7 @@ describe('lookupStatement', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation(async (url: string) => {
-        if (url.startsWith('https://id.test')) {
+        if (isIdentity(url)) {
           await delay(20);
           return respond(404);
         }
@@ -207,7 +209,7 @@ describe('lookupStatement', () => {
 
   it('stops the other requests once one has failed', async () => {
     const fetchMock = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
-      if (url.startsWith('https://id.test')) return respond(200, cert);
+      if (isIdentity(url)) return respond(200, cert);
       if (url.endsWith('/statement')) return respond(404);
       await delay(50);
       if (init.signal?.aborted) throw new DOMException('aborted', 'AbortError');
@@ -226,7 +228,7 @@ describe('lookupStatement', () => {
     let keysSignal: AbortSignal | undefined;
     let keysAbortedBeforeIdentity: boolean | undefined;
     const fetchMock = vi.fn().mockImplementation(async (url: string, init: RequestInit) => {
-      if (url.startsWith('https://id.test')) {
+      if (isIdentity(url)) {
         await delay(50);
         keysAbortedBeforeIdentity = keysSignal?.aborted;
         return respond(200, cert);
