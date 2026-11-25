@@ -16,6 +16,7 @@ export const SEARCH_PARAM: Record<SearchBy, string> = {
   issuer: 'issuer',
   subject: 'subject',
   payloadHash: 'hash',
+  advanced: 'query',
 };
 
 export const lookupQueryKeys = {
@@ -89,7 +90,9 @@ export function readParams(search: string = window.location.search): LookupParam
   const ledger = parseLedgerName(rawLedger);
   let entry: EntryRef | null = null;
   let rawEntry: EntryRef | null = null;
-  for (const by of Object.keys(SEARCH_PARAM) as SearchBy[]) {
+  // A compound query is authoritative; an invalid one must not fall back to a simpler search.
+  const searchTypes: SearchBy[] = params.has('query') ? ['advanced'] : Object.keys(SEARCH_PARAM) as SearchBy[];
+  for (const by of searchTypes) {
     const raw = params.get(SEARCH_PARAM[by]);
     if (raw !== null) {
       rawEntry = { by, value: raw };

@@ -4,6 +4,7 @@
  */
 
 import type { IndexSearchBy, InspectionJson, SearchBy, Verdict, VerificationJson } from '../types/lookup-types';
+import { parseAdvancedQuery, serializeQuery } from './advanced-query';
 
 const LEDGER_HOST_SUFFIX = '.confidential-ledger.azure.com';
 const DNS_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -46,6 +47,12 @@ const MAX_TEXT_SEARCH = 1024;
 /** Validate a value for the given search type. Payload hashes are lowercased to match the index. */
 export function parseEntry(by: SearchBy, input: string): string | null {
   switch (by) {
+    case 'advanced':
+      try {
+        return serializeQuery(parseAdvancedQuery(input));
+      } catch {
+        return null;
+      }
     case 'txId':
       return parseTxId(input);
     case 'payloadHash': {
@@ -62,7 +69,7 @@ export function parseEntry(by: SearchBy, input: string): string | null {
 
 /** Whether a search type is answered by the mst-indexer rather than the ledger. */
 export function isIndexSearch(by: SearchBy): by is IndexSearchBy {
-  return by === 'issuer' || by === 'subject' || by === 'payloadHash';
+  return by === 'issuer' || by === 'subject' || by === 'payloadHash' || by === 'advanced';
 }
 
 /**

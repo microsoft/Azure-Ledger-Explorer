@@ -167,7 +167,20 @@ export interface LookupResult {
 export type DirectSearchBy = 'txId';
 
 /** Search types answered by the mst-indexer, only for ledgers onboarded to it. */
-export type IndexSearchBy = 'issuer' | 'subject' | 'payloadHash';
+export type IndexField = 'issuer' | 'subject' | 'payloadHash';
+export type IndexSearchBy = IndexField | 'advanced';
+
+export type QueryOperator = 'eq' | 'contains' | 'startswith' | 'endswith';
+export type QueryNode =
+  | { kind: 'condition'; field: IndexField; operator: QueryOperator; value: string; negated: boolean }
+  | { kind: 'group'; match: 'all' | 'any'; children: QueryNode[]; negated: boolean };
+
+export interface AdvancedQuery {
+  version: 1;
+  root: QueryNode;
+  /** Omitted for existing links, which default to newest first. */
+  order?: 'newest' | 'oldest';
+}
 
 /** What the user searched by. */
 export type SearchBy = DirectSearchBy | IndexSearchBy;
@@ -195,8 +208,8 @@ export interface IndexedEntry {
 export interface IndexSearchPage {
   entries: IndexedEntry[];
   /**
-   * Sequence number the next page starts below, or `null` if this is the
-   * last page.
+   * Exclusive sequence-number cursor: below for newest first, above for
+   * oldest first, or `null` if this is the last page.
    */
   nextBefore: number | null;
 }
