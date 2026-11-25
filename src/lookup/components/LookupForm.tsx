@@ -3,7 +3,7 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Button, Checkbox, Field, Input, Select, Text, makeStyles, tokens } from '@fluentui/react-components';
 import {
   Fingerprint20Regular,
@@ -89,6 +89,9 @@ interface LookupFormProps {
  */
 export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEntry, initialTouched = false, busy, onSubmit }) => {
   const styles = useStyles();
+  const queryLabelId = useId();
+  const queryHintId = useId();
+  const queryErrorId = useId();
   const [ledger, setLedger] = useState(initialLedger);
   const [by, setBy] = useState<SearchBy>(initialEntry?.by ?? 'txId');
   const [value, setValue] = useState(initialEntry?.value ?? '');
@@ -96,7 +99,14 @@ export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEn
   const [advanced, setAdvanced] = useState(() => {
     try {
       const query = initialEntry?.by === 'advanced' ? parseAdvancedQuery(initialEntry.value) : null;
-      return { root: query?.root ?? newGroup(), oldestFirst: query?.order === 'oldest', error: '' };
+      const root = query?.root;
+      return {
+        root: root?.kind === 'condition'
+          ? { kind: 'group' as const, match: 'all' as const, negated: false, children: [root] }
+          : root ?? newGroup(),
+        oldestFirst: query?.order === 'oldest',
+        error: '',
+      };
     } catch (error) {
       return { root: newGroup(), oldestFirst: false, error: error instanceof Error ? error.message : 'Invalid advanced query.' };
     }
@@ -115,6 +125,7 @@ export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEn
   const parsedLedger = parseLedgerName(ledger);
   const parsedValue = by === 'advanced' ? (advancedError ? null : advancedValue) : parseEntry(by, value);
   const type = SEARCH_TYPES[by];
+  const showAdvancedError = Boolean(advancedError && (touched || advanced.error));
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -158,9 +169,17 @@ export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEn
       </Field>}
       {by === 'advanced' && (
         <div className={styles.advanced}>
-          <Field label="Advanced index query" hint={INDEX_HINT} validationState={advancedError && (touched || advanced.error) ? 'error' : 'none'} validationMessage={touched || advanced.error ? advancedError : undefined}>
+          <div
+            role="group"
+            aria-labelledby={queryLabelId}
+            aria-describedby={`${queryHintId}${showAdvancedError ? ` ${queryErrorId}` : ''}`}
+            aria-invalid={showAdvancedError}
+          >
+            <Text id={queryLabelId} weight="semibold">Advanced index query</Text>
             <AdvancedQueryBuilder root={advanced.root} onChange={(root) => setAdvanced({ ...advanced, root, error: '' })} />
-          </Field>
+            <Text id={queryHintId} as="p" size={200}>{INDEX_HINT}</Text>
+            {showAdvancedError && <Text id={queryErrorId} as="p" role="alert">{advancedError}</Text>}
+          </div>
           <Field hint="Order by ledger sequence number, not signing time. Unchecked shows newest first.">
             <Checkbox label="Oldest first" checked={advanced.oldestFirst} onChange={(_, data) => setAdvanced({ ...advanced, oldestFirst: data.checked === true })} />
           </Field>
