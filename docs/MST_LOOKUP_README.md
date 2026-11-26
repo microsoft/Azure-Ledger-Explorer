@@ -4,6 +4,25 @@ A small standalone page, at `/lookup/`, that fetches one transparent statement f
 
 - **Transaction ID** (the one returned when the statement was registered): answered by the ledger, for any ledger. Opens the verified result.
 - **Issuer**, **subject** or **payload hash**: answered by the mst-indexer, only for ledgers onboarded to it. Lists matching entries; opening one verifies it.
+- **Advanced search**: combines issuer, subject and payload-hash conditions in nested **Match all (AND)** / **Match any (OR)** groups. **NOT** can negate a condition or an entire group. Issuer and subject support equality, contains, starts-with and ends-with comparisons (case-sensitive); payload hash supports equality only. The OData filter preview is read-only.
+
+The advanced section also has an **Oldest first** checkbox. Unchecked (the
+default), entries are newest first. Checked, entries are oldest first, ordered
+by ledger sequence number rather than signing time. This choice is saved as
+`"order":"oldest"` in the shared query and reverses both sorting and pagination.
+Older links without an order retain newest-first behavior. Simple searches
+always remain newest first.
+
+Advanced searches use `?ledger=<ledger>&query=<URL-encoded JSON>` with a
+versioned expression (`{"version":1,"root":...}`). Shared queries are validated
+before fetching; malformed queries show validation errors rather than falling
+back to another search. Existing `tx`, `issuer`, `subject` and `hash` links still
+work. The builder allows four levels of nesting and at most 46 generated OData
+nodes, reserving four of the server's 50 nodes for pagination. Each condition
+requires a non-empty value, text values are limited to 1024 characters, and the
+JSON query is limited to 12,000 characters. Pagination applies its sequence
+constraint outside the entire compound expression. Index results remain
+unverified until opened.
 
 The search is kept in the URL so a result can be shared:
 
@@ -50,7 +69,7 @@ Issuer, subject and payload-hash searches query the mst-indexer read API, hosted
 
 - **Issuer** and **subject** match any value containing the text (`contains`, case-sensitive). The indexer allows substring search only on these two columns.
 - **Payload hash** is an exact match on the SHA-256 of the statement's embedded payload, the same value the result page shows. For a hash envelope that payload is already the artifact's digest, so this is the hash of the digest, not of the artifact file.
-- Results are newest first, 20 per page, with **Load more**. The indexer returns a bare array without a count or next link, so the page asks for one extra row to tell whether another page exists. Each page starts below the last sequence number shown (`SequenceNo lt <n>`) instead of using `$skip`. That avoids the indexer's 10,000-row `$skip` limit, and entries indexed while you page don't repeat rows. Rows that share a sequence number are kept on the same page; if they alone fill a page, the page fetches all of them (up to 500) with `SequenceNo eq <n>`.
+- Results are newest first by default (oldest first when selected in Advanced search), 20 per page, with **Load more**. The indexer returns a bare array without a count or next link, so the page asks for one extra row to tell whether another page exists. Each page starts below the last sequence number shown (`SequenceNo lt <n>`) for newest-first searches, or above it (`SequenceNo gt <n>`) for oldest-first searches, instead of using `$skip`. That avoids the indexer's 10,000-row `$skip` limit, and entries indexed while you page don't repeat rows. Rows that share a sequence number are kept on the same page; if they alone fill a page, the page fetches all of them (up to 500) with `SequenceNo eq <n>`.
 
 Index rows are pointers, not evidence. The list says so, and each entry is fetched from the ledger and verified only when it is opened.
 

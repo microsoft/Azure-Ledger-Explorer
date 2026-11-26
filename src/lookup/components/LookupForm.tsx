@@ -3,8 +3,8 @@
  * Licensed under the Apache License, Version 2.0.
  */
 
-import React, { useState } from 'react';
-import { Button, Field, Input, Select, makeStyles } from '@fluentui/react-components';
+import React, { useId, useState } from 'react';
+import { Button, Checkbox, Field, Input, Select, Text, makeStyles, tokens } from '@fluentui/react-components';
 import {
   Fingerprint20Regular,
   NumberSymbol20Regular,
@@ -14,6 +14,8 @@ import {
 } from '@fluentui/react-icons';
 import type { EntryRef, SearchBy } from '../types/lookup-types';
 import { parseEntry, parseLedgerName } from '../utils/lookup-verdict';
+import { newGroup, parseAdvancedQuery, queryFilter, serializeQuery } from '../utils/advanced-query';
+import { AdvancedQueryBuilder } from './AdvancedQueryBuilder';
 
 const useStyles = makeStyles({
   form: {
@@ -26,11 +28,19 @@ const useStyles = makeStyles({
   by: { flex: '0 0 170px' },
   value: { flex: '3 1 240px' },
   submit: { marginTop: '26px' },
+  advanced: { flex: '1 1 100%', display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 },
+  preview: { fontFamily: tokens.fontFamilyMonospace, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', margin: 0 },
 });
 
 const INDEX_HINT = 'Searches the MST indexer; works only for ledgers onboarded to it.';
 
 const SEARCH_TYPES: Record<SearchBy, { label: string; placeholder: string; invalid: string; hint?: string }> = {
+  advanced: {
+    label: 'Advanced search',
+    placeholder: '',
+    invalid: 'Complete the query conditions.',
+    hint: INDEX_HINT,
+  },
   txId: {
     label: 'Transaction ID',
     placeholder: 'e.g. 1217.321066',
@@ -57,6 +67,7 @@ const SEARCH_TYPES: Record<SearchBy, { label: string; placeholder: string; inval
 };
 
 const SEARCH_ICONS: Record<SearchBy, React.ReactElement> = {
+  advanced: <Search20Regular />,
   txId: <NumberSymbol20Regular />,
   issuer: <PersonTag20Regular />,
   subject: <Tag20Regular />,
@@ -78,14 +89,43 @@ interface LookupFormProps {
  */
 export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEntry, initialTouched = false, busy, onSubmit }) => {
   const styles = useStyles();
+  const queryLabelId = useId();
+  const queryHintId = useId();
+  const queryErrorId = useId();
   const [ledger, setLedger] = useState(initialLedger);
   const [by, setBy] = useState<SearchBy>(initialEntry?.by ?? 'txId');
   const [value, setValue] = useState(initialEntry?.value ?? '');
   const [touched, setTouched] = useState(initialTouched);
+  const [advanced, setAdvanced] = useState(() => {
+    try {
+      const query = initialEntry?.by === 'advanced' ? parseAdvancedQuery(initialEntry.value) : null;
+      const root = query?.root;
+      return {
+        root: root?.kind === 'condition'
+          ? { kind: 'group' as const, match: 'all' as const, negated: false, children: [root] }
+          : root ?? newGroup(),
+        oldestFirst: query?.order === 'oldest',
+        error: '',
+      };
+    } catch (error) {
+      return { root: newGroup(), oldestFirst: false, error: error instanceof Error ? error.message : 'Invalid advanced query.' };
+    }
+  });
+  let advancedValue: string | null = null;
+  let preview = '';
+  let advancedError = advanced.error;
+  try {
+    const query = { version: 1 as const, root: advanced.root, order: advanced.oldestFirst ? 'oldest' as const : 'newest' as const };
+    advancedValue = serializeQuery(query);
+    preview = queryFilter(query);
+  } catch (error) {
+    advancedError ||= error instanceof Error ? error.message : 'Invalid advanced query.';
+  }
 
   const parsedLedger = parseLedgerName(ledger);
-  const parsedValue = parseEntry(by, value);
+  const parsedValue = by === 'advanced' ? (advancedError ? null : advancedValue) : parseEntry(by, value);
   const type = SEARCH_TYPES[by];
+  const showAdvancedError = Boolean(advancedError && (touched || advanced.error));
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -113,7 +153,7 @@ export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEn
           ))}
         </Select>
       </Field>
-      <Field
+      {by !== 'advanced' && <Field
         className={styles.value}
         label={type.label}
         hint={type.hint}
@@ -126,9 +166,34 @@ export const LookupForm: React.FC<LookupFormProps> = ({ initialLedger, initialEn
           placeholder={type.placeholder}
           contentBefore={SEARCH_ICONS[by]}
         />
-      </Field>
+      </Field>}
+      {by === 'advanced' && (
+        <div className={styles.advanced}>
+          <div
+            role="group"
+            aria-labelledby={queryLabelId}
+            aria-describedby={`${queryHintId}${showAdvancedError ? ` ${queryErrorId}` : ''}`}
+            aria-invalid={showAdvancedError}
+          >
+            <Text id={queryLabelId} weight="semibold">Advanced index query</Text>
+            <AdvancedQueryBuilder root={advanced.root} onChange={(root) => setAdvanced({ ...advanced, root, error: '' })} />
+            <Text id={queryHintId} as="p" size={200}>{INDEX_HINT}</Text>
+            {showAdvancedError && <Text id={queryErrorId} as="p" role="alert">{advancedError}</Text>}
+          </div>
+          <Field hint="Order by ledger sequence number, not signing time. Unchecked shows newest first.">
+            <Checkbox label="Oldest first" checked={advanced.oldestFirst} onChange={(_, data) => setAdvanced({ ...advanced, oldestFirst: data.checked === true })} />
+          </Field>
+          {preview && (
+            <details>
+              <summary>OData filter preview</summary>
+              <pre className={styles.preview}>{preview}</pre>
+            </details>
+          )}
+          <Text size={200}>Up to four levels of nesting. Complex queries are limited to the indexer&apos;s filter budget; results are verified only when opened.</Text>
+        </div>
+      )}
       <Button
-        className={styles.submit}
+        className={by === 'advanced' ? undefined : styles.submit}
         appearance="primary"
         type="submit"
         icon={<Search20Regular />}

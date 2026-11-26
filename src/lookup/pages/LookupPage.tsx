@@ -22,6 +22,7 @@ import { LookupForm } from '../components/LookupForm';
 import { LookupResultView } from '../components/LookupResultView';
 import { useIndexSearch, useLookupParams, useMstLookup } from '../hooks/use-mst-lookup';
 import { defaultEndpoints, LookupError } from '../services/mst-lookup-service';
+import { indexSearchOrder } from '../services/indexer-search-service';
 import { CONTROL_PLANE_HOST, IDENTITY_HOST } from '../config/endpoints';
 import type { DirectSearchBy, EntryRef, IndexSearchBy } from '../types/lookup-types';
 import { isIndexSearch } from '../utils/lookup-verdict';
@@ -139,6 +140,7 @@ const LookupPage: React.FC = () => {
         <IndexSearchResults
           ledger={ledger}
           entries={searchEntries}
+          oldestFirst={indexSearchOrder(indexEntry.by, indexEntry.value) === 'oldest'}
           hasMore={search.hasNextPage}
           loadingMore={search.isFetchingNextPage}
           onLoadMore={() => void search.fetchNextPage()}

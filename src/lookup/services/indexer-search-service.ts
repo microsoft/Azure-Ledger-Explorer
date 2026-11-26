@@ -4,6 +4,7 @@
  */
 
 import type { IndexedEntry, IndexSearchBy, IndexSearchPage } from '../types/lookup-types';
+import { parseAdvancedQuery, queryFilter } from '../utils/advanced-query';
 import {
   defaultEndpoints,
   fetchWithRetry,
@@ -15,6 +16,10 @@ import {
 /** Rows shown per page. */
 export const INDEX_PAGE_SIZE = 20;
 
+export function indexSearchOrder(by: IndexSearchBy, value: string): 'newest' | 'oldest' {
+  return by === 'advanced' && parseAdvancedQuery(value).order === 'oldest' ? 'oldest' : 'newest';
+}
+
 /**
  * The OData `$filter` for a search. Issuer and subject match substrings (the
  * indexer allows `contains` only on those two columns); a payload hash must
@@ -23,6 +28,8 @@ export const INDEX_PAGE_SIZE = 20;
 export function indexFilter(by: IndexSearchBy, value: string): string {
   const literal = `'${value.replace(/'/g, "''")}'`;
   switch (by) {
+    case 'advanced':
+      return queryFilter(parseAdvancedQuery(value));
     case 'issuer':
       return `contains(Issuer,${literal})`;
     case 'subject':
@@ -33,14 +40,14 @@ export function indexFilter(by: IndexSearchBy, value: string): string {
 }
 
 /**
- * The indexer URL for one page of a search, newest entries first.
+ * The indexer URL for one page of a search in the selected sequence order.
  *
  * Pages are keyed on sequence number rather than `$skip`: the indexer caps
  * `$skip` at 10000, and offsets shift when new entries are indexed between
  * pages, repeating rows.
  *
- * @param before - Return only entries with a lower sequence number, or `null`
- *   for the first page.
+ * @param before - Exclusive sequence cursor (lower for newest first, higher
+ *   for oldest first), or `null` for the first page.
  */
 export function indexSearchUrl(
   ledger: string,
@@ -49,10 +56,11 @@ export function indexSearchUrl(
   before: number | null,
   endpoints: LookupEndpoints = defaultEndpoints,
 ): string {
-  const filter = before === null ? indexFilter(by, value) : `${indexFilter(by, value)} and SequenceNo lt ${before}`;
+  const order = indexSearchOrder(by, value);
+  const filter = before === null ? indexFilter(by, value) : `${indexFilter(by, value)} and SequenceNo ${order === 'oldest' ? 'gt' : 'lt'} ${before}`;
   // One extra row tells whether another page exists: the indexer returns a
   // bare array, without `@odata.nextLink` or a count.
-  return entriesUrl(ledger, filter, INDEX_PAGE_SIZE + 1, endpoints);
+  return entriesUrl(ledger, filter, INDEX_PAGE_SIZE + 1, endpoints, order);
 }
 
 /**
@@ -61,10 +69,10 @@ export function indexSearchUrl(
  */
 export const SAME_SEQNO_LIMIT = 500;
 
-function entriesUrl(ledger: string, filter: string, top: number, endpoints: LookupEndpoints): string {
+function entriesUrl(ledger: string, filter: string, top: number, endpoints: LookupEndpoints, order: 'newest' | 'oldest'): string {
   const query = [
     `$filter=${encodeURIComponent(filter)}`,
-    `$orderby=${encodeURIComponent('SequenceNo desc')}`,
+    `$orderby=${encodeURIComponent(`SequenceNo ${order === 'oldest' ? 'asc' : 'desc'}`)}`,
     `$top=${top}`,
   ].join('&');
   return `${endpoints.indexerBase}/${encodeURIComponent(ledger)}/entries?${query}`;
@@ -102,28 +110,28 @@ export async function searchIndex(
   endpoints: LookupEndpoints = defaultEndpoints,
   options?: FetchOptions,
 ): Promise<IndexSearchPage> {
+  const order = indexSearchOrder(by, value);
   const rows = await fetchRows(indexSearchUrl(ledger, by, value, before, endpoints), options);
   // Decide paging from the raw rows: a row dropped as invalid still occupies
   // a slot in the indexer's page.
   if (rows.length <= INDEX_PAGE_SIZE) {
     return { entries: rows.filter(isIndexedEntry), nextBefore: null };
   }
-  // Several rows can share a sequence number. Hold back those at the lowest
-  // sequence number fetched so the next page, which starts below a sequence
-  // number, gets them all.
+  // Hold back rows at the trailing sequence boundary so the next page
+  // includes that whole sequence, in either direction.
   const seqNos = rows.map(sequenceNoOf).filter((n): n is number => n !== null);
   if (seqNos.length === 0) {
     throw new LookupError('malformed', 'search', 'The ledger index returned entries without sequence numbers.');
   }
-  const boundary = Math.min(...seqNos);
+  const boundary = order === 'oldest' ? Math.max(...seqNos) : Math.min(...seqNos);
   const complete = rows.filter((r) => sequenceNoOf(r) !== boundary).filter(isIndexedEntry);
   if (rows.some((r) => sequenceNoOf(r) !== boundary)) {
-    return { entries: complete, nextBefore: boundary + 1 };
+    return { entries: complete, nextBefore: boundary + (order === 'oldest' ? -1 : 1) };
   }
   // Every row fetched shares one sequence number: fetch all of them, then
-  // continue below it.
+  // continue past it in the selected direction.
   const filter = `${indexFilter(by, value)} and SequenceNo eq ${boundary}`;
-  const all = await fetchRows(entriesUrl(ledger, filter, SAME_SEQNO_LIMIT, endpoints), options);
+  const all = await fetchRows(entriesUrl(ledger, filter, SAME_SEQNO_LIMIT, endpoints, order), options);
   return { entries: all.filter(isIndexedEntry), nextBefore: boundary };
 }
 

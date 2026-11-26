@@ -32,6 +32,8 @@ const useStyles = makeStyles({
   mono: { fontFamily: tokens.fontFamilyMonospace, wordBreak: 'break-all' },
   wrap: { wordBreak: 'break-all' },
   muted: { color: tokens.colorNeutralForeground3 },
+  tableScroll: { overflowX: 'auto', minWidth: 0 },
+  table: { minWidth: '600px' },
 });
 
 interface IndexSearchResultsProps {
@@ -39,6 +41,7 @@ interface IndexSearchResultsProps {
   entries: IndexedEntry[];
   hasMore: boolean;
   loadingMore: boolean;
+  oldestFirst?: boolean;
   onLoadMore: () => void;
   onOpen: (txId: string) => void;
 }
@@ -58,6 +61,7 @@ export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
   entries,
   hasMore,
   loadingMore,
+  oldestFirst = false,
   onLoadMore,
   onOpen,
 }) => {
@@ -76,12 +80,13 @@ export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
     <div className={styles.root}>
       <div className={styles.intro}>
         <Text className={styles.muted}>
-          Matches from the ledger index, newest first. They are not verified: open an entry to fetch it
+          Matches from the ledger index, {oldestFirst ? 'oldest' : 'newest'} first. They are not verified: open an entry to fetch it
           from the ledger and verify it.
         </Text>
         <CopyButton link value={() => window.location.href} what="link to this search" />
       </div>
-      <Table size="small" aria-label="Indexed entries">
+      <div className={styles.tableScroll} tabIndex={0} role="region" aria-label="Scrollable indexed entries">
+      <Table className={styles.table} size="small" aria-label="Indexed entries">
         <TableHeader>
           <TableRow>
             <TableHeaderCell className={styles.tx}>Transaction</TableHeaderCell>
@@ -119,6 +124,7 @@ export const IndexSearchResults: React.FC<IndexSearchResultsProps> = ({
           ))}
         </TableBody>
       </Table>
+      </div>
       {hasMore && (
         <div>
           <Button onClick={onLoadMore} disabled={loadingMore}>
